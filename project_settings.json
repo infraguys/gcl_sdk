@@ -1,0 +1,17 @@
+{
+    "project": {
+        "name": "gcl_sdk",
+        "package_name": "gcl_sdk",
+        "description": "The Genesis Core SDK",
+        "summary": "The Genesis Core SDK"
+    },
+    "author": {
+        "name": "Genesis Corporation",
+        "email": "eugene@frolov.net.ru"
+    },
+    "template_info": {
+        "name": "py_element",
+        "version": "1.0.0",
+        "template_file_name": "py_element.settings.json"
+    }
+}
