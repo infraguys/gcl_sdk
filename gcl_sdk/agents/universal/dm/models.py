@@ -1,0 +1,373 @@
+#    Copyright 2025 Genesis Corporation.
+#
+#    All Rights Reserved.
+#
+#    Licensed under the Apache License, Version 2.0 (the "License"); you may
+#    not use this file except in compliance with the License. You may obtain
+#    a copy of the License at
+#
+#         http://www.apache.org/licenses/LICENSE-2.0
+#
+#    Unless required by applicable law or agreed to in writing, software
+#    distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+#    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+#    License for the specific language governing permissions and limitations
+#    under the License.
+from __future__ import annotations
+
+import os
+import json
+import logging
+import hashlib
+import datetime
+import typing as tp
+import uuid as sys_uuid
+
+from restalchemy.dm import models
+from restalchemy.dm import properties
+from restalchemy.dm import filters as dm_filters
+from restalchemy.dm import types
+from restalchemy.storage.sql import orm
+
+from gcl_sdk.agents.universal import utils
+from gcl_sdk.agents.universal import constants as c
+
+
+LOG = logging.getLogger(__name__)
+
+
+class Payload(models.Model, models.SimpleViewMixin):
+    capabilities = properties.property(types.Dict(), default=dict)
+    facts = properties.property(types.Dict(), default=dict)
+    hash = properties.property(types.String(max_length=256), default="")
+    version = properties.property(
+        types.Integer(min_value=0), default=0, required=True
+    )
+
+    def __hash__(self):
+        return hash((self.hash, self.version))
+
+    def __eq__(self, other: Payload) -> bool:
+        return self.__hash__() == other.__hash__()
+
+    def calculate_hash(
+        self, hash_method: tp.Callable[[str | bytes], str] = hashlib.sha256
+    ) -> None:
+        m = hash_method()
+        resources = self.resources()
+        resources.sort(key=lambda r: r.full_hash)
+        hashes = [r.full_hash for r in resources]
+        m.update(
+            json.dumps(hashes, separators=(",", ":"), sort_keys=True).encode(
+                "utf-8"
+            )
+        )
+        self.hash = m.hexdigest()
+
+    def resources(self) -> list[Resource]:
+        """Lists all resources by in the payload."""
+        return self.caps_resources() + self.facts_resources()
+
+    def caps_resources(self, capability: str | None = None) -> list[Resource]:
+        """
+        Lists all resources by capability or all resources if capability is None.
+        """
+        return self._resources(self.capabilities, capability)
+
+    def add_caps_resource(
+        self, resource: Resource, skip_fields: tuple[str, ...] = tuple()
+    ) -> None:
+        """Add a resource to the capabilities basket."""
+        self._add_resource(self.capabilities, resource, skip_fields)
+
+    def add_caps_resources(
+        self, resources: list[Resource], skip_fields: tuple[str, ...] = tuple()
+    ) -> None:
+        """Add resources to the capabilities basket."""
+        self._add_resources(self.capabilities, resources, skip_fields)
+
+    def facts_resources(self, fact: str | None = None) -> list[Resource]:
+        """
+        Lists all resources by fact or all resources if fact is None.
+        """
+        return self._resources(self.facts, fact)
+
+    def add_facts_resource(
+        self, resource: Resource, skip_fields: tuple[str, ...] = tuple()
+    ) -> None:
+        """Add a resource to the facts basket."""
+        self._add_resource(self.facts, resource, skip_fields)
+
+    def add_facts_resources(
+        self, resources: list[Resource], skip_fields: tuple[str, ...] = tuple()
+    ) -> None:
+        """Add resources to the facts basket."""
+        self._add_resources(self.facts, resources, skip_fields)
+
+    def save(self, payload_path: str) -> None:
+        """Save the payload from the data plane."""
+        self.calculate_hash()
+
+        # Create missing directories
+        payload_dir = os.path.dirname(payload_path)
+        if not os.path.exists(payload_dir):
+            os.makedirs(payload_dir)
+
+        with open(payload_path, "w") as f:
+            payload_data = self.dump_to_simple_view()
+            json.dump(payload_data, f, indent=2)
+
+    @classmethod
+    def _resources(
+        cls, source: dict, res_filter: str | None = None
+    ) -> list[Resource]:
+        """
+        Lists all resources by capability/fact or all resources in the basket.
+        """
+        #  Lists all resources by capability
+        if res_filter is not None:
+            try:
+                data = source[res_filter]["resources"]
+            except KeyError:
+                return []
+
+            return [Resource.restore_from_simple_view(**r) for r in data]
+
+        # Lists all resources
+        resources = []
+        for res_filter in source:
+            resources.extend(cls._resources(source, res_filter))
+
+        return resources
+
+    @classmethod
+    def _add_resource(
+        cls,
+        dest: dict,
+        resource: Resource,
+        skip_fields: tuple[str, ...] = tuple(),
+    ) -> None:
+        try:
+            dest[resource.kind]["resources"].append(
+                resource.dump_to_simple_view(skip=skip_fields)
+            )
+        except KeyError:
+            dest[resource.kind] = {
+                "resources": [resource.dump_to_simple_view(skip=skip_fields)]
+            }
+
+    @classmethod
+    def _add_resources(
+        cls,
+        dest: dict,
+        resources: list[Resource],
+        skip_fields: tuple[str, ...] = tuple(),
+    ) -> None:
+        for resource in resources:
+            cls._add_resource(dest, resource, skip_fields)
+
+    @classmethod
+    def empty(cls):
+        return cls()
+
+    @classmethod
+    def load(cls, payload_path: str) -> Payload:
+        """Load the saved payload from the file."""
+        if not os.path.exists(payload_path):
+            return cls.empty()
+
+        # Load base from the payload file
+        with open(payload_path) as f:
+            payload_data = json.load(f)
+            payload: Payload = Payload.restore_from_simple_view(**payload_data)
+
+        return payload
+
+
+class UniversalAgent(
+    models.ModelWithRequiredUUID,
+    models.ModelWithRequiredNameDesc,
+    models.ModelWithTimestamp,
+    models.SimpleViewMixin,
+    orm.SQLStorableMixin,
+):
+    __tablename__ = "ua_agents"
+
+    capabilities = properties.property(types.Dict(), default=dict)
+    facts = properties.property(types.Dict(), default=dict)
+    node = properties.property(types.UUID(), required=True)
+    status = properties.property(
+        types.Enum([s.value for s in c.AgentStatus]),
+        default=c.AgentStatus.NEW.value,
+    )
+
+    @property
+    def list_capabilities(self) -> list[str]:
+        return self.capabilities["capabilities"]
+
+    @property
+    def list_facts(self) -> list[str]:
+        return self.facts["facts"]
+
+    @classmethod
+    def from_system_uuid(
+        cls, capabilities: tp.Iterable[str], facts: tp.Iterable[str]
+    ):
+        uuid = utils.system_uuid()
+        capabilities = {"capabilities": list(capabilities)}
+        facts = {"facts": list(facts)}
+        return cls(
+            uuid=uuid,
+            name=f"Universal Agent {str(uuid)[:8]}",
+            status=c.AgentStatus.ACTIVE.value,
+            capabilities=capabilities,
+            facts=facts,
+            # Actually it's won't be true for some cases. For instance,
+            # baremetal nodes added by hands. We dont' have such cases
+            # so keep it simple so far.
+            node=uuid,
+        )
+
+    def get_payload(self, hash: str = "", version: int = 0) -> Payload:
+        # Calculate hash of the target resources
+        caps_resources = TargetResource.objects.get_all(
+            filters={
+                "agent": dm_filters.EQ(str(self.uuid)),
+                "kind": dm_filters.In(self.list_capabilities),
+            }
+        )
+        facts_resources = Resource.objects.get_all(
+            filters={
+                "node": dm_filters.EQ(str(self.node)),
+            }
+        )
+
+        payload = Payload.empty()
+
+        payload.add_caps_resources(
+            caps_resources,
+            skip_fields=("agent", "master", "tracked_at", "node"),
+        )
+        payload.add_facts_resources(
+            facts_resources,
+            skip_fields=("node",),
+        )
+        payload.calculate_hash()
+
+        # TODO(akremenetsky): Add support for versions
+        if payload.hash == hash:
+            # Return the empty payload with the same hash and version.
+            # That means the local value of the agent is correct.
+            return Payload(hash=hash, version=version)
+
+        # Fill the payload with data for capabilities with empty resources.
+        # Seems all resources for these capabilities were deleted.
+        for capability in self.list_capabilities:
+            payload.capabilities.setdefault(capability, {"resources": []})
+
+            # All gathered resources for capabilities are consideredas facts too.
+            payload.facts.setdefault(capability, {"resources": []})
+
+        for fact in self.list_facts:
+            payload.facts.setdefault(fact, {"resources": []})
+
+        LOG.debug(
+            "Target and agents payloads are different. Agent %s", self.uuid
+        )
+        return payload
+
+
+class Resource(
+    models.ModelWithRequiredUUID, models.SimpleViewMixin, orm.SQLStorableMixin
+):
+    __tablename__ = "ua_actual_resources"
+
+    kind = properties.property(types.String(max_length=64), required=True)
+    value = properties.property(types.Dict())
+    hash = properties.property(types.String(max_length=256), default="")
+    full_hash = properties.property(types.String(max_length=256), default="")
+    status = properties.property(types.String(max_length=32), default="ACTIVE")
+    node = properties.property(types.AllowNone(types.UUID()), default=None)
+
+    def eq_hash(self, other: "Resource") -> bool:
+        return self.hash == other.hash and self.full_hash == other.full_hash
+
+    def calculate_hash(self) -> None:
+        self.hash = utils.calculate_hash(self.value)
+
+    def calculate_full_hash(self) -> None:
+        self.full_hash = utils.calculate_hash(self.value)
+
+
+class TargetResource(Resource):
+    __tablename__ = "ua_target_resources"
+
+    agent = properties.property(types.AllowNone(types.UUID()), default=None)
+    master = properties.property(types.AllowNone(types.UUID()), default=None)
+    tracked_at = properties.property(
+        types.UTCDateTimeZ(),
+        default=lambda: datetime.datetime.now(datetime.timezone.utc),
+    )
+
+
+class ResourceMixin(models.SimpleViewMixin):
+
+    def get_resource_uuid(self) -> str:
+        return self.uuid
+
+    def get_resource_target_fields(self) -> list[str]:
+        """TODO: what is target fields?"""
+        return []
+
+    def get_resource_ignore_fields(self) -> list[str]:
+        """TODO: what is ignore fields?"""
+        return []
+
+    def to_ua_resource(self, kind: str) -> Resource:
+        # It's considered as a data plane values
+        value = self.dump_to_simple_view(
+            skip=self.get_resource_ignore_fields()
+        )
+
+        # Need to get only target fields with values to calculate hash
+        target_fields = self.get_resource_target_fields()
+
+        if target_fields:
+            target_data = {
+                k: v for k, v in value.items() if k in target_fields
+            }
+        else:
+            target_data = value
+
+        return Resource(
+            uuid=self.get_resource_uuid(),
+            kind=kind,
+            value=value,
+            hash=utils.calculate_hash(target_data),
+            full_hash=utils.calculate_hash(value),
+        )
+
+    @classmethod
+    def from_ua_resource(cls, resource: Resource) -> "ResourceMixin":
+        return cls.restore_from_simple_view(**resource.value)
+
+
+class TargetResourceMixin(ResourceMixin):
+    def to_ua_resource(
+        self,
+        kind: str,
+        master: sys_uuid.UUID | None = None,
+        tracked_at: datetime.datetime | None = None,
+    ) -> TargetResource:
+        resource = super().to_ua_resource(kind)
+        tracked_at = tracked_at or datetime.datetime.now(datetime.timezone.utc)
+
+        return TargetResource(
+            uuid=resource.uuid,
+            kind=resource.kind,
+            value=resource.value,
+            hash=resource.hash,
+            full_hash="",
+            master=master,
+            tracked_at=tracked_at,
+        )
