@@ -13,28 +13,14 @@
 #    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 #    License for the specific language governing permissions and limitations
 #    under the License.
+from __future__ import annotations
 
-import typing as tp
-import importlib_metadata
-
-
-EVENT_PAYLOADS_GROUP = "gcl_sdk_event_payloads"
+import uuid as sys_uuid
 
 
-def load_event_payload_map() -> dict:
-    event_payload_map = {
-        ep.name: ep.load()
-        for ep in importlib_metadata.entry_points(
-            group=EVENT_PAYLOADS_GROUP,
-        )
-    }
-    return event_payload_map
-
-
-def load_from_entry_point(group: str, name: str) -> tp.Any:
-    """Load class from entry points."""
-    for ep in importlib_metadata.entry_points(group=group):
-        if ep.name == name:
-            return ep.load()
-
-    raise RuntimeError(f"No class '{name}' found in entry points {group}")
+def system_uuid(
+    system_uuid_path: str = "/sys/class/dmi/id/product_uuid",
+) -> sys_uuid.UUID:
+    """Return system uuid"""
+    with open(system_uuid_path) as f:
+        return sys_uuid.UUID(f.read().strip())
