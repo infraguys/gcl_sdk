@@ -14,27 +14,18 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-import typing as tp
-import importlib_metadata
+from restalchemy.api import routes
+
+from gcl_sdk.agents.universal.status_api import controllers
 
 
-EVENT_PAYLOADS_GROUP = "gcl_sdk_event_payloads"
+class ResourcesRoute(routes.Route):
+    """Handler for /v1/resources/ endpoint"""
+
+    __controller__ = controllers.ResourcesController
 
 
-def load_event_payload_map() -> dict:
-    event_payload_map = {
-        ep.name: ep.load()
-        for ep in importlib_metadata.entry_points(
-            group=EVENT_PAYLOADS_GROUP,
-        )
-    }
-    return event_payload_map
+class UniversalAgentsRoute(routes.Route):
+    """Handler for /v1/agents/ endpoint"""
 
-
-def load_from_entry_point(group: str, name: str) -> tp.Any:
-    """Load class from entry points."""
-    for ep in importlib_metadata.entry_points(group=group):
-        if ep.name == name:
-            return ep.load()
-
-    raise RuntimeError(f"No class '{name}' found in entry points {group}")
+    __controller__ = controllers.UniversalAgentsController
