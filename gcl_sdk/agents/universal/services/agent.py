@@ -153,7 +153,7 @@ class UniversalAgentService(looper_basic.BasicService):
             actual_resource = actual_resources[r]
 
             # Nothing to do if the resources are the same
-            if target_resource.eq_hash(actual_resource):
+            if target_resource.hash == actual_resource.hash:
                 collected_resources.append(actual_resource)
                 continue
 
@@ -201,8 +201,14 @@ class UniversalAgentService(looper_basic.BasicService):
             if target_resource["full_hash"] == actual_resource["full_hash"]:
                 continue
 
+            # Remove read-only fields
+            resource = target_resource.copy()
+            resource.pop("created_at", None)
+            resource.pop("updated_at", None)
+            resource.pop("node", None)
+
             try:
-                self._status_api.resources.update(**target_resource)
+                self._status_api.resources.update(**resource)
             except Exception:
                 LOG.exception("Error updating resource %s", uuid)
 

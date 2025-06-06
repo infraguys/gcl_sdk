@@ -65,12 +65,22 @@ class MigrationStep(migrations.AbstarctMigrationStep):
                 "status" varchar(32) NOT NULL,
                 "node" UUID DEFAULT NULL,
                 "hash" varchar(256) NOT NULL,
-                "full_hash" varchar(256) NOT NULL
+                "full_hash" varchar(256) NOT NULL,
+                "created_at" timestamp NOT NULL DEFAULT current_timestamp,
+                "updated_at" timestamp NOT NULL DEFAULT current_timestamp
             );
             """,
             """
             CREATE INDEX IF NOT EXISTS ua_actual_resources_node_id_idx
                 ON ua_actual_resources (node);
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS ua_actual_resources_kind_id_idx
+                ON ua_actual_resources (kind);
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS ua_actual_resources_full_hash_id_idx
+                ON ua_actual_resources (full_hash);
             """,
             """
             CREATE TABLE IF NOT EXISTS ua_target_resources (
@@ -83,7 +93,9 @@ class MigrationStep(migrations.AbstarctMigrationStep):
                 "node" UUID DEFAULT NULL,
                 "agent" UUID references ua_agents(uuid) ON DELETE CASCADE,
                 "master" UUID references ua_target_resources(uuid) ON DELETE CASCADE DEFAULT NULL,
-                "tracked_at" timestamp NOT NULL DEFAULT current_timestamp
+                "tracked_at" timestamp NOT NULL DEFAULT current_timestamp,
+                "created_at" timestamp NOT NULL DEFAULT current_timestamp,
+                "updated_at" timestamp NOT NULL DEFAULT current_timestamp
             );
             """,
             """
@@ -97,6 +109,17 @@ class MigrationStep(migrations.AbstarctMigrationStep):
             """
             CREATE INDEX IF NOT EXISTS ua_target_resources_kind_id_idx
                 ON ua_target_resources (kind);
+            """,
+            """
+            CREATE OR REPLACE VIEW outdated_resources AS
+                SELECT
+                    ua_target_resources.uuid as uuid,
+                    ua_target_resources.kind as kind,
+                    ua_target_resources.uuid as target_resource,
+                    ua_actual_resources.uuid as actual_resource
+                FROM ua_target_resources INNER JOIN ua_actual_resources ON 
+                    ua_target_resources.uuid = ua_actual_resources.uuid
+                WHERE ua_target_resources.full_hash != ua_actual_resources.full_hash;
             """,
         ]
 
@@ -114,6 +137,13 @@ class MigrationStep(migrations.AbstarctMigrationStep):
             "ua_actual_resources",
             "ua_agents",
         ]
+
+        views = [
+            "outdated_resources",
+        ]
+
+        for view_name in views:
+            self._delete_view_if_exists(session, view_name)
 
         for table_name in tables:
             self._delete_table_if_exists(session, table_name)

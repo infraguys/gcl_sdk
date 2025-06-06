@@ -25,6 +25,7 @@ import uuid as sys_uuid
 
 from restalchemy.dm import models
 from restalchemy.dm import properties
+from restalchemy.dm import relationships
 from restalchemy.dm import filters as dm_filters
 from restalchemy.dm import types
 from restalchemy.storage.sql import orm
@@ -54,9 +55,12 @@ class Payload(models.Model, models.SimpleViewMixin):
         self, hash_method: tp.Callable[[str | bytes], str] = hashlib.sha256
     ) -> None:
         m = hash_method()
-        resources = self.resources()
-        resources.sort(key=lambda r: r.full_hash)
-        hashes = [r.full_hash for r in resources]
+        caps_resources = self.caps_resources()
+        facts_resources = self.facts_resources()
+        caps_resources.sort(key=lambda r: r.hash)
+        facts_resources.sort(key=lambda r: r.full_hash)
+        hashes = [r.hash for r in caps_resources]
+        hashes.extend([r.full_hash for r in facts_resources])
         m.update(
             json.dumps(hashes, separators=(",", ":"), sort_keys=True).encode(
                 "utf-8"
@@ -278,7 +282,10 @@ class UniversalAgent(
 
 
 class Resource(
-    models.ModelWithRequiredUUID, models.SimpleViewMixin, orm.SQLStorableMixin
+    models.ModelWithRequiredUUID,
+    models.ModelWithTimestamp,
+    models.SimpleViewMixin,
+    orm.SQLStorableMixin,
 ):
     __tablename__ = "ua_actual_resources"
 
@@ -288,9 +295,6 @@ class Resource(
     full_hash = properties.property(types.String(max_length=256), default="")
     status = properties.property(types.String(max_length=32), default="ACTIVE")
     node = properties.property(types.AllowNone(types.UUID()), default=None)
-
-    def eq_hash(self, other: "Resource") -> bool:
-        return self.hash == other.hash and self.full_hash == other.full_hash
 
     def calculate_hash(self) -> None:
         self.hash = utils.calculate_hash(self.value)
@@ -371,3 +375,19 @@ class TargetResourceMixin(ResourceMixin):
             master=master,
             tracked_at=tracked_at,
         )
+
+
+class OutdatedResource(models.ModelWithUUID, orm.SQLStorableMixin):
+    __tablename__ = "outdated_resources"
+
+    kind = properties.property(types.String(max_length=64), required=True)
+    target_resource = relationships.relationship(
+        TargetResource,
+        prefetch=True,
+        required=True,
+    )
+    actual_resource = relationships.relationship(
+        Resource,
+        prefetch=True,
+        required=True,
+    )
