@@ -18,16 +18,6 @@ from izulu import root
 from gcl_sdk.agents.universal.dm import models
 
 
-class AgentDriverException(root.Error):
+class UniversalAgentException(root.Error):
     __toggles__ = root.Toggles.DEFAULT ^ root.Toggles.FORBID_UNANNOTATED_FIELDS
     __template__ = "An unknown exception occurred."
-
-
-class ResourceAlreadyExists(AgentDriverException):
-    __template__ = "The resource already exists: {resource}"
-    resource: models.Resource
-
-
-class ResourceNotFound(AgentDriverException):
-    __template__ = "The resource not found: {resource}"
-    resource: models.Resource

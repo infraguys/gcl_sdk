@@ -13,14 +13,12 @@
 #    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 #    License for the specific language governing permissions and limitations
 #    under the License.
-import datetime
 import uuid as sys_uuid
 
 import bazooka
 
 from gcl_sdk.agents.universal.dm import models
-from gcl_sdk.agents.universal.clients import base
-from gcl_sdk.agents.universal import constants as c
+from gcl_sdk.agents.universal.clients.http import base
 
 
 class UniversalAgentsClient(base.CollectionBaseModelClient):

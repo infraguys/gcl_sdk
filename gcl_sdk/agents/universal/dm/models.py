@@ -302,6 +302,57 @@ class Resource(
     def calculate_full_hash(self) -> None:
         self.full_hash = utils.calculate_hash(self.value)
 
+    def replace_value(
+        self,
+        value: dict[str, tp.Any],
+        target_fields: frozenset[str] | None = None,
+        extract_status: bool = True,
+    ) -> Resource:
+        """Return a new resource with replaced value and hashes."""
+        if target_fields is None:
+            hash = self.hash
+        else:
+            hash = utils.calculate_hash({k: value[k] for k in target_fields})
+
+        if extract_status:
+            status = value.get("status", self.status)
+        else:
+            status = self.status
+
+        return Resource(
+            uuid=self.uuid,
+            kind=self.kind,
+            value=value,
+            hash=hash,
+            full_hash=utils.calculate_hash(value),
+            status=status,
+            node=self.node,
+        )
+
+    @classmethod
+    def from_value(
+        cls,
+        value: dict[str, tp.Any],
+        kind: str,
+        target_fields: frozenset[str] | None = None,
+    ) -> Resource:
+        status = value.get("status", "ACTIVE")
+        uuid = sys_uuid.UUID(value["uuid"])
+
+        if target_fields is None:
+            hash = ""
+        else:
+            hash = utils.calculate_hash({k: value[k] for k in target_fields})
+
+        return cls(
+            uuid=uuid,
+            kind=kind,
+            value=value,
+            hash=hash,
+            full_hash=utils.calculate_hash(value),
+            status=status,
+        )
+
 
 class TargetResource(Resource):
     __tablename__ = "ua_target_resources"

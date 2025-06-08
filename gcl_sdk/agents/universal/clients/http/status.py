@@ -16,8 +16,7 @@
 import bazooka
 
 from gcl_sdk.agents.universal.dm import models
-from gcl_sdk.agents.universal.clients import base
-from gcl_sdk.agents.universal import constants as c
+from gcl_sdk.agents.universal.clients.http import base
 
 
 class UniversalAgentsClient(base.CollectionBaseModelClient):

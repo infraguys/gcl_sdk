@@ -17,6 +17,7 @@
 import logging
 import sys
 import typing as tp
+import configparser
 
 import bazooka
 from oslo_config import cfg
@@ -24,10 +25,10 @@ from oslo_config import cfg
 from gcl_sdk.common import config
 from gcl_sdk.common import log as infra_log
 from gcl_sdk.common import utils
-from gcl_sdk.agents.universal.clients import orch
-from gcl_sdk.agents.universal.clients import status
+from gcl_sdk.agents.universal.clients.http import orch
+from gcl_sdk.agents.universal.clients.http import status
 from gcl_sdk.agents.universal.services import agent
-from gcl_sdk.agents.universal import driver as driver_base
+from gcl_sdk.agents.universal.driver import base as driver_base
 from gcl_sdk.agents.universal import constants as c
 
 
@@ -66,10 +67,20 @@ def load_driver(
         driver_base.AbstractCapabilityDriver | driver_base.AbstractFactDriver
     ],
 ) -> driver_base.AbstractCapabilityDriver | driver_base.AbstractFactDriver:
-    try:
-        return class_(**CONF[class_.__name__])
-    except cfg.NoSuchOptError:
+    parser = configparser.ConfigParser()
+    parser.read(cfg.CONF.config_file)
+
+    if not parser.has_section(class_.__name__):
         return class_()
+
+    params = {}
+    for option in parser.options(class_.__name__):
+        if option in parser.defaults():
+            continue
+
+        params[option] = parser.get(class_.__name__, option)
+
+    return class_(**params)
 
 
 def main():

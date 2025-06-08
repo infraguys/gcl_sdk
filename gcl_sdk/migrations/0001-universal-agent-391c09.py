@@ -87,7 +87,7 @@ class MigrationStep(migrations.AbstarctMigrationStep):
                 "uuid" UUID NOT NULL PRIMARY KEY,
                 "kind" varchar(64) NOT NULL,
                 "value" JSONB NOT NULL,
-                "status" varchar(32) NOT NULL,
+                "status" varchar(32) NOT NULL DEFAULT 'ACTIVE',
                 "hash" varchar(256) NOT NULL,
                 "full_hash" varchar(256) NOT NULL,
                 "node" UUID DEFAULT NULL,
