@@ -18,11 +18,11 @@ from __future__ import annotations
 import os
 import json
 import logging
-import hashlib
 import datetime
 import typing as tp
 import uuid as sys_uuid
 
+import xxhash
 from restalchemy.dm import models
 from restalchemy.dm import properties
 from restalchemy.dm import relationships
@@ -52,7 +52,7 @@ class Payload(models.Model, models.SimpleViewMixin):
         return self.__hash__() == other.__hash__()
 
     def calculate_hash(
-        self, hash_method: tp.Callable[[str | bytes], str] = hashlib.sha256
+        self, hash_method: tp.Callable[[str | bytes], str] = xxhash.xxh3_64
     ) -> None:
         m = hash_method()
         caps_resources = self.caps_resources()

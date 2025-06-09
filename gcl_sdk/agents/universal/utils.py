@@ -16,7 +16,7 @@
 from __future__ import annotations
 
 import json
-import hashlib
+import xxhash
 import typing as tp
 import uuid as sys_uuid
 
@@ -37,7 +37,7 @@ def node_uuid() -> sys_uuid.UUID:
 
 
 def calculate_hash(
-    value: dict, hash_method: tp.Callable[[str], str] = hashlib.sha256
+    value: dict, hash_method: tp.Callable[[str], str] = xxhash.xxh3_64
 ) -> str:
     m = hash_method()
     m.update(
