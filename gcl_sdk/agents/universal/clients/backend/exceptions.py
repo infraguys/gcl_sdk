@@ -29,3 +29,8 @@ class ResourceAlreadyExists(BackendClientException):
 class ResourceNotFound(BackendClientException):
     __template__ = "The resource not found: {resource}"
     resource: models.Resource
+
+
+class ResourceProjectMismatch(BackendClientException):
+    __template__ = "The resource project mismatch: {resource}"
+    resource: models.Resource

@@ -28,7 +28,7 @@ from gcl_sdk.common import utils
 from gcl_sdk.agents.universal.clients.http import orch
 from gcl_sdk.agents.universal.clients.http import status
 from gcl_sdk.agents.universal.services import agent
-from gcl_sdk.agents.universal.driver import base as driver_base
+from gcl_sdk.agents.universal.drivers import base as driver_base
 from gcl_sdk.agents.universal import constants as c
 
 

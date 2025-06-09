@@ -24,8 +24,8 @@ from restalchemy.dm import properties
 from restalchemy.dm import types
 from restalchemy.dm import models as ra_models
 
-from gcl_sdk.agents.universal.driver import base
-from gcl_sdk.agents.universal.driver import exceptions as driver_exc
+from gcl_sdk.agents.universal.drivers import base
+from gcl_sdk.agents.universal.drivers import exceptions as driver_exc
 from gcl_sdk.agents.universal.dm import models
 
 

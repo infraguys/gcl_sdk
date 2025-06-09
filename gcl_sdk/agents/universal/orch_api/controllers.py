@@ -25,7 +25,7 @@ class OrchUniversalAgent(models.UniversalAgent):
 
 
 class UniversalAgentsController(controllers.BaseResourceController):
-    """Controller for /v1/orch_agents/ endpoint"""
+    """Controller for /v1/agents/ endpoint"""
 
     __resource__ = resources.ResourceByRAModel(
         model_class=OrchUniversalAgent,

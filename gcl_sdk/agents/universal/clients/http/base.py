@@ -13,6 +13,7 @@
 #    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 #    License for the specific language governing permissions and limitations
 #    under the License.
+import abc
 import typing as tp
 import uuid as sys_uuid
 import http as httplib
@@ -23,96 +24,18 @@ from bazooka import exceptions as bazooka_exc
 from restalchemy.dm import models
 
 
-# class CollectionBaseClient:
-#     ACTIONS_KEY = "actions"
-#     INVOKE_KEY = "invoke"
+class AbstractAuthenticator(abc.ABC):
 
-#     def __init__(
-#         self,
-#         base_url: str,
-#         http_client: bazooka.Client | None = None,
-#     ) -> None:
-#         self._http_client = http_client or bazooka.Client()
-#         self._base_url = base_url
-
-#     def _collection_url(self, collection: str):
-#         if not self._base_url.endswith("/") and not collection.startswith("/"):
-#             return self._base_url + "/" + collection
-#         return self._base_url + collection
-
-#     def resource_url(self, collection: str, uuid: sys_uuid.UUID):
-#         return urljoin(self._collection_url(collection), str(uuid))
-
-#     def get(self, collection: str, uuid: sys_uuid.UUID) -> dict[str : tp.Any]:
-#         url = self.resource_url(collection, uuid)
-#         resp = self._http_client.get(url)
-#         return resp.json()
-
-#     def filter(
-#         self, collection: str, **filters: tp.Dict[str, tp.Any]
-#     ) -> list[dict[str : tp.Any]]:
-#         resp = self._http_client.get(
-#             self._collection_url(collection), params=filters
-#         )
-#         return resp.json()
-
-#     def create(
-#         self, collection: str, data: dict[str : tp.Any]
-#     ) -> dict[str : tp.Any]:
-#         resp = self._http_client.post(
-#             self._collection_url(collection), json=data
-#         )
-#         return resp.json()
-
-#     def update(
-#         self,
-#         collection: str,
-#         uuid: sys_uuid.UUID,
-#         **params: tp.Dict[str, tp.Any]
-#     ) -> dict[str : tp.Any]:
-#         url = self.resource_url(collection, uuid)
-#         resp = self._http_client.put(url, json=params)
-#         return resp.json()
-
-#     def delete(self, collection: str, uuid: sys_uuid.UUID) -> None:
-#         url = self.resource_url(collection, uuid)
-#         self._http_client.delete(url)
-
-#     def do_action(
-#         self,
-#         collection: str,
-#         name: str,
-#         uuid: sys_uuid.UUID,
-#         invoke: bool = False,
-#         **kwargs
-#     ) -> dict[str : tp.Any] | None:
-#         url = self.resource_url(collection, uuid) + "/"
-#         action_url = urljoin(urljoin(url, self.ACTIONS_KEY) + "/", name)
-
-#         if invoke:
-#             action_url = urljoin(action_url + "/", self.INVOKE_KEY)
-#             resp = self._http_client.post(action_url, json=kwargs)
-#         else:
-#             resp = self._http_client.get(action_url, params=kwargs)
-
-#         # Try to convert response to json
-#         resp.raise_for_status()
-#         try:
-#             return resp.json()
-#         except bazooka_exc.BaseHTTPException:
-#             return None
-
-
-class AbstractAuthenticator:
-
+    @abc.abstractmethod
     def authenticate(self) -> None:
-        raise NotImplementedError()
+        """Authenticate the client."""
 
+    @abc.abstractmethod
     def get_auth_header(self) -> dict[str, str]:
-        raise NotImplementedError()
+        """Get the authentication header."""
 
 
-class CoreIamAuthenticator:
+class CoreIamAuthenticator(AbstractAuthenticator):
     DEFAULT_CLIENT_UUID = sys_uuid.UUID("00000000-0000-0000-0000-000000000000")
 
     def __init__(

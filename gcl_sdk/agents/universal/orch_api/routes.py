@@ -20,13 +20,13 @@ from gcl_sdk.agents.universal.orch_api import controllers
 
 
 class UniversalAgentsGetPayloadAction(routes.Action):
-    """Handler for /v1/orch_agents/<uuid>/actions/get_payload endpoint"""
+    """Handler for /v1/agents/<uuid>/actions/get_payload endpoint"""
 
     __controller__ = controllers.UniversalAgentsController
 
 
 class UniversalAgentsRoute(routes.Route):
-    """Handler for /v1/orch_agents/ endpoint"""
+    """Handler for /v1/agents/ endpoint"""
 
     __controller__ = controllers.UniversalAgentsController
 

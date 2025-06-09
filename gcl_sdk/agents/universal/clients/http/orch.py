@@ -22,7 +22,7 @@ from gcl_sdk.agents.universal.clients.http import base
 
 
 class UniversalAgentsClient(base.CollectionBaseModelClient):
-    __collection_url__ = "/v1/orch_agents/"
+    __collection_url__ = "/v1/agents/"
     __model__ = models.UniversalAgent
 
     def get_payload(
