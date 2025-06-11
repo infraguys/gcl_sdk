@@ -19,6 +19,7 @@ import os
 import json
 import logging
 import datetime
+import collections
 import typing as tp
 import uuid as sys_uuid
 
@@ -28,6 +29,8 @@ from restalchemy.dm import properties
 from restalchemy.dm import relationships
 from restalchemy.dm import filters as dm_filters
 from restalchemy.dm import types
+from restalchemy.common import exceptions as ra_exc
+from restalchemy.storage.sql import engines
 from restalchemy.storage.sql import orm
 
 from gcl_sdk.agents.universal import utils
@@ -205,6 +208,25 @@ class UniversalAgent(
         default=c.AgentStatus.NEW.value,
     )
 
+    # def __init__(
+    #     self,
+    #     *args,
+    #     created_at: datetime.datetime | None = None,
+    #     updated_at: datetime.datetime | None = None,
+    #     **kwargs,
+    # ):
+    #     if created_at is not None:
+    #         created_at.replace(tzinfo=datetime.timezone.utc)
+
+    #     if updated_at is not None:
+    #         updated_at.replace(tzinfo=datetime.timezone.utc)
+
+    #     print(created_at, updated_at)
+
+    #     return super().__init__(
+    #         *args, created_at=created_at, updated_at=updated_at, **kwargs
+    #     )
+
     @property
     def list_capabilities(self) -> list[str]:
         return self.capabilities["capabilities"]
@@ -279,6 +301,51 @@ class UniversalAgent(
             "Target and agents payloads are different. Agent %s", self.uuid
         )
         return payload
+
+    @classmethod
+    def have_capabilities(
+        cls, capabilities: tp.Collection[str]
+    ) -> dict[str, list["UniversalAgent"]]:
+        if not capabilities:
+            return {}
+
+        caps_str = "'" + "','".join(capabilities) + "'"
+
+        expression = (
+            "SELECT * FROM ua_agents ua  "
+            "WHERE ua.status = 'ACTIVE' AND "
+            "      ua.capabilities->'capabilities' ?| "
+            "  ARRAY[{caps}]; "
+        ).format(caps=caps_str)
+
+        engine = engines.engine_factory.get_engine()
+        with engine.session_manager() as session:
+            curs = session.execute(expression, tuple())
+            response = curs.fetchall()
+
+        if not response:
+            return {}
+
+        # Group agents by capabilities and return them as dict
+        cap_map = collections.defaultdict(list)
+        for data in response:
+            # There is known issue with date format so we need
+            # to handle it manually.
+            if created_at := data.get("created_at"):
+                data["created_at"] = created_at.replace(
+                    tzinfo=datetime.timezone.utc
+                )
+
+            if updated_at := data.get("updated_at"):
+                data["updated_at"] = updated_at.replace(
+                    tzinfo=datetime.timezone.utc
+                )
+
+            agent = cls(**data)
+            for capability in agent.list_capabilities:
+                cap_map[capability].append(agent)
+
+        return cap_map
 
 
 class Resource(

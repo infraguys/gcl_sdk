@@ -22,6 +22,8 @@ PAYLOAD_PATH = os.path.join(WORK_DIR, "payload.json")
 DEFAULT_DATETIME_FORMAT = "%Y-%m-%d %H:%M:%S.%1f"
 EP_UNIVERSAL_AGENT = "gcl_sdk_universal_agent"
 
+DEF_SQL_LIMIT = 100
+
 
 class AgentStatus(str, enum.Enum):
     NEW = "NEW"
