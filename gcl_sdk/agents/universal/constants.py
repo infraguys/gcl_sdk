@@ -17,8 +17,10 @@ import os
 import enum
 
 
+GENESIS_WORK_DIR = "/var/lib/genesis"
 WORK_DIR = "/var/lib/genesis/universal_agent/"
 PAYLOAD_PATH = os.path.join(WORK_DIR, "payload.json")
+NODE_UUID_PATH = os.path.join(GENESIS_WORK_DIR, "node-id")
 DEFAULT_DATETIME_FORMAT = "%Y-%m-%d %H:%M:%S.%1f"
 EP_UNIVERSAL_AGENT = "gcl_sdk_universal_agent"
 

@@ -16,7 +16,9 @@
 from __future__ import annotations
 
 import logging
+import itertools
 
+from restalchemy.common import contexts
 from restalchemy.dm import filters as dm_filters
 from gcl_looper.services import basic as looper_basic
 
@@ -41,54 +43,58 @@ class UniversalAgentSchedulerService(looper_basic.BasicService):
     def _get_unscheduled_resources(
         self, limit: int = c.DEF_SQL_LIMIT
     ) -> list[models.TargetResource]:
-        # capabilities_in = []
-        # filters_in = []
-        # filters_like = []
-        # filters = []
+        capabilities_in = []
+        filters_in = []
+        filters_like = []
+        filters = []
 
         # Prepare like and in filters based on capabilities
-        # for cap in self._capabilities:
-        #     if cap.endswith("*"):
-        #         cap = cap.replace("*", "%")
-        #         filters_like.append({"kind": dm_filters.Like(cap)})
-        #     else:
-        #         capabilities_in.append(cap)
+        for cap in self._capabilities:
+            if cap.endswith("*"):
+                cap = cap.replace("*", "%")
+                filters_like.append({"kind": dm_filters.Like(cap)})
+            else:
+                capabilities_in.append(cap)
 
-        # if capabilities_in:
-        #     filters_in = [{"kind": dm_filters.In(capabilities_in)}]
+        if capabilities_in:
+            filters_in = [{"kind": dm_filters.In(capabilities_in)}]
 
-        # if not filters_like and not filters_in:
-        #     LOG.debug("No filters for target resources")
-        #     return
+        if not filters_like and not filters_in:
+            LOG.debug("No filters for target resources")
+            return
 
-        # filters = dm_filters.AND(
-        #     {"agent": dm_filters.Is(None)},
-        #     dm_filters.OR(filters_in + filters_like),
-        # )
+        filters = dm_filters.AND(
+            {"agent": dm_filters.Is(None)},
+            dm_filters.OR(*itertools.chain(filters_in + filters_like)),
+        )
 
         return models.TargetResource.objects.get_all(
-            filters={
-                "agent": dm_filters.Is(None),
-                "kind": dm_filters.In(self._capabilities),
-            },
+            filters=filters,
             limit=limit,
         )
 
     def _iteration(self):
-        unscheduled = self._get_unscheduled_resources()
-        if not unscheduled:
-            return
+        with contexts.Context().session_manager():
+            unscheduled = self._get_unscheduled_resources()
+            if not unscheduled:
+                return
 
-        LOG.info("Found %d unscheduled resources", len(unscheduled))
+            LOG.info("Found %d unscheduled resources", len(unscheduled))
 
-        cap_agent_map = models.UniversalAgent.have_capabilities(
-            tuple(u.kind for u in unscheduled)
-        )
+            cap_agent_map = models.UniversalAgent.have_capabilities(
+                tuple(u.kind for u in unscheduled)
+            )
 
-        # FIXME(akremenetsky): The simplest implementation.
-        # Take a first agent that satisfies
-        for resource in unscheduled:
-            if resource.kind in cap_agent_map:
+            # FIXME(akremenetsky): The simplest implementation.
+            # Take a first agent that satisfies
+            for resource in unscheduled:
+                if resource.kind not in cap_agent_map:
+                    LOG.warning("No agent for resource %s", resource.kind)
+                    continue
+
+                # It's supposed only one agent have a particular EM capability
+                # In case of multiple agents, the first one is chosen for nodes,
+                # the second one is chosen for configs and so on.
                 agent = cap_agent_map[resource.kind][0]
                 resource.agent = agent.uuid
                 resource.node = agent.node
@@ -98,6 +104,3 @@ class UniversalAgentSchedulerService(looper_basic.BasicService):
                     resource.uuid,
                     agent.uuid,
                 )
-            else:
-                LOG.warning("No agent for resource %s", resource.kind)
-                continue

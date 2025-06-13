@@ -22,7 +22,10 @@ from gcl_sdk.agents.universal.dm import models
 
 
 class AbstractBackendClient(abc.ABC):
-    """Abstract backend client."""
+    """Abstract backend client.
+
+    An interface for clients to communicate with a backend side.
+    """
 
     @abc.abstractmethod
     def get(self, resource: models.Resource) -> dict[str, tp.Any]:
@@ -37,7 +40,7 @@ class AbstractBackendClient(abc.ABC):
         """Update the resource. Returns the updated resource."""
 
     @abc.abstractmethod
-    def list(self, kind: str) -> list[dict[str, tp.Any]]:
+    def list(self, kind: str, **kwargs) -> list[dict[str, tp.Any]]:
         """Lists all resources by kind."""
 
     @abc.abstractmethod

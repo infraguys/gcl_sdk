@@ -20,15 +20,11 @@ from restalchemy.api import controllers
 from gcl_sdk.agents.universal.dm import models
 
 
-class OrchUniversalAgent(models.UniversalAgent):
-    pass
-
-
 class UniversalAgentsController(controllers.BaseResourceController):
     """Controller for /v1/agents/ endpoint"""
 
     __resource__ = resources.ResourceByRAModel(
-        model_class=OrchUniversalAgent,
+        model_class=models.UniversalAgent,
         process_filters=True,
         convert_underscore=False,
     )
@@ -36,7 +32,7 @@ class UniversalAgentsController(controllers.BaseResourceController):
     @actions.get
     def get_payload(
         self,
-        resource: OrchUniversalAgent,
+        resource: models.UniversalAgent,
         hash: str = "",
         version: str = "0",
     ):

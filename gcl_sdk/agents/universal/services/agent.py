@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import logging
+import typing as tp
 
 from gcl_looper.services import basic as looper_basic
 from bazooka import exceptions as baz_exc
@@ -83,7 +84,6 @@ class UniversalAgentService(looper_basic.BasicService):
             LOG.warning("The resource already exists: %s", resource.uuid)
             dp_resource = driver.get(resource)
 
-        # self._status_api.resources.create(dp_resource)
         return dp_resource
 
     def _delete_resource(
@@ -96,22 +96,12 @@ class UniversalAgentService(looper_basic.BasicService):
         except driver_exc.ResourceNotFound:
             LOG.warning("The resource does not exist: %s", resource.uuid)
 
-        # self._status_api.resources.delete(resource.uuid)
-
     def _update_resource(
         self,
         driver: driver_base.AbstractCapabilityDriver,
         resource: models.Resource,
     ) -> models.Resource:
         dp_resource = driver.update(resource)
-
-        # try:
-        #     self._status_api.resources.update(
-        #         **dp_resource.dump_to_simple_view()
-        #     )
-        # except baz_exc.NotFoundError:
-        #     self._status_api.resources.create(dp_resource)
-
         return dp_resource
 
     def _actualize_resources(
@@ -167,8 +157,8 @@ class UniversalAgentService(looper_basic.BasicService):
 
     def _actualize_resource_facts(
         self,
-        target_facts: list[dict],
-        actual_facts: list[dict],
+        target_facts: list[dict[str : tp.Any]],
+        actual_facts: list[dict[str : tp.Any]],
     ) -> None:
         """Actualize facts in Status API.
 
@@ -245,18 +235,13 @@ class UniversalAgentService(looper_basic.BasicService):
 
         # Check if the agent is registered
         try:
-            cp_payload = self._orch_api.agents.get_payload(
+            payload = self._orch_api.agents.get_payload(
                 self._system_uuid, last_payload
             )
         except baz_exc.NotFoundError:
             # Auto discovery mechanism
             self._register_agent()
             return
-
-        # Choose the target payload. If the payloads are equal, the CP returns
-        # light payload without capabilities so use the last payload
-        # in this case.
-        payload = last_payload if last_payload == cp_payload else cp_payload
 
         # TODO(akremenetsky): Implement actions
 

@@ -18,7 +18,7 @@ import uuid as sys_uuid
 import bazooka
 
 from gcl_sdk.agents.universal.dm import models
-from gcl_sdk.agents.universal.clients.http import base
+from gcl_sdk.clients.http import base
 
 
 class UniversalAgentsClient(base.CollectionBaseModelClient):
@@ -26,15 +26,20 @@ class UniversalAgentsClient(base.CollectionBaseModelClient):
     __model__ = models.UniversalAgent
 
     def get_payload(
-        self, uuid: sys_uuid.UUID, payload: models.Payload
+        self, uuid: sys_uuid.UUID, last_payload: models.Payload
     ) -> models.Payload:
         payload_data = self.do_action(
             "get_payload",
             uuid,
-            hash=payload.hash,
-            version=payload.version,
+            hash=last_payload.hash,
+            version=last_payload.version,
         )
-        return models.Payload.restore_from_simple_view(**payload_data)
+        cp_payload = models.Payload.restore_from_simple_view(**payload_data)
+
+        # Choose the target payload. If the payloads are equal, the CP returns
+        # light payload without capabilities so use the last payload
+        # in this case.
+        return last_payload if last_payload == cp_payload else cp_payload
 
 
 class OrchAPI:

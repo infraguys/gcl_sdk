@@ -16,28 +16,25 @@
 from __future__ import annotations
 
 import typing as tp
-import uuid as sys_uuid
 
 from bazooka import exceptions as bazooka_exc
 
+from gcl_sdk.clients.http import base as http
 from gcl_sdk.agents.universal.dm import models
-from gcl_sdk.agents.universal.clients.http import base as http
 from gcl_sdk.agents.universal.clients.backend import base
 from gcl_sdk.agents.universal.clients.backend import exceptions
 
 
-class GCRestApiBackendClient(base.AbstractBackendClient):
-    """Genesis Core Rest API backend client."""
+class RestApiBackendClient(base.AbstractBackendClient):
+    """Rest API backend client."""
 
     def __init__(
         self,
         http_client: http.CollectionBaseClient,
         collection_map: dict[str:str],
-        project_id: sys_uuid.UUID,
     ) -> None:
         self._client = http_client
         self._collection_map = collection_map
-        self._project_id = str(project_id)
 
     def get(self, resource: models.Resource) -> dict[str, tp.Any]:
         """Get the resource value in dictionary format."""
@@ -52,14 +49,6 @@ class GCRestApiBackendClient(base.AbstractBackendClient):
         """Creates the resource. Returns the created resource."""
         collection_url = self._collection_map[resource.kind]
 
-        # Inject mandatory fields
-        resource.value["uuid"] = str(resource.uuid)
-
-        # Simple validation for project_id. Only one project is supported.
-        res_project_id = resource.value.get("project_id", None)
-        if res_project_id and res_project_id != self._project_id:
-            raise exceptions.ResourceProjectMismatch(resource=resource)
-
         try:
             return self._client.create(collection_url, resource.value)
         except bazooka_exc.ConflictError:
@@ -69,25 +58,19 @@ class GCRestApiBackendClient(base.AbstractBackendClient):
         """Update the resource. Returns the updated resource."""
         collection_url = self._collection_map[resource.kind]
 
-        # FIXME(akremenetsky): Not the best implementation
-        # Remove popential RO fields
-        value = resource.value.copy()
-        value.pop("created_at", None)
-        value.pop("updated_at", None)
-        value.pop("project_id", None)
-        value.pop("uuid", None)
-
         try:
-            return self._client.update(collection_url, resource.uuid, **value)
+            return self._client.update(
+                collection_url, resource.uuid, **resource.value
+            )
         except bazooka_exc.NotFoundError:
             raise exceptions.ResourceNotFound(resource=resource)
 
-    def list(self, kind: str) -> list[dict[str, tp.Any]]:
+    def list(self, kind: str, **kwargs) -> list[dict[str, tp.Any]]:
         """Lists all resources by kind."""
         collection_url = self._collection_map[kind]
 
         # TODO(akremenetsky): Use a project prefix to filter resources
-        return self._client.filter(collection_url, project_id=self._project_id)
+        return self._client.filter(collection_url, **kwargs)
 
     def delete(self, resource: models.Resource) -> None:
         """Delete the resource."""

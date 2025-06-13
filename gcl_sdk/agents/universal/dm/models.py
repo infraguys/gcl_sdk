@@ -29,7 +29,6 @@ from restalchemy.dm import properties
 from restalchemy.dm import relationships
 from restalchemy.dm import filters as dm_filters
 from restalchemy.dm import types
-from restalchemy.common import exceptions as ra_exc
 from restalchemy.storage.sql import engines
 from restalchemy.storage.sql import orm
 
@@ -41,6 +40,43 @@ LOG = logging.getLogger(__name__)
 
 
 class Payload(models.Model, models.SimpleViewMixin):
+    """This model is used to represent the payload of the agent.
+
+    The models is used as for control plane and data plane.
+    The control plane payload is received from Orch API and it
+    has be applied to the data plane, excepting `facts`.
+    A data plane payload is a collected payload from the data.
+    If CP and DP payloads are different from target values of
+    resources that means we need to update something on the data plane.
+    If CP and DP payloads are different from facts point of view,
+    it means we need to update something in the Status API to save
+    new facts.
+
+    capabilities - a set of managed resources, for example, configuration,
+        secrets and so on. An orchestrator sets which resources should be
+        presented on the data plane. CP resources from the capabilities
+        contains only managed fields. When these resources are gathered
+        from the data plane they may have some additional fields,
+        for instance, created time, updated time and so on. Only the
+        managed fields are orchestrated.
+
+    facts - opposite to the capabilities. These resources are gathered from
+        the data plane independently from the orchestrator. In other words,
+        they are not managed by the orchestrator. A simple example of facts
+        are network interfaces.
+
+    hash - a hash of the payload. The formula is described below:
+        hash(
+            hash(cap_resource0.hash),
+            hash(cap_resource1.hash),
+            ...
+            hash(fact_resource0.full_hash),
+            hash(fact_resource1.full_hash),
+            ...
+        )
+
+    """
+
     capabilities = properties.property(types.Dict(), default=dict)
     facts = properties.property(types.Dict(), default=dict)
     hash = properties.property(types.String(max_length=256), default="")
@@ -198,6 +234,14 @@ class UniversalAgent(
     models.SimpleViewMixin,
     orm.SQLStorableMixin,
 ):
+    """Universal Agent model.
+
+    Unified agent that implements common logic of abstract resource and
+    fact management.
+
+    The models has helpful tools to APIs, resource, payload and other models.
+    """
+
     __tablename__ = "ua_agents"
 
     capabilities = properties.property(types.Dict(), default=dict)
@@ -207,25 +251,6 @@ class UniversalAgent(
         types.Enum([s.value for s in c.AgentStatus]),
         default=c.AgentStatus.NEW.value,
     )
-
-    # def __init__(
-    #     self,
-    #     *args,
-    #     created_at: datetime.datetime | None = None,
-    #     updated_at: datetime.datetime | None = None,
-    #     **kwargs,
-    # ):
-    #     if created_at is not None:
-    #         created_at.replace(tzinfo=datetime.timezone.utc)
-
-    #     if updated_at is not None:
-    #         updated_at.replace(tzinfo=datetime.timezone.utc)
-
-    #     print(created_at, updated_at)
-
-    #     return super().__init__(
-    #         *args, created_at=created_at, updated_at=updated_at, **kwargs
-    #     )
 
     @property
     def list_capabilities(self) -> list[str]:
@@ -313,10 +338,10 @@ class UniversalAgent(
 
         expression = (
             "SELECT * FROM ua_agents ua  "
-            "WHERE ua.status = 'ACTIVE' AND "
+            "WHERE ua.status = '{status}' AND "
             "      ua.capabilities->'capabilities' ?| "
             "  ARRAY[{caps}]; "
-        ).format(caps=caps_str)
+        ).format(status=c.AgentStatus.ACTIVE.value, caps=caps_str)
 
         engine = engines.engine_factory.get_engine()
         with engine.session_manager() as session:
@@ -342,7 +367,8 @@ class UniversalAgent(
                 )
 
             agent = cls(**data)
-            for capability in agent.list_capabilities:
+            caps = set(agent.list_capabilities) & set(capabilities)
+            for capability in caps:
                 cap_map[capability].append(agent)
 
         return cap_map
@@ -354,6 +380,52 @@ class Resource(
     models.SimpleViewMixin,
     orm.SQLStorableMixin,
 ):
+    """This model is represent an abstract resource for the Universal Agent.
+
+    This model is mostly used as an actual resource, for instance, gathered
+    from the data plane. In this case the `value` dict contains a real object
+    from the data plane in dict format.
+
+    kind - resource kind, for instance, "config", "secret", ...
+    value - resource value in dict format.
+    hash - hash value only for the target fields.
+    full_hash - hash value for the whole value (all fields).
+    status - resource status, for instance, "ACTIVE", "NEW", ...
+
+    Some explanation for the `hash` and `full_hash`. Let's assume we have
+    the following target node resource:
+    {
+        "uuid": "a1b2c3d4-e5f6-7890-a1b2-c3d4e5f67890",
+        "name": "vm",
+        "project_id": "12345678-c625-4fee-81d5-f691897b8142",
+        "root_disk_size": 15,
+        "cores": 1,
+        "ram": 1024,
+        "image": "http://10.20.0.1:8080/genesis-base.raw"
+    }
+    All these fields are considered as target fields and they are used
+    to calculate `hash`.
+
+    After node creation we have the the follwing:
+    {
+        "uuid": "a1b2c3d4-e5f6-7890-a1b2-c3d4e5f67890",
+        "name": "vm",
+        "project_id": "12345678-c625-4fee-81d5-f691897b8142",
+        "root_disk_size": 15,
+        "cores": 1,
+        "ram": 1024,
+        "image": "http://10.20.0.1:8080/genesis-base.raw",
+
+        // Not target fields below
+        "created_at": "2022-01-01T00:00:00+00:00",
+        "updated_at": "2022-01-01T00:00:00+00:00",
+        "default_network": {}
+    }
+
+    For hash calculation only the target fields are used as discussed
+    above.  `full_hash` is calculated for all fields.
+    """
+
     __tablename__ = "ua_actual_resources"
 
     kind = properties.property(types.String(max_length=64), required=True)
@@ -365,9 +437,6 @@ class Resource(
 
     def calculate_hash(self) -> None:
         self.hash = utils.calculate_hash(self.value)
-
-    def calculate_full_hash(self) -> None:
-        self.full_hash = utils.calculate_hash(self.value)
 
     def replace_value(
         self,
@@ -422,6 +491,11 @@ class Resource(
 
 
 class TargetResource(Resource):
+    """This model is represent an abstract resource for the Universal Agent.
+
+    Almost the same as `Resource` but it's used as a target resource.
+    """
+
     __tablename__ = "ua_target_resources"
 
     agent = properties.property(types.AllowNone(types.UUID()), default=None)
@@ -433,16 +507,21 @@ class TargetResource(Resource):
 
 
 class ResourceMixin(models.SimpleViewMixin):
+    """A helpful mixin to convert models to the resource model."""
 
-    def get_resource_uuid(self) -> str:
+    def get_resource_uuid(self) -> sys_uuid.UUID:
+        """Get resource uuid."""
         return self.uuid
 
     def get_resource_target_fields(self) -> list[str]:
-        """TODO: what is target fields?"""
+        """Return the list of target fields.
+
+        Refer to the Resource model for more details about target fields.
+        """
         return []
 
     def get_resource_ignore_fields(self) -> list[str]:
-        """TODO: what is ignore fields?"""
+        """Return fields that should not belong to the resource."""
         return []
 
     def to_ua_resource(self, kind: str) -> Resource:
@@ -475,6 +554,11 @@ class ResourceMixin(models.SimpleViewMixin):
 
 
 class TargetResourceMixin(ResourceMixin):
+    """A helpful mixin to convert models to the resource model.
+
+    The same as ResourceMixin but it's used as a target resource.
+    """
+
     def to_ua_resource(
         self,
         kind: str,

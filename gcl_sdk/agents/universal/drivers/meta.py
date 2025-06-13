@@ -35,7 +35,10 @@ LOG = logging.getLogger(__name__)
 class MetaDataPlaneModel(
     ra_models.ModelWithRequiredUUID, models.ResourceMixin
 ):
-    """TODO"""
+    """A base model for using in MetaFileStorageAgentDriver.
+
+    Child models should implement methods to work with data plane.
+    """
 
     # Store the resource target fields
     target_fields = properties.property(
@@ -52,11 +55,14 @@ class MetaDataPlaneModel(
         )
 
     def get_resource_target_fields(self) -> list[str]:
-        """TODO: what is target fields?"""
+        """Return the list of target fields.
+
+        Refer to the Resource model for more details about target fields.
+        """
         return self.target_fields
 
     def get_resource_ignore_fields(self) -> list[str]:
-        """TODO: what is ignore fields?"""
+        """Return fields that should not belong to the resource."""
         return ["target_fields"]
 
     def get_meta_fields(self) -> set[str] | None:
@@ -104,7 +110,8 @@ class MetaFileStorageAgentDriver(base.AbstractCapabilityDriver):
     contains some meta information such path, uuid and so on but this file
     does not contain the information that can be fetched from the data plane.
 
-    TODO: Add link to the MetaModel
+    Particular models should be derived from `MetaDataPlaneModel` to work
+    properly with the driver.
     """
 
     __model_map__ = {"model": MetaDataPlaneModel}

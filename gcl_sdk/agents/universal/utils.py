@@ -15,10 +15,13 @@
 #    under the License.
 from __future__ import annotations
 
+import os
 import json
 import xxhash
 import typing as tp
 import uuid as sys_uuid
+
+from gcl_sdk.agents.universal import constants as c
 
 
 def system_uuid(
@@ -29,11 +32,18 @@ def system_uuid(
         return sys_uuid.UUID(f.read().strip())
 
 
-def node_uuid() -> sys_uuid.UUID:
+def node_uuid(
+    node_path: str = c.NODE_UUID_PATH, use_machine_if_absent: bool = True
+) -> sys_uuid.UUID:
     """Return node uuid"""
+    if os.path.exists(node_path):
+        with open(node_path) as f:
+            return sys_uuid.UUID(f.read().strip())
 
-    # FIXME(akremenetsky): Actually it's not correct for some baremetal cases.
-    return system_uuid()
+    if use_machine_if_absent:
+        return system_uuid()
+
+    raise FileNotFoundError(f"The node-id location {node_path} not found")
 
 
 def calculate_hash(
