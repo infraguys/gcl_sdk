@@ -33,6 +33,7 @@ class MigrationStep(migrations.AbstarctMigrationStep):
         sql_expressions = [
             # TABLES
             """
+            DROP TYPE IF EXISTS enum_agent_status;
             CREATE TYPE "enum_agent_status" AS ENUM (
                 'NEW',
                 'ACTIVE',
@@ -135,6 +136,7 @@ class MigrationStep(migrations.AbstarctMigrationStep):
 
         tables = [
             "ua_actual_resources",
+            "ua_target_resources",
             "ua_agents",
         ]
 
