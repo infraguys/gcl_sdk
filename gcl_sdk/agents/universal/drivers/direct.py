@@ -80,14 +80,14 @@ class DirectAgentDriver(base.AbstractCapabilityDriver):
 
         # Collect all resources in convient format
         resources = []
-        storate_items = {i["uuid"]: i for i in self._storage.list(capability)}
+        storage_items = {i["uuid"]: i for i in self._storage.list(capability)}
         values = {i["uuid"]: i for i in self._client.list(capability)}
 
         # If storage item or value is missing, consider it as
         # a missing resource
-        for uuid in storate_items.keys() & values.keys():
+        for uuid in storage_items.keys() & values.keys():
             value = values[uuid]
-            item = storate_items[uuid]
+            item = storage_items[uuid]
             target_fields = frozenset(item["target_fields"])
             res = models.Resource.from_value(value, capability, target_fields)
             resources.append(res)
