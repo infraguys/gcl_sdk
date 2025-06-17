@@ -14,9 +14,18 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-import unittest
+from restalchemy.api import routes
+
+from gcl_sdk.agents.universal.status_api import controllers
 
 
-class SimpleTest(unittest.TestCase):
-    def test_ok(self):
-        self.assertFalse(False)
+class ResourcesRoute(routes.Route):
+    """Handler for /v1/resources/ endpoint"""
+
+    __controller__ = controllers.ResourcesController
+
+
+class UniversalAgentsRoute(routes.Route):
+    """Handler for /v1/agents/ endpoint"""
+
+    __controller__ = controllers.UniversalAgentsController

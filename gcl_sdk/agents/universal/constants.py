@@ -13,28 +13,22 @@
 #    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 #    License for the specific language governing permissions and limitations
 #    under the License.
-
-import typing as tp
-import importlib_metadata
-
-
-EVENT_PAYLOADS_GROUP = "gcl_sdk_event_payloads"
+import os
+import enum
 
 
-def load_event_payload_map() -> dict:
-    event_payload_map = {
-        ep.name: ep.load()
-        for ep in importlib_metadata.entry_points(
-            group=EVENT_PAYLOADS_GROUP,
-        )
-    }
-    return event_payload_map
+GENESIS_WORK_DIR = "/var/lib/genesis"
+WORK_DIR = "/var/lib/genesis/universal_agent/"
+PAYLOAD_PATH = os.path.join(WORK_DIR, "payload.json")
+NODE_UUID_PATH = os.path.join(GENESIS_WORK_DIR, "node-id")
+DEFAULT_DATETIME_FORMAT = "%Y-%m-%d %H:%M:%S.%1f"
+EP_UNIVERSAL_AGENT = "gcl_sdk_universal_agent"
+
+DEF_SQL_LIMIT = 100
 
 
-def load_from_entry_point(group: str, name: str) -> tp.Any:
-    """Load class from entry points."""
-    for ep in importlib_metadata.entry_points(group=group):
-        if ep.name == name:
-            return ep.load()
-
-    raise RuntimeError(f"No class '{name}' found in entry points {group}")
+class AgentStatus(str, enum.Enum):
+    NEW = "NEW"
+    ACTIVE = "ACTIVE"
+    ERROR = "ERROR"
+    DISABLED = "DISABLED"
