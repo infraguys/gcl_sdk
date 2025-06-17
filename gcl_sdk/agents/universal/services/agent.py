@@ -138,7 +138,9 @@ class UniversalAgentService(looper_basic.BasicService):
                 LOG.exception("Error deleting resource %s", r.uuid)
 
         for r in target_resources.keys() & actual_resources.keys():
-            # We need to get exactly target resource, not actual
+            # set does not guarantee which instance will be given on
+            # intersection therefore get actual and target resources
+            # explicitly.
             target_resource = target_resources[r]
             actual_resource = actual_resources[r]
 
