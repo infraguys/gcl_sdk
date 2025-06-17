@@ -54,7 +54,7 @@ core_agent_opts = [
     cfg.ListOpt(
         "facts_drivers",
         default=None,
-        help="List of agent capability drivers",
+        help="List of agent facts drivers",
     ),
 ]
 
