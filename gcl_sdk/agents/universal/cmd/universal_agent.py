@@ -21,6 +21,8 @@ import configparser
 
 import bazooka
 from oslo_config import cfg
+from restalchemy.common import config_opts as ra_config_opts
+from restalchemy.storage.sql import engines
 
 from gcl_sdk.common import config
 from gcl_sdk.common import log as infra_log
@@ -83,8 +85,30 @@ def load_driver(
     return class_(**params)
 
 
+def register_db_opts(config_file: str) -> bool:
+    print(f"Using config file: {config_file}")
+    parser = configparser.ConfigParser()
+    parser.read(config_file)
+
+    # Register DB options if they are present
+    if parser.has_section("db"):
+        ra_config_opts.register_posgresql_db_opts(CONF)
+        return True
+
+    return False
+
+
 def main():
+    # Get the config file path
+    for i, arg in enumerate(sys.argv):
+        if arg == "--config-file":
+            config_file = sys.argv[i + 1]
+            break
+    else:
+        raise FileNotFoundError("Unable to find config file")
+
     # Parse config
+    need_db = register_db_opts(config_file)
     config.parse(sys.argv[1:])
 
     # Configure logging
@@ -108,6 +132,9 @@ def main():
 
     capabilities = set()
     facts = set()
+
+    if need_db:
+        engines.engine_factory.configure_postgresql_factory(CONF)
 
     # Load capability drivers
     for driver_name in CONF[DOMAIN].caps_drivers or tuple():
