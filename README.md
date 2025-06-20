@@ -19,9 +19,6 @@ sudo apt-get install tox libev-dev
 Fedora:
 ```bash
 sudo dnf install python3-tox libev-devel
-
-tox -e develop
-source .tox/develop/bin/activate
 ```
 
 Initialize virtual environment:

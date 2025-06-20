@@ -423,7 +423,7 @@ class Resource(
     }
 
     For hash calculation only the target fields are used as discussed
-    above.  `full_hash` is calculated for all fields.
+    above. `full_hash` is calculated for all fields.
     """
 
     __tablename__ = "ua_actual_resources"
@@ -505,6 +505,12 @@ class TargetResource(Resource):
         default=lambda: datetime.datetime.now(datetime.timezone.utc),
     )
 
+    def update_value(self, other: TargetResource) -> None:
+        """Update the resource value."""
+        self.hash = other.hash
+        self.value = other.value
+        self.status = other.status
+
 
 class ResourceMixin(models.SimpleViewMixin):
     """A helpful mixin to convert models to the resource model."""
@@ -565,17 +571,124 @@ class TargetResourceMixin(ResourceMixin):
         master: sys_uuid.UUID | None = None,
         tracked_at: datetime.datetime | None = None,
     ) -> TargetResource:
-        resource = super().to_ua_resource(kind)
         tracked_at = tracked_at or datetime.datetime.now(datetime.timezone.utc)
+        value = self.dump_to_simple_view(
+            skip=self.get_resource_ignore_fields()
+        )
+
+        # Need to get only target fields with values to calculate hash
+        target_fields = self.get_resource_target_fields()
+
+        if target_fields:
+            target_data = {
+                k: v for k, v in value.items() if k in target_fields
+            }
+        else:
+            target_data = value
 
         return TargetResource(
-            uuid=resource.uuid,
-            kind=resource.kind,
-            value=resource.value,
-            hash=resource.hash,
+            uuid=self.get_resource_uuid(),
+            kind=kind,
+            value=target_data,
+            hash=utils.calculate_hash(target_data),
             full_hash="",
             master=master,
             tracked_at=tracked_at,
+        )
+
+
+class TargetResourceSQLStorableMixin:
+
+    @classmethod
+    def _execute_expression(
+        cls, expression: str, params: tp.Collection, session=None
+    ) -> list[dict[str, tp.Any]]:
+        if session is None:
+            engine = engines.engine_factory.get_engine()
+            with engine.session_manager() as session:
+                curs = session.execute(expression, params)
+                response = curs.fetchall()
+        else:
+            curs = session.execute(expression, params)
+            response = curs.fetchall()
+
+        return response
+
+    @classmethod
+    def get_new_entities(
+        cls, table: str, kind: str, limit: int = 100, session=None
+    ) -> list["TargetResourceSQLStorableMixin"]:
+        expression = (
+            "SELECT "
+            "    {table}.uuid as uuid "
+            "FROM {table} LEFT JOIN "
+            "( "
+            "    SELECT "
+            "        uuid "
+            "    FROM ua_target_resources "
+            "    WHERE kind = %s "
+            ") AS ua_target_resources_by_kind "
+            "ON {table}.uuid = ua_target_resources_by_kind.uuid "
+            "WHERE ua_target_resources_by_kind.uuid is NULL "
+            "LIMIT %s;"
+        ).format(table=table)
+        params = (kind, limit)
+
+        response = cls._execute_expression(expression, params, session)
+        if not response:
+            return []
+
+        return cls.objects.get_all(
+            filters={"uuid": dm_filters.In(str(r["uuid"]) for r in response)},
+        )
+
+    @classmethod
+    def get_updated_entities(
+        cls, table: str, kind: str, limit: int = 100, session=None
+    ) -> list["TargetResourceSQLStorableMixin"]:
+        expression = (
+            "SELECT "
+            "    {table}.uuid as uuid "
+            "FROM {table} INNER JOIN ua_target_resources ON  "
+            "    {table}.uuid = ua_target_resources.uuid "
+            "WHERE {table}.updated_at != ua_target_resources.tracked_at "
+            "AND ua_target_resources.kind = %s "
+            "LIMIT %s;"
+        ).format(table=table)
+        params = (kind, limit)
+
+        response = cls._execute_expression(expression, params, session)
+        if not response:
+            return []
+
+        return cls.objects.get_all(
+            filters={"uuid": dm_filters.In(str(r["uuid"]) for r in response)},
+        )
+
+    @classmethod
+    def get_deleted_target_resources(
+        cls, table: str, kind: str, limit: int = 100, session=None
+    ) -> list[TargetResource]:
+        expression = (
+            "SELECT "
+            "    ua_target_resources.uuid as uuid "
+            "FROM ua_target_resources LEFT JOIN {table} ON  "
+            "    ua_target_resources.uuid = {table}.uuid  "
+            "WHERE ua_target_resources.kind = %s "
+            "    AND {table}.uuid is NULL "
+            "LIMIT %s;"
+        ).format(table=table)
+        params = (
+            kind,
+            limit,
+        )
+
+        response = cls._execute_expression(expression, params, session)
+        if not response:
+            return []
+
+        return TargetResource.objects.get_all(
+            filters={"uuid": dm_filters.In(str(r["uuid"]) for r in response)},
         )
 
 
