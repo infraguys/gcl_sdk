@@ -60,15 +60,17 @@ class MigrationStep(migrations.AbstarctMigrationStep):
             """,
             """
             CREATE TABLE IF NOT EXISTS ua_actual_resources (
-                "uuid" UUID NOT NULL PRIMARY KEY,
+                "uuid" UUID NOT NULL,
                 "kind" varchar(64) NOT NULL,
+                "res_uuid" UUID NOT NULL PRIMARY KEY,
                 "value" JSONB NOT NULL,
                 "status" varchar(32) NOT NULL,
                 "node" UUID DEFAULT NULL,
                 "hash" varchar(256) NOT NULL,
                 "full_hash" varchar(256) NOT NULL,
                 "created_at" timestamp NOT NULL DEFAULT current_timestamp,
-                "updated_at" timestamp NOT NULL DEFAULT current_timestamp
+                "updated_at" timestamp NOT NULL DEFAULT current_timestamp,
+                UNIQUE (uuid, kind)
             );
             """,
             """
@@ -85,18 +87,20 @@ class MigrationStep(migrations.AbstarctMigrationStep):
             """,
             """
             CREATE TABLE IF NOT EXISTS ua_target_resources (
-                "uuid" UUID NOT NULL PRIMARY KEY,
+                "uuid" UUID NOT NULL,
                 "kind" varchar(64) NOT NULL,
+                "res_uuid" UUID NOT NULL PRIMARY KEY,
                 "value" JSONB NOT NULL,
                 "status" varchar(32) NOT NULL DEFAULT 'ACTIVE',
                 "hash" varchar(256) NOT NULL,
                 "full_hash" varchar(256) NOT NULL,
                 "node" UUID DEFAULT NULL,
                 "agent" UUID references ua_agents(uuid) ON DELETE CASCADE,
-                "master" UUID references ua_target_resources(uuid) ON DELETE CASCADE DEFAULT NULL,
+                "master" UUID DEFAULT NULL,
                 "tracked_at" timestamp NOT NULL DEFAULT current_timestamp,
                 "created_at" timestamp NOT NULL DEFAULT current_timestamp,
-                "updated_at" timestamp NOT NULL DEFAULT current_timestamp
+                "updated_at" timestamp NOT NULL DEFAULT current_timestamp,
+                UNIQUE (uuid, kind)
             );
             """,
             """
@@ -112,12 +116,12 @@ class MigrationStep(migrations.AbstarctMigrationStep):
                 ON ua_target_resources (kind);
             """,
             """
-            CREATE OR REPLACE VIEW outdated_resources AS
+            CREATE OR REPLACE VIEW ua_outdated_resources_view AS
                 SELECT
                     ua_target_resources.uuid as uuid,
                     ua_target_resources.kind as kind,
-                    ua_target_resources.uuid as target_resource,
-                    ua_actual_resources.uuid as actual_resource
+                    ua_target_resources.res_uuid as target_resource,
+                    ua_actual_resources.res_uuid as actual_resource
                 FROM ua_target_resources INNER JOIN ua_actual_resources ON 
                     ua_target_resources.uuid = ua_actual_resources.uuid
                 WHERE ua_target_resources.full_hash != ua_actual_resources.full_hash;
@@ -141,7 +145,7 @@ class MigrationStep(migrations.AbstarctMigrationStep):
         ]
 
         views = [
-            "outdated_resources",
+            "ua_outdated_resources_view",
         ]
 
         for view_name in views:

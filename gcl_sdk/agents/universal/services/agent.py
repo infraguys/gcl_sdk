@@ -175,13 +175,15 @@ class UniversalAgentService(looper_basic.BasicService):
             resource["node"] = str(utils.node_uuid())
             try:
                 resource = models.Resource.restore_from_simple_view(**resource)
-                self._status_api.resources.create(resource)
+                self._status_api.resources(resource.kind).create(resource)
             except Exception:
                 LOG.exception("Error creating resource %s", uuid)
 
         for uuid in actual_resources.keys() - target_resources.keys():
+            resource = actual_resources[uuid]
+
             try:
-                self._status_api.resources.delete(uuid)
+                self._status_api.resources(resource["kind"]).delete(uuid)
             except Exception:
                 LOG.exception("Error deleting resource %s", uuid)
 
@@ -197,10 +199,11 @@ class UniversalAgentService(looper_basic.BasicService):
             resource = target_resource.copy()
             resource.pop("created_at", None)
             resource.pop("updated_at", None)
+            resource.pop("res_uuid", None)
             resource.pop("node", None)
 
             try:
-                self._status_api.resources.update(**resource)
+                self._status_api.resources(resource["kind"]).update(**resource)
             except Exception:
                 LOG.exception("Error updating resource %s", uuid)
 

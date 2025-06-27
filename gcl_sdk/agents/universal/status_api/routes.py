@@ -19,13 +19,22 @@ from restalchemy.api import routes
 from gcl_sdk.agents.universal.status_api import controllers
 
 
-class ResourcesRoute(routes.Route):
-    """Handler for /v1/resources/ endpoint"""
-
-    __controller__ = controllers.ResourcesController
-
-
 class UniversalAgentsRoute(routes.Route):
     """Handler for /v1/agents/ endpoint"""
 
     __controller__ = controllers.UniversalAgentsController
+
+
+class ResourcesRoute(routes.Route):
+    """Handler for /v1/kind/<name>/resources/ endpoint"""
+
+    __controller__ = controllers.ResourcesController
+
+
+class KindRoute(routes.Route):
+    """Handler for /v1/kind/ endpoint"""
+
+    __allow_methods__ = [routes.FILTER, routes.GET]
+    __controller__ = controllers.KindController
+
+    resources = routes.route(ResourcesRoute, resource_route=True)
