@@ -144,11 +144,11 @@ class TestUniversalAgent:
         assert not CapDriver.delete_called
         assert not CapDriver.update_called
         self.orch_api.agents.get_payload.assert_called_once()
-        self.status_api.resources.create.assert_called_once_with(
+        self.status_api.resources("foo").create.assert_called_once_with(
             resource.to_ua_resource(kind="foo")
         )
-        self.status_api.resources.update.assert_not_called()
-        self.status_api.resources.delete.assert_not_called()
+        self.status_api.resources("foo").update.assert_not_called()
+        self.status_api.resources("foo").delete.assert_not_called()
 
     def test_agent_update_capability(self):
         uuid = sys_uuid.uuid4()
@@ -185,9 +185,9 @@ class TestUniversalAgent:
         assert not CapDriver.delete_called
         assert not CapDriver.create_called
         self.orch_api.agents.get_payload.assert_called_once()
-        self.status_api.resources.create.assert_not_called()
-        self.status_api.resources.update.assert_not_called()
-        self.status_api.resources.delete.assert_not_called()
+        self.status_api.resources("foo").create.assert_not_called()
+        self.status_api.resources("foo").update.assert_not_called()
+        self.status_api.resources("foo").delete.assert_not_called()
 
     def test_agent_delete_capability(self):
         uuid = sys_uuid.uuid4()
@@ -221,9 +221,11 @@ class TestUniversalAgent:
         assert not CapDriver.update_called
         assert not CapDriver.create_called
         self.orch_api.agents.get_payload.assert_called_once()
-        self.status_api.resources.create.assert_not_called()
-        self.status_api.resources.update.assert_not_called()
-        self.status_api.resources.delete.assert_called_once_with(str(uuid))
+        self.status_api.resources("foo").create.assert_not_called()
+        self.status_api.resources("foo").update.assert_not_called()
+        self.status_api.resources("foo").delete.assert_called_once_with(
+            str(uuid)
+        )
 
     def test_agent_new_capabilities(self):
         uuid_a = sys_uuid.uuid4()
@@ -254,9 +256,9 @@ class TestUniversalAgent:
         agent._iteration()
 
         self.orch_api.agents.get_payload.assert_called_once()
-        assert self.status_api.resources.create.call_count == 2
-        self.status_api.resources.update.assert_not_called()
-        self.status_api.resources.delete.assert_not_called()
+        assert self.status_api.resources("foo").create.call_count == 2
+        self.status_api.resources("foo").update.assert_not_called()
+        self.status_api.resources("foo").delete.assert_not_called()
 
     def test_agent_mix_capability_actions(self):
         uuid_a = sys_uuid.uuid4()
@@ -303,11 +305,13 @@ class TestUniversalAgent:
 
         agent._iteration()
 
-        self.status_api.resources.create.assert_called_once_with(
+        self.status_api.resources("foo").create.assert_called_once_with(
             resource_a.to_ua_resource(kind="foo")
         )
-        self.status_api.resources.update.assert_not_called()
-        self.status_api.resources.delete.assert_called_once_with(str(uuid_c))
+        self.status_api.resources("foo").update.assert_not_called()
+        self.status_api.resources("foo").delete.assert_called_once_with(
+            str(uuid_c)
+        )
 
     def test_agent_new_fact(self):
         uuid = sys_uuid.uuid4()
@@ -335,11 +339,11 @@ class TestUniversalAgent:
         agent._iteration()
 
         self.orch_api.agents.get_payload.assert_called_once()
-        self.status_api.resources.create.assert_called_once_with(
+        self.status_api.resources("foo").create.assert_called_once_with(
             resource.to_ua_resource(kind="foo")
         )
-        self.status_api.resources.update.assert_not_called()
-        self.status_api.resources.delete.assert_not_called()
+        self.status_api.resources("foo").update.assert_not_called()
+        self.status_api.resources("foo").delete.assert_not_called()
 
     def test_agent_update_fact(self):
         uuid = sys_uuid.uuid4()
@@ -371,14 +375,15 @@ class TestUniversalAgent:
         agent._iteration()
 
         self.orch_api.agents.get_payload.assert_called_once()
-        self.status_api.resources.create.assert_not_called()
-        self.status_api.resources.delete.assert_not_called()
+        self.status_api.resources("foo").create.assert_not_called()
+        self.status_api.resources("foo").delete.assert_not_called()
 
         data = res.to_ua_resource(kind="foo").dump_to_simple_view()
         data.pop("created_at", None)
         data.pop("updated_at", None)
+        data.pop("res_uuid", None)
         data.pop("node", None)
-        self.status_api.resources.update.assert_called_once_with(**data)
+        self.status_api.resources("foo").update.assert_called_once_with(**data)
 
     def test_agent_delete_fact(self):
         uuid = sys_uuid.uuid4()
@@ -403,9 +408,11 @@ class TestUniversalAgent:
         agent._iteration()
 
         self.orch_api.agents.get_payload.assert_called_once()
-        self.status_api.resources.create.assert_not_called()
-        self.status_api.resources.update.assert_not_called()
-        self.status_api.resources.delete.assert_called_once_with(str(uuid))
+        self.status_api.resources("foo").create.assert_not_called()
+        self.status_api.resources("foo").update.assert_not_called()
+        self.status_api.resources("foo").delete.assert_called_once_with(
+            str(uuid)
+        )
 
     def test_agent_new_facts(self):
         uuid_a = sys_uuid.uuid4()
@@ -438,9 +445,9 @@ class TestUniversalAgent:
         agent._iteration()
 
         self.orch_api.agents.get_payload.assert_called_once()
-        assert self.status_api.resources.create.call_count == 2
-        self.status_api.resources.update.assert_not_called()
-        self.status_api.resources.delete.assert_not_called()
+        assert self.status_api.resources("foo").create.call_count == 2
+        self.status_api.resources("foo").update.assert_not_called()
+        self.status_api.resources("foo").delete.assert_not_called()
 
     def test_agent_mix_fact_actions(self):
         uuid_a = sys_uuid.uuid4()
@@ -480,13 +487,16 @@ class TestUniversalAgent:
         agent._iteration()
 
         self.orch_api.agents.get_payload.assert_called_once()
-        self.status_api.resources.create.assert_called_once_with(
+        self.status_api.resources("foo").create.assert_called_once_with(
             resource_a.to_ua_resource(kind="foo")
         )
-        self.status_api.resources.delete.assert_called_once_with(str(uuid_c))
+        self.status_api.resources("foo").delete.assert_called_once_with(
+            str(uuid_c)
+        )
 
         data = res.to_ua_resource(kind="foo").dump_to_simple_view()
         data.pop("created_at", None)
         data.pop("updated_at", None)
+        data.pop("res_uuid", None)
         data.pop("node", None)
-        self.status_api.resources.update.assert_called_once_with(**data)
+        self.status_api.resources("foo").update.assert_called_once_with(**data)

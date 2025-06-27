@@ -375,7 +375,7 @@ class UniversalAgent(
 
 
 class Resource(
-    models.ModelWithRequiredUUID,
+    models.ModelWithID,
     models.ModelWithTimestamp,
     models.SimpleViewMixin,
     orm.SQLStorableMixin,
@@ -428,12 +428,47 @@ class Resource(
 
     __tablename__ = "ua_actual_resources"
 
+    # Should be the same as `uuid` of internal object that the
+    # resource is holding. Therefore isn't unique since we can have
+    # the same `uuid` but different `kind`. The simplest example is
+    # any resource is created by the Element Manager. We will have
+    # two objects with the same `uuid` but different `kind`.
+    # - (<uuid_foo>, em_core_object) (EM resource)
+    # - (<uuid_foo>, object) (A particular service resource)
+    uuid = properties.property(
+        types.UUID(),
+        read_only=True,
+        default=lambda: sys_uuid.uuid4(),
+    )
     kind = properties.property(types.String(max_length=64), required=True)
     value = properties.property(types.Dict())
     hash = properties.property(types.String(max_length=256), default="")
     full_hash = properties.property(types.String(max_length=256), default="")
     status = properties.property(types.String(max_length=32), default="ACTIVE")
     node = properties.property(types.AllowNone(types.UUID()), default=None)
+
+    # The `uuid` field isn't unique, since it's possible to have several
+    # resource with the same `uuid` but different `kind`. Therefore the
+    # primary key is `res_uuid`. it's useful to have a single unique
+    # identifier and it can be any unique UUID but it's recommended to
+    # use `uuid5(uuid, kind)`.
+    res_uuid = properties.property(
+        types.UUID(),
+        id_property=True,
+        required=True,
+        default=lambda: sys_uuid.uuid4(),
+    )
+
+    def __eq__(self, other: Resource):
+        if isinstance(other, self.__class__):
+            return self.uuid == other.uuid and self.kind == other.kind
+        return False
+
+    def __ne__(self, other):
+        return not self == other
+
+    def __hash__(self):
+        return hash((self.uuid, self.kind))
 
     def calculate_hash(self) -> None:
         self.hash = utils.calculate_hash(self.value)
@@ -458,12 +493,17 @@ class Resource(
         return Resource(
             uuid=self.uuid,
             kind=self.kind,
+            res_uuid=self.res_uuid,
             value=value,
             hash=hash,
             full_hash=utils.calculate_hash(value),
             status=status,
             node=self.node,
         )
+
+    @classmethod
+    def gen_res_uuid(cls, uuid: sys_uuid.UUID, kind: str) -> sys_uuid.UUID:
+        return sys_uuid.uuid5(uuid, kind)
 
     @classmethod
     def from_value(
@@ -483,6 +523,7 @@ class Resource(
         return cls(
             uuid=uuid,
             kind=kind,
+            res_uuid=cls.gen_res_uuid(uuid, kind),
             value=value,
             hash=hash,
             full_hash=utils.calculate_hash(value),
@@ -519,16 +560,16 @@ class ResourceMixin(models.SimpleViewMixin):
         """Get resource uuid."""
         return self.uuid
 
-    def get_resource_target_fields(self) -> list[str]:
-        """Return the list of target fields.
+    def get_resource_target_fields(self) -> tp.Collection[str]:
+        """Return the collection of target fields.
 
         Refer to the Resource model for more details about target fields.
         """
-        return []
+        return set()
 
-    def get_resource_ignore_fields(self) -> list[str]:
+    def get_resource_ignore_fields(self) -> tp.Collection[str]:
         """Return fields that should not belong to the resource."""
-        return []
+        return set()
 
     def to_ua_resource(self, kind: str) -> Resource:
         # It's considered as a data plane values
@@ -549,6 +590,7 @@ class ResourceMixin(models.SimpleViewMixin):
         return Resource(
             uuid=self.get_resource_uuid(),
             kind=kind,
+            res_uuid=Resource.gen_res_uuid(self.get_resource_uuid(), kind),
             value=value,
             hash=utils.calculate_hash(target_data),
             full_hash=utils.calculate_hash(value),
@@ -589,6 +631,9 @@ class TargetResourceMixin(ResourceMixin):
         return TargetResource(
             uuid=self.get_resource_uuid(),
             kind=kind,
+            res_uuid=TargetResource.gen_res_uuid(
+                self.get_resource_uuid(), kind
+            ),
             value=target_data,
             hash=utils.calculate_hash(target_data),
             full_hash="",
@@ -693,7 +738,7 @@ class TargetResourceSQLStorableMixin:
 
 
 class OutdatedResource(models.ModelWithUUID, orm.SQLStorableMixin):
-    __tablename__ = "outdated_resources"
+    __tablename__ = "ua_outdated_resources_view"
 
     kind = properties.property(types.String(max_length=64), required=True)
     target_resource = relationships.relationship(

@@ -13,20 +13,89 @@
 #    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 #    License for the specific language governing permissions and limitations
 #    under the License.
+import functools
+import uuid as sys_uuid
+import typing as tp
+
 import bazooka
 
 from gcl_sdk.agents.universal.dm import models
 from gcl_sdk.clients.http import base
 
 
-class UniversalAgentsClient(base.CollectionBaseModelClient):
-    __collection_url__ = "/v1/agents/"
+class UniversalAgentsClient(base.StaticCollectionBaseModelClient):
+    __collection_path__ = "/v1/agents/"
     __model__ = models.UniversalAgent
 
 
 class ResourcesClient(base.CollectionBaseModelClient):
-    __collection_url__ = "/v1/resources/"
+    API_VERSION = "v1"
+
     __model__ = models.Resource
+
+    def __init__(
+        self,
+        base_url: str,
+        kind: str,
+        http_client: bazooka.Client | None = None,
+        auth: base.AbstractAuthenticator | None = None,
+    ) -> None:
+        collecton_path = f"/{self.API_VERSION}/kind/{kind}/resources/"
+        super().__init__(base_url, collecton_path, http_client, auth)
+        self._kind = kind
+
+    def _set_kind_ref(self, resource: models.Resource | dict) -> None:
+        """Set the resource kind as a reference.
+
+        The `kind` field in the response is a reference since the kind is
+        a collection now. It's not convenient to use it as the reference
+        so set it to a reference before creating the resource in Status API.
+        """
+        ref = f"/{self.API_VERSION}/kind/{self._kind}"
+
+        try:
+            resource.kind = ref
+        except AttributeError:
+            if "kind" in resource:
+                resource["kind"] = ref
+
+    def _drop_kind_ref(self, resource: models.Resource | dict) -> None:
+        """Drop the kind reference and set it as a string.
+
+        The `kind` field in the response is a reference since the kind is
+        a collection now. It's not convenient to use it as the reference
+        so drop the reference and set the kind as a string before using it.
+        """
+        try:
+            resource.kind = self._kind
+        except AttributeError:
+            if "kind" in resource:
+                resource["kind"] = self._kind
+
+    def get(self, uuid: sys_uuid.UUID) -> models.Resource:
+        resource = super().get(uuid)
+        self._drop_kind_ref(resource)
+        return resource
+
+    def filter(self, **filters: tp.Dict[str, tp.Any]) -> list[models.Resource]:
+        resources = super().filter(**filters)
+        for r in resources:
+            self._drop_kind_ref(r)
+        return resources
+
+    def create(self, object: models.Resource) -> models.Resource:
+        self._set_kind_ref(object)
+        resource = super().create(object)
+        self._drop_kind_ref(resource)
+        return resource
+
+    def update(
+        self, uuid: sys_uuid.UUID, **params: tp.Dict[str, tp.Any]
+    ) -> models.Resource:
+        self._set_kind_ref(params)
+        resource = super().update(uuid, **params)
+        self._drop_kind_ref(resource)
+        return resource
 
 
 class StatusAPI:
@@ -36,15 +105,14 @@ class StatusAPI:
         http_client: bazooka.Client | None = None,
     ) -> None:
         http_client = http_client or bazooka.Client()
-
         self._http_client = http_client
+        self._base_url = base_url
         self._agents_client = UniversalAgentsClient(base_url, http_client)
-        self._resources_client = ResourcesClient(base_url, http_client)
 
     @property
-    def agents(self):
+    def agents(self) -> UniversalAgentsClient:
         return self._agents_client
 
-    @property
-    def resources(self):
-        return self._resources_client
+    @functools.lru_cache
+    def resources(self, kind: str) -> ResourcesClient:
+        return ResourcesClient(self._base_url, kind, self._http_client)

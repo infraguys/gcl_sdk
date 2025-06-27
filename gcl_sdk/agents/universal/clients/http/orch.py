@@ -21,8 +21,8 @@ from gcl_sdk.agents.universal.dm import models
 from gcl_sdk.clients.http import base
 
 
-class UniversalAgentsClient(base.CollectionBaseModelClient):
-    __collection_url__ = "/v1/agents/"
+class UniversalAgentsClient(base.StaticCollectionBaseModelClient):
+    __collection_path__ = "/v1/agents/"
     __model__ = models.UniversalAgent
 
     def get_payload(

@@ -216,7 +216,6 @@ class CollectionBaseClient:
 
 
 class CollectionBaseModelClient(CollectionBaseClient):
-    __collection_url__: str | None = None
     __model__: tp.Type[models.SimpleViewMixin] = None
     __resource_client__: tp.Type["ResourceBaseModelClient"] = None
     __parent__: str | None = None
@@ -224,10 +223,15 @@ class CollectionBaseModelClient(CollectionBaseClient):
     def __init__(
         self,
         base_url: str,
+        collection_path: str,
         http_client: bazooka.Client | None = None,
         auth: AbstractAuthenticator | None = None,
     ) -> None:
         super().__init__(base_url, http_client, auth)
+        self._collection_path = collection_path
+
+    def get_collection(self) -> str:
+        return self._collection_path
 
     def __call__(
         self, resource_uuid: sys_uuid.UUID
@@ -238,40 +242,52 @@ class CollectionBaseModelClient(CollectionBaseClient):
 
     def get(self, uuid: sys_uuid.UUID) -> models.SimpleViewMixin:
         return self.__model__.restore_from_simple_view(
-            **super().get(self.__collection_url__, uuid)
+            **super().get(self.get_collection(), uuid)
         )
 
     def filter(
         self, **filters: tp.Dict[str, tp.Any]
-    ) -> models.SimpleViewMixin:
+    ) -> list[models.SimpleViewMixin]:
         return [
             self.__model__.restore_from_simple_view(**o)
-            for o in super().filter(self.__collection_url__, **filters)
+            for o in super().filter(self.get_collection(), **filters)
         ]
 
     def create(self, object: models.SimpleViewMixin) -> models.SimpleViewMixin:
         skip = tuple() if self.__parent__ is None else (self.__parent__,)
         data = object.dump_to_simple_view(skip=skip)
         return self.__model__.restore_from_simple_view(
-            **super().create(self.__collection_url__, data)
+            **super().create(self.get_collection(), data)
         )
 
     def update(
         self, uuid: sys_uuid.UUID, **params: tp.Dict[str, tp.Any]
     ) -> models.SimpleViewMixin:
         return self.__model__.restore_from_simple_view(
-            **super().update(self.__collection_url__, uuid, **params)
+            **super().update(self.get_collection(), uuid, **params)
         )
 
     def delete(self, uuid: sys_uuid.UUID) -> None:
-        super().delete(self.__collection_url__, uuid)
+        super().delete(self.get_collection(), uuid)
 
     def do_action(
         self, name: str, uuid: sys_uuid.UUID, invoke: bool = False, **kwargs
     ) -> dict[str : tp.Any] | None:
         return super().do_action(
-            self.__collection_url__, name, uuid, invoke, **kwargs
+            self.get_collection(), name, uuid, invoke, **kwargs
         )
+
+
+class StaticCollectionBaseModelClient(CollectionBaseModelClient):
+    __collection_path__: str | None = None
+
+    def __init__(
+        self,
+        base_url: str,
+        http_client: bazooka.Client | None = None,
+        auth: AbstractAuthenticator | None = None,
+    ) -> None:
+        super().__init__(base_url, self.__collection_path__, http_client, auth)
 
 
 class ResourceBaseModelClient:
@@ -282,7 +298,7 @@ class ResourceBaseModelClient:
 
     def __init__(
         self,
-        collection: CollectionBaseModelClient,
+        collection: StaticCollectionBaseModelClient,
         resource_uuid: sys_uuid.UUID,
         http_client: bazooka.Client | None = None,
     ):
@@ -292,7 +308,7 @@ class ResourceBaseModelClient:
 
     def resource_url(self):
         return self._collection.resource_url(
-            self._collection.__collection_url__, self._resource_uuid
+            self._collection.__collection_path__, self._resource_uuid
         )
 
     def get(self) -> models.SimpleViewMixin:
