@@ -24,5 +24,5 @@ class AuditController(
 
     #
     def get(self, uuid: sys_uuid.UUID, **kwargs):
-        self._enforce("audit_log:audit_record:read")
+        self._enforce("audit_log.audit_record.read")
         return super().get(uuid, **kwargs)

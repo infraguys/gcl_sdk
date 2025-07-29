@@ -64,7 +64,7 @@ class TestAuditApi:
         response = requests.get(url)
         output = response.json()
         expected = {
-            "action": "insert",
+            "action": "create",
             "object_type": "ua_agents",
             "object_uuid": str(agent_a.uuid),
             "uuid": str(audit.uuid),
