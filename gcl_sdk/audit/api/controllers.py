@@ -17,11 +17,3 @@ class AuditController(
         process_filters=True,
         convert_underscore=False,
     )
-
-    def filter(self, filters, order_by=None):
-        self._enforce("read")
-        return super().filter(filters, order_by)
-
-    def get(self, uuid: sys_uuid.UUID, **kwargs):
-        self._enforce("read")
-        return super().get(uuid, **kwargs)
