@@ -38,9 +38,14 @@ class MigrationStep(migrations.AbstarctMigrationStep):
                 "object_uuid" UUID NOT NULL,
                 "object_type" varchar(64) NOT NULL,
                 "user_uuid" UUID DEFAULT NULL,
-                "created_at" timestamp with time zone NOT NULL DEFAULT NOW(),
-                "action" varchar(64) NOT NULL
+                "action" varchar(64) NOT NULL,
+                "created_at" TIMESTAMP(6) NOT NULL DEFAULT NOW(),
+                "updated_at" TIMESTAMP(6) NOT NULL DEFAULT NOW()
             );
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS gcl_sdk_audit_logs_object_type_action_idx
+                ON gcl_sdk_audit_logs (object_type, action);
             """,
         ]
 

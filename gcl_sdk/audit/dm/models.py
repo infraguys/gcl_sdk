@@ -1,8 +1,7 @@
 import datetime
 import inspect
 
-from restalchemy.common.contexts import ContextIsNotExistsInStorage
-from restalchemy.common.contexts import get_context
+from restalchemy.common import contexts
 from restalchemy.dm import models
 from restalchemy.dm import properties
 from restalchemy.dm import types
@@ -12,6 +11,7 @@ from gcl_sdk.audit import constants
 
 
 class AuditRecord(
+    models.ModelWithTimestamp,
     models.ModelWithUUID,
     orm.SQLStorableMixin,
 ):
@@ -32,11 +32,6 @@ class AuditRecord(
         default=None,
         read_only=True,
     )
-    created_at = properties.property(
-        types.UTCDateTimeZ(),
-        read_only=True,
-        default=lambda: datetime.datetime.now(datetime.timezone.utc),
-    )
     action = properties.property(
         types.String(max_length=64),
         required=True,
@@ -45,33 +40,39 @@ class AuditRecord(
 
 
 class AuditLogSQLStorableMixin(orm.SQLStorableMixin):
-    def insert(self, session=None, force=False, action=None, object_type=None):
+    def insert(
+        self, session=None, force=False, action: str = None, object_type=None
+    ):
         if force or self.is_dirty():
             with self._get_engine().session_manager(session=session) as s:
                 super().insert(session)
-                self._write_audit_log(action, object_type)
+                self._write_audit_log(action, object_type, session=s)
 
-    def update(self, session, force=False, action=None, object_type=None):
+    def update(
+        self, session, force=False, action: str = None, object_type=None
+    ):
         if force or self.is_dirty():
             with self._get_engine().session_manager(session=session) as s:
                 super().update(session)
-                self._write_audit_log(action, object_type)
+                self._write_audit_log(action, object_type, session=s)
 
-    def delete(self, session, action=None, object_type=None):
+    def delete(self, session, action: str = None, object_type=None):
         with self._get_engine().session_manager(session=session) as s:
             super().delete(session)
-            self._write_audit_log(action, object_type)
+            self._write_audit_log(action, object_type, session=s)
 
-    def _write_audit_log(self, action=None, object_type=None):
+    def _write_audit_log(
+        self, action: str = None, object_type=None, session=None
+    ):
         if action is None:
             action = inspect.stack()[1].function
             action = getattr(constants.Action, action, action)
         if object_type is None:
             object_type = self.get_table().name
         try:
-            ctx = get_context()
+            ctx = contexts.get_context()
             user_uuid = ctx.iam_context.token_info.user_uuid
-        except (ContextIsNotExistsInStorage, AttributeError):
+        except (contexts.ContextIsNotExistsInStorage, AttributeError):
             user_uuid = None
 
         AuditRecord(
@@ -79,4 +80,4 @@ class AuditLogSQLStorableMixin(orm.SQLStorableMixin):
             object_type=object_type,
             user_uuid=user_uuid,
             action=action,
-        ).insert()
+        ).insert(session)
