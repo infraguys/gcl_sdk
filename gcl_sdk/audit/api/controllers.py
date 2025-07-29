@@ -19,10 +19,9 @@ class AuditController(
     )
 
     def filter(self, filters, order_by=None):
-        self._enforce("audit_log.audit_record.read")
+        self._enforce("read")
         return super().filter(filters, order_by)
 
-    #
     def get(self, uuid: sys_uuid.UUID, **kwargs):
-        self._enforce("audit_log.audit_record.read")
+        self._enforce("read")
         return super().get(uuid, **kwargs)

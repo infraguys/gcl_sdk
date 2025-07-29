@@ -5,6 +5,8 @@ from urllib.parse import urljoin
 
 import pytest
 import requests
+from gcl_iam.drivers import DummyDriver
+from gcl_iam.enforcers import Enforcer
 from mock import mock
 from oslo_config import cfg
 from restalchemy.common import contexts
@@ -22,6 +24,18 @@ class UniversalAgentAuditMixin(
     AuditLogSQLStorableMixin, models.UniversalAgent
 ): ...
 
+
+introspection_info = lambda x: DummyDriver().get_introspection_info(None)
+
+
+class DummyDriverIam(DummyDriver):
+    introspection_info = introspection_info
+    enforcer = Enforcer(["audit_log.audit_record.read"])
+
+
+class DummyContext(Context):
+    iam_context = DummyDriverIam()
+    introspection_info = introspection_info
 
 
 class TestAuditApi:
@@ -45,7 +59,7 @@ class TestAuditApi:
 
     def test_no_audit(self, audit_api: test_utils.RestServiceTestCase):
         url = urljoin(audit_api.base_url, "audit/")
-        contexts.get_context = mock.MagicMock(return_value=Context)
+        contexts.get_context = mock.MagicMock(return_value=DummyContext)
         response = requests.get(url)
         assert response.json() == []
         assert response.status_code == 200
@@ -60,7 +74,7 @@ class TestAuditApi:
             filters={"object_uuid": agent_a.uuid}
         )
         url = urljoin(audit_api.base_url, f"audit/{audit.uuid}")
-        contexts.get_context = mock.MagicMock(return_value=Context)
+        contexts.get_context = mock.MagicMock(return_value=DummyContext)
         response = requests.get(url)
         output = response.json()
         expected = {
@@ -86,7 +100,7 @@ class TestAuditApi:
         agent_b.insert(force=True)
         audits = AuditRecord.objects.get_all()
         url = urljoin(audit_api.base_url, "audit/")
-        contexts.get_context = mock.MagicMock(return_value=Context)
+        contexts.get_context = mock.MagicMock(return_value=DummyContext)
         response = requests.get(url)
         output = response.json()
         assert response.status_code == 200
