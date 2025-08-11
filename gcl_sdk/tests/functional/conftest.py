@@ -36,7 +36,7 @@ from restalchemy.openapi import engines as openapi_engines
 from gcl_sdk.agents.universal.dm import models
 from gcl_sdk.agents.universal.orch_api import routes as orch_routes
 from gcl_sdk.agents.universal.status_api import routes as status_routes
-
+from gcl_sdk.audit.api import routes as audit_routes
 
 FIRST_MIGRATION = "0000-init-events-table-2cfd220e.py"
 
@@ -129,6 +129,39 @@ def status_api_wsgi_app():
     return middlewares.attach_middlewares(
         applications.OpenApiApplication(
             route_class=StatusApiApp,
+            openapi_engine=get_openapi_engine(),
+        ),
+        [
+            context_mw.ContextMiddleware,
+            errors_mw.ErrorsHandlerMiddleware,
+            logging_mw.LoggingMiddleware,
+        ],
+    )
+
+
+@pytest.fixture(scope="module")
+def audit_api_wsgi_app():
+    class AuditApiApp(routes.RootRoute):
+        pass
+
+    class ApiEndpointController(controllers.RoutesListController):
+        __TARGET_PATH__ = "/v1/"
+
+    class ApiEndpointRoute(routes.Route):
+        __controller__ = ApiEndpointController
+        __allow_methods__ = [routes.FILTER]
+
+        audit = routes.route(audit_routes.AuditRoute)
+
+    setattr(
+        AuditApiApp,
+        "v1",
+        routes.route(ApiEndpointRoute),
+    )
+
+    return middlewares.attach_middlewares(
+        applications.OpenApiApplication(
+            route_class=AuditApiApp,
             openapi_engine=get_openapi_engine(),
         ),
         [
