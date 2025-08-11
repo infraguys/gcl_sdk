@@ -48,6 +48,7 @@ class CoreIamAuthenticator(AbstractAuthenticator):
         client_id: str = "GenesisCoreClientId",
         client_secret: str = "GenesisCoreClientSecret",
         client_uuid: sys_uuid.UUID = DEFAULT_CLIENT_UUID,
+        scope: str | None = None,
         ttl: int = 86400,  # 1 day
         http_client: bazooka.Client | None = None,
     ):
@@ -66,7 +67,7 @@ class CoreIamAuthenticator(AbstractAuthenticator):
             "password": password,
             "client_id": client_id,
             "client_secret": client_secret,
-            "scope": "",
+            "scope": scope or self.empty_scope(),
             "ttl": str(ttl),
         }
 
@@ -85,6 +86,14 @@ class CoreIamAuthenticator(AbstractAuthenticator):
         if not self._access_token:
             self.authenticate()
         return {"Authorization": f"Bearer {self._access_token}"}
+
+    @classmethod
+    def empty_scope(cls) -> str:
+        return ""
+
+    @classmethod
+    def project_scope(cls, project_id: sys_uuid.UUID) -> str:
+        return f"project:{project_id}"
 
 
 class CollectionBaseClient:
