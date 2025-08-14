@@ -84,6 +84,8 @@ class MetaDataPlaneModel(
 
         `None` means all fields are meta fields but it doesn't mean they
         won't be updated from the data plane.
+
+        Empty list means there's no meta fields.
         """
         return None
 
@@ -164,6 +166,12 @@ class MetaFileStorageAgentDriver(base.AbstractCapabilityDriver):
         self, capability: str, meta_object: MetaDataPlaneModel
     ) -> None:
         """Add the resource from the meta file."""
+
+        meta_fields = meta_object.get_meta_fields()
+        if meta_fields is not None and len(meta_fields) == 0:
+            # meta is not used, just finish here
+            return
+
         # Create the directory if it doesn't exist
         os.makedirs(os.path.dirname(self._meta_file), exist_ok=True)
 
@@ -175,9 +183,7 @@ class MetaFileStorageAgentDriver(base.AbstractCapabilityDriver):
         view = meta_object.dump_to_simple_view()
 
         # Save only meta fields
-        # TODO(akremenetsky): Handle an empty meta fields list.
-        # Actually it means no fields are saved.
-        if meta_fields := meta_object.get_meta_fields():
+        if meta_fields:
             for k in tuple(view.keys()):
                 if k not in meta_fields:
                     view.pop(k)

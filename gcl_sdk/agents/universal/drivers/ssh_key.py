@@ -57,6 +57,8 @@ class SSHKey(meta.MetaDataPlaneModel):
 
         `None` means all fields are meta fields but it doesn't mean they
         won't be updated from the data plane.
+
+        Empty list means there's no meta fields.
         """
 
         # Keep all fields as meta fields for simplicity
