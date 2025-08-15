@@ -22,6 +22,7 @@ from gcl_looper.services import basic as looper_basic
 from bazooka import exceptions as baz_exc
 
 from gcl_sdk.agents.universal.drivers import base as driver_base
+from gcl_sdk.agents.universal.drivers import meta as driver_meta
 from gcl_sdk.agents.universal.drivers import exceptions as driver_exc
 from gcl_sdk.agents.universal.dm import models
 from gcl_sdk.agents.universal.clients.http import status as status_clients
@@ -154,6 +155,10 @@ class UniversalAgentService(looper_basic.BasicService):
                 collected_resources.append(resource)
             except Exception:
                 LOG.exception("Error updating resource %s", r.uuid)
+
+        # Persist meta storage if used
+        if isinstance(driver, driver_meta.MetaFileStorageAgentDriver):
+            driver.persist_storage()
 
         return collected_resources
 
