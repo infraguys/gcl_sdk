@@ -18,6 +18,8 @@ from __future__ import annotations
 import os
 import json
 import logging
+from pathlib import Path
+import threading
 import uuid as sys_uuid
 
 from restalchemy.dm import properties
@@ -84,6 +86,8 @@ class MetaDataPlaneModel(
 
         `None` means all fields are meta fields but it doesn't mean they
         won't be updated from the data plane.
+
+        Empty list means there's no meta fields.
         """
         return None
 
@@ -98,6 +102,51 @@ class MetaDataPlaneModel(
 
     def update_on_dp(self) -> None:
         """Update the resource on the data plane."""
+
+
+class MetaFileStorageSingleton(dict):
+    _instances = {}
+    _lock = threading.Lock()
+
+    def __new__(cls, meta_file: str):
+        if meta_file not in cls._instances:
+            with cls._lock:
+                if meta_file not in cls._instances:
+                    cls._instances[meta_file] = super(
+                        MetaFileStorageSingleton, cls
+                    ).__new__(cls)
+        # if capability not in cls._instances[meta_file]:
+        #     with cls._lock:
+        #         cls._instances[meta_file][capability] = super(
+        #             MetaFileStorageSingleton, cls
+        #         ).__new__(cls)
+        return cls._instances[meta_file]
+
+    def __init__(self, meta_file: str):
+        self._meta_file = Path(meta_file)
+
+        super().__init__()
+        self.load()
+
+    def load(self) -> None:
+        if not os.path.exists(self._meta_file):
+            self.clear()
+            return
+
+        with open(self._meta_file) as f:
+            data = json.load(f)
+            self.clear()
+            self.update(data)
+
+    def persist(self) -> None:
+        # Create the directory if it doesn't exist
+        os.makedirs(os.path.dirname(self._meta_file), exist_ok=True)
+
+        # Save the new data
+        tmp_file = self._meta_file.with_suffix(".tmp")
+        with open(tmp_file, "w") as f:
+            json.dump(self, f, indent=2)
+        os.replace(tmp_file, self._meta_file)
 
 
 class MetaFileStorageAgentDriver(base.AbstractCapabilityDriver):
@@ -119,6 +168,7 @@ class MetaFileStorageAgentDriver(base.AbstractCapabilityDriver):
     def __init__(self, *args, meta_file: str, **kwargs):
         super().__init__()
         self._meta_file = meta_file
+        self._storage = MetaFileStorageSingleton(self._meta_file)
 
         # Check the model map is in the correct format
         for cap_models in self.__model_map__.values():
@@ -133,65 +183,47 @@ class MetaFileStorageAgentDriver(base.AbstractCapabilityDriver):
         It loads only the `meta` part that cannot be fetched from the data plane
         or lightweight models.
         """
-        if not os.path.exists(self._meta_file):
-            return []
 
-        with open(self._meta_file) as f:
-            data = json.load(f)[capability]
+        if capability not in self._storage:
+            self._storage[capability] = {"resources": {}, "target_fields": []}
+        capstor = self._storage[capability]
 
         cap_model = self.__model_map__[capability]
-        return [cap_model.restore_from_simple_view(**r) for r in data]
+        return [cap_model.restore_from_simple_view(**r) for r in capstor]
 
-    def _delete_from_meta(self, uuid: sys_uuid.UUID) -> None:
+    def _delete_from_meta(self, kind: str, uuid: sys_uuid.UUID) -> None:
         """Remove the resource from the meta file."""
-        if not os.path.exists(self._meta_file):
-            return
 
         uuid = str(uuid)
 
-        with open(self._meta_file, "r+") as f:
-            data = json.load(f)
-            for capability in tuple(data.keys()):
-                data[capability] = [
-                    r for r in data[capability] if r["uuid"] != uuid
-                ]
-            f.seek(0)
-            f.truncate(0)
-            json.dump(data, f, indent=2)
-            LOG.debug("Deleted meta resource %s", uuid)
+        self._storage[kind]["resources"].pop(uuid)
+        self._storage.persist()
+        LOG.debug("Deleted meta resource %s", uuid)
 
     def _add_to_meta(
         self, capability: str, meta_object: MetaDataPlaneModel
     ) -> None:
         """Add the resource from the meta file."""
-        # Create the directory if it doesn't exist
-        os.makedirs(os.path.dirname(self._meta_file), exist_ok=True)
 
-        # Create the file if it doesn't exist
-        if not os.path.exists(self._meta_file):
-            with open(self._meta_file, "w") as f:
-                json.dump({capability: []}, f, indent=2)
+        meta_fields = meta_object.get_meta_fields()
+        if meta_fields is not None and len(meta_fields) == 0:
+            # meta is not used, just finish here
+            return
 
         view = meta_object.dump_to_simple_view()
 
         # Save only meta fields
-        # TODO(akremenetsky): Handle an empty meta fields list.
-        # Actually it means no fields are saved.
-        if meta_fields := meta_object.get_meta_fields():
+        if meta_fields:
             for k in tuple(view.keys()):
                 if k not in meta_fields:
                     view.pop(k)
 
-        # Save the new meta object
-        with open(self._meta_file, "r+") as f:
-            data = json.load(f)
-            if capability not in data:
-                data[capability] = []
-            data[capability].append(view)
-            f.seek(0)
-            f.truncate(0)
-            json.dump(data, f, indent=2)
-            LOG.debug("Saved meta resource: %s", view)
+        self._storage[capability]["resources"][str(meta_object.uuid)] = view
+        self._storage[capability]["resources"][
+            "target_fields"
+        ] = meta_object.target_fields
+        self._storage.persist()
+        LOG.debug("Saved meta resource: %s", view)
 
     def get_capabilities(self) -> list[str]:
         """Returns a list of capabilities supported by the driver."""
@@ -275,7 +307,7 @@ class MetaFileStorageAgentDriver(base.AbstractCapabilityDriver):
         meta_obj.update_on_dp()
 
         # The simplest implementation, just recreate.
-        self._delete_from_meta(resource.uuid)
+        self._delete_from_meta(resource.kind, resource.uuid)
         self._add_to_meta(resource.kind, meta_obj)
 
         new_resource = meta_obj.to_ua_resource(resource.kind)
@@ -298,5 +330,5 @@ class MetaFileStorageAgentDriver(base.AbstractCapabilityDriver):
         meta_obj = cap_model.from_ua_resource(resource)
 
         meta_obj.delete_from_dp()
-        self._delete_from_meta(resource.uuid)
+        self._delete_from_meta(resource.kind, resource.uuid)
         LOG.debug("Deleted resource: %s", resource.uuid)

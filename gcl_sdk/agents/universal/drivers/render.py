@@ -87,6 +87,8 @@ class Render(meta.MetaDataPlaneModel):
 
         `None` means all fields are meta fields but it doesn't mean they
         won't be updated from the data plane.
+
+        Empty list means there's no meta fields.
         """
         return {"uuid", "on_change", "path"}
 
