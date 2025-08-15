@@ -22,6 +22,7 @@ import uuid as sys_uuid
 from gcl_looper.services import basic as looper_basic
 
 from gcl_sdk.agents.universal.drivers import base as driver_base
+from gcl_sdk.agents.universal.drivers import meta as driver_meta
 from gcl_sdk.agents.universal.drivers import exceptions as driver_exc
 from gcl_sdk.agents.universal.dm import models
 from gcl_sdk.agents.universal.clients.orch import base as orch_base
@@ -137,6 +138,10 @@ class UniversalAgentService(looper_basic.BasicService):
                 # The resource wasn't deleted so add it back
                 collected_resources.append(r)
                 LOG.exception("Error deleting resource %s", r.uuid)
+
+        # Persist meta storage if used
+        if isinstance(driver, driver_meta.MetaFileStorageAgentDriver):
+            driver.persist_storage()
 
         for r in target_resources.keys() & actual_resources.keys():
             # set does not guarantee which instance will be given on
