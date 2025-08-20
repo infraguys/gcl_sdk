@@ -17,15 +17,15 @@ from __future__ import annotations
 
 import logging
 import typing as tp
+import uuid as sys_uuid
 
 from gcl_looper.services import basic as looper_basic
-from bazooka import exceptions as baz_exc
 
 from gcl_sdk.agents.universal.drivers import base as driver_base
 from gcl_sdk.agents.universal.drivers import exceptions as driver_exc
 from gcl_sdk.agents.universal.dm import models
-from gcl_sdk.agents.universal.clients.http import status as status_clients
-from gcl_sdk.agents.universal.clients.http import orch as orch_clients
+from gcl_sdk.agents.universal.clients.orch import base as orch_base
+from gcl_sdk.agents.universal.clients.orch import exceptions as orch_exc
 from gcl_sdk.agents.universal import constants as c
 from gcl_sdk.agents.universal import utils
 
@@ -37,19 +37,18 @@ class UniversalAgentService(looper_basic.BasicService):
 
     def __init__(
         self,
+        agent_uuid: sys_uuid.UUID,
+        orch_client: orch_base.AbstractOrchClient,
         caps_drivers: list[driver_base.AbstractCapabilityDriver],
         facts_drivers: list[driver_base.AbstractFactDriver],
-        orch_api: orch_clients.OrchAPI,
-        status_api: status_clients.StatusAPI,
-        payload_path: str = c.PAYLOAD_PATH,
-        iter_min_period=3,
-        iter_pause=0.1,
+        payload_path: str | None = c.PAYLOAD_PATH,
+        iter_min_period: float = 3,
+        iter_pause: float = 0.1,
     ):
         super().__init__(iter_min_period, iter_pause)
-        self._system_uuid = utils.system_uuid()
-        self._orch_api = orch_api
-        self._status_api = status_api
+        self._orch_client = orch_client
         self._payload_path = payload_path
+        self._agent_uuid = agent_uuid
 
         # Make driver maps by capability and facts:
         # For instance, {"config": ConfigDriver, "service": ServiceDriver}
@@ -66,18 +65,20 @@ class UniversalAgentService(looper_basic.BasicService):
     def _register_agent(self) -> None:
         capabilities = self._caps_driver_map.keys()
         facts = self._facts_driver_map.keys()
-        agent = models.UniversalAgent.from_system_uuid(capabilities, facts)
+        agent = models.UniversalAgent.from_system_uuid(
+            capabilities, facts, self._agent_uuid
+        )
         try:
-            self._status_api.agents.create(agent)
+            self._orch_client.agents_create(agent)
             LOG.info("Agent registered: %s", agent.uuid)
-        except baz_exc.ConflictError:
+        except orch_exc.AgentAlreadyExists:
             LOG.warning("Agent already registered: %s", agent.uuid)
 
     def _create_resource(
         self,
         driver: driver_base.AbstractCapabilityDriver,
         resource: models.Resource,
-    ) -> None:
+    ) -> models.Resource:
         try:
             dp_resource = driver.create(resource)
         except driver_exc.ResourceAlreadyExists:
@@ -175,7 +176,7 @@ class UniversalAgentService(looper_basic.BasicService):
             resource["node"] = str(utils.node_uuid())
             try:
                 resource = models.Resource.restore_from_simple_view(**resource)
-                self._status_api.resources(resource.kind).create(resource)
+                self._orch_client.resources_create(resource)
             except Exception:
                 LOG.exception("Error creating resource %s", uuid)
 
@@ -183,7 +184,8 @@ class UniversalAgentService(looper_basic.BasicService):
             resource = actual_resources[uuid]
 
             try:
-                self._status_api.resources(resource["kind"]).delete(uuid)
+                resource = models.Resource.restore_from_simple_view(**resource)
+                self._orch_client.resources_delete(resource)
             except Exception:
                 LOG.exception("Error deleting resource %s", uuid)
 
@@ -202,8 +204,11 @@ class UniversalAgentService(looper_basic.BasicService):
             resource.pop("res_uuid", None)
             resource.pop("node", None)
 
+            res_uuid = resource.pop("uuid")
+            kind = resource.pop("kind")
+
             try:
-                self._status_api.resources(resource["kind"]).update(**resource)
+                self._orch_client.resources_update(kind, res_uuid, **resource)
             except Exception:
                 LOG.exception("Error updating resource %s", uuid)
 
@@ -236,14 +241,17 @@ class UniversalAgentService(looper_basic.BasicService):
         collected_payload = models.Payload.empty()
 
         # Last successfully saved payload. Use it to compare with CP payload.
-        last_payload = models.Payload.load(self._payload_path)
+        if self._payload_path:
+            last_payload = models.Payload.load(self._payload_path)
+        else:
+            last_payload = None
 
         # Check if the agent is registered
         try:
-            payload = self._orch_api.agents.get_payload(
-                self._system_uuid, last_payload
+            payload = self._orch_client.agents_get_payload(
+                self._agent_uuid, last_payload
             )
-        except baz_exc.NotFoundError:
+        except orch_exc.AgentNotFound:
             # Auto discovery mechanism
             self._register_agent()
             return
@@ -296,4 +304,5 @@ class UniversalAgentService(looper_basic.BasicService):
         # are different. So the difference in the facts. Update it.
 
         # Save the collected payload after actualization
-        collected_payload.save(self._payload_path)
+        if self._payload_path:
+            collected_payload.save(self._payload_path)
