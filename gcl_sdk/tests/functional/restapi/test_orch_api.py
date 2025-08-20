@@ -189,6 +189,8 @@ class TestUAOrchApi:
         view.pop("master", None)
         view.pop("node", None)
         view.pop("tracked_at", None)
+        view.pop("master_hash", None)
+        view.pop("master_full_hash", None)
         assert output["capabilities"]["foo"]["resources"] == [view]
         assert output["facts"] == {
             "bar": {"resources": []},
