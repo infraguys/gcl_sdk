@@ -13,25 +13,11 @@
 #    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 #    License for the specific language governing permissions and limitations
 #    under the License.
-import os
+
 import enum
 
 
-GENESIS_WORK_DIR = "/var/lib/genesis"
-WORK_DIR = "/var/lib/genesis/universal_agent/"
-PAYLOAD_PATH = os.path.join(WORK_DIR, "payload.json")
-NODE_UUID_PATH = os.path.join(GENESIS_WORK_DIR, "node-id")
-DEFAULT_DATETIME_FORMAT = "%Y-%m-%d %H:%M:%S.%1f"
-EP_UNIVERSAL_AGENT = "gcl_sdk_universal_agent"
-
-DEF_SQL_LIMIT = 100
-
-
-class AgentStatus(str, enum.Enum):
-    NEW = "NEW"
-    ACTIVE = "ACTIVE"
-    ERROR = "ERROR"
-    DISABLED = "DISABLED"
+DEF_ROOT_DISK_SIZE = 10
 
 
 class InstanceStatus(str, enum.Enum):
@@ -39,3 +25,21 @@ class InstanceStatus(str, enum.Enum):
     IN_PROGRESS = "IN_PROGRESS"
     ACTIVE = "ACTIVE"
     ERROR = "ERROR"
+
+
+class NodeStatus(str, enum.Enum):
+    NEW = "NEW"
+    SCHEDULED = "SCHEDULED"
+    IN_PROGRESS = "IN_PROGRESS"
+    STARTED = "STARTED"
+    ACTIVE = "ACTIVE"
+    ERROR = "ERROR"
+
+
+class NodeType(str, enum.Enum):
+    VM = "VM"
+    HW = "HW"
+
+
+class NodeSetType(str, enum.Enum):
+    SET = "SET"
