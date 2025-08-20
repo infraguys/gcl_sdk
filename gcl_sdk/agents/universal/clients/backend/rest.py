@@ -31,7 +31,7 @@ class RestApiBackendClient(base.AbstractBackendClient):
     def __init__(
         self,
         http_client: http.CollectionBaseClient,
-        collection_map: dict[str:str],
+        collection_map: dict[str, str],
     ) -> None:
         self._client = http_client
         self._collection_map = collection_map
