@@ -19,12 +19,8 @@ import tempfile
 import uuid as sys_uuid
 from unittest import mock
 
-from bazooka import exceptions as bazooka_exc
-from restalchemy.dm import models as ra_models
-from restalchemy.dm import properties
-from restalchemy.dm import types as ra_types
-
 from gcl_sdk.agents.universal import utils
+from gcl_sdk.agents.universal.clients.orch import exceptions as orch_exc
 from gcl_sdk.agents.universal.dm import models
 from gcl_sdk.agents.universal.drivers import base
 from gcl_sdk.agents.universal.services import agent as agent_svc
@@ -90,30 +86,29 @@ class TestUniversalAgent:
 
     def setup_method(self) -> None:
         # Run service
-        self.orch_api = mock.MagicMock()
-        self.status_api = mock.MagicMock()
+        self.orch_client = mock.MagicMock()
+        self.agent_uuid = MACHINE_UUID
 
     def teardown_method(self) -> None:
         if os.path.exists(self.PAYLOAD_PATH):
             os.remove(self.PAYLOAD_PATH)
 
     def test_agent_registration(self):
-        cause = mock.MagicMock()
-        cause.response.status_code = 404
-        self.orch_api.agents.get_payload = mock.MagicMock(
-            side_effect=bazooka_exc.NotFoundError(cause)
+        # Simulate agent not found on orchestrator
+        self.orch_client.agents_get_payload = mock.MagicMock(
+            side_effect=orch_exc.AgentNotFound(uuid=self.agent_uuid)
         )
 
         agent = agent_svc.UniversalAgentService(
+            agent_uuid=self.agent_uuid,
+            orch_client=self.orch_client,
             caps_drivers=[],
             facts_drivers=[],
-            orch_api=self.orch_api,
-            status_api=self.status_api,
         )
 
         agent._iteration()
 
-        self.status_api.agents.create.assert_called_once()
+        self.orch_client.agents_create.assert_called_once()
 
     def test_agent_new_capability(self):
         uuid = sys_uuid.uuid4()
@@ -122,7 +117,9 @@ class TestUniversalAgent:
         payload.add_caps_resource(resource.to_ua_resource(kind="foo"))
         payload.calculate_hash()
 
-        self.orch_api.agents.get_payload = mock.MagicMock(return_value=payload)
+        self.orch_client.agents_get_payload = mock.MagicMock(
+            return_value=payload
+        )
 
         class CapDriver(FooCapDriver):
 
@@ -131,10 +128,10 @@ class TestUniversalAgent:
                 return super().create(resource)
 
         agent = agent_svc.UniversalAgentService(
+            agent_uuid=self.agent_uuid,
+            orch_client=self.orch_client,
             caps_drivers=[CapDriver()],
             facts_drivers=[],
-            orch_api=self.orch_api,
-            status_api=self.status_api,
             payload_path=self.PAYLOAD_PATH,
         )
 
@@ -143,12 +140,16 @@ class TestUniversalAgent:
         assert CapDriver.create_called
         assert not CapDriver.delete_called
         assert not CapDriver.update_called
-        self.orch_api.agents.get_payload.assert_called_once()
-        self.status_api.resources("foo").create.assert_called_once_with(
-            resource.to_ua_resource(kind="foo")
-        )
-        self.status_api.resources("foo").update.assert_not_called()
-        self.status_api.resources("foo").delete.assert_not_called()
+        self.orch_client.agents_get_payload.assert_called_once()
+        # A fact for created capability should be created
+        # in Status via orch client
+        self.orch_client.resources_create.assert_called_once()
+        created_res = self.orch_client.resources_create.call_args.args[0]
+        assert isinstance(created_res, models.Resource)
+        assert created_res.uuid == uuid
+        assert created_res.kind == "foo"
+        self.orch_client.resources_update.assert_not_called()
+        self.orch_client.resources_delete.assert_not_called()
 
     def test_agent_update_capability(self):
         uuid = sys_uuid.uuid4()
@@ -158,7 +159,9 @@ class TestUniversalAgent:
         payload.add_facts_resource(resource.to_ua_resource(kind="foo"))
         payload.calculate_hash()
 
-        self.orch_api.agents.get_payload = mock.MagicMock(return_value=payload)
+        self.orch_client.agents_get_payload = mock.MagicMock(
+            return_value=payload
+        )
 
         class CapDriver(FooCapDriver):
             def list(self, capability):
@@ -172,10 +175,10 @@ class TestUniversalAgent:
                 return super().update(resource)
 
         agent = agent_svc.UniversalAgentService(
+            agent_uuid=self.agent_uuid,
+            orch_client=self.orch_client,
             caps_drivers=[CapDriver()],
             facts_drivers=[],
-            orch_api=self.orch_api,
-            status_api=self.status_api,
             payload_path=self.PAYLOAD_PATH,
         )
 
@@ -184,10 +187,10 @@ class TestUniversalAgent:
         assert CapDriver.update_called
         assert not CapDriver.delete_called
         assert not CapDriver.create_called
-        self.orch_api.agents.get_payload.assert_called_once()
-        self.status_api.resources("foo").create.assert_not_called()
-        self.status_api.resources("foo").update.assert_not_called()
-        self.status_api.resources("foo").delete.assert_not_called()
+        self.orch_client.agents_get_payload.assert_called_once()
+        self.orch_client.resources_create.assert_not_called()
+        self.orch_client.resources_update.assert_not_called()
+        self.orch_client.resources_delete.assert_not_called()
 
     def test_agent_delete_capability(self):
         uuid = sys_uuid.uuid4()
@@ -197,7 +200,9 @@ class TestUniversalAgent:
         payload.add_facts_resource(resource.to_ua_resource(kind="foo"))
         payload.calculate_hash()
 
-        self.orch_api.agents.get_payload = mock.MagicMock(return_value=payload)
+        self.orch_client.agents_get_payload = mock.MagicMock(
+            return_value=payload
+        )
 
         class CapDriver(FooCapDriver):
             def list(self, capability):
@@ -208,10 +213,10 @@ class TestUniversalAgent:
                 return super().delete(resource)
 
         agent = agent_svc.UniversalAgentService(
+            agent_uuid=self.agent_uuid,
+            orch_client=self.orch_client,
             caps_drivers=[CapDriver()],
             facts_drivers=[],
-            orch_api=self.orch_api,
-            status_api=self.status_api,
             payload_path=self.PAYLOAD_PATH,
         )
 
@@ -220,12 +225,13 @@ class TestUniversalAgent:
         assert CapDriver.delete_called
         assert not CapDriver.update_called
         assert not CapDriver.create_called
-        self.orch_api.agents.get_payload.assert_called_once()
-        self.status_api.resources("foo").create.assert_not_called()
-        self.status_api.resources("foo").update.assert_not_called()
-        self.status_api.resources("foo").delete.assert_called_once_with(
-            str(uuid)
-        )
+        self.orch_client.agents_get_payload.assert_called_once()
+        self.orch_client.resources_create.assert_not_called()
+        self.orch_client.resources_update.assert_not_called()
+        self.orch_client.resources_delete.assert_called_once()
+        deleted_res = self.orch_client.resources_delete.call_args.args[0]
+        assert isinstance(deleted_res, models.Resource)
+        assert deleted_res.uuid == uuid
 
     def test_agent_new_capabilities(self):
         uuid_a = sys_uuid.uuid4()
@@ -237,7 +243,9 @@ class TestUniversalAgent:
         payload.add_caps_resource(resource_b.to_ua_resource(kind="foo"))
         payload.calculate_hash()
 
-        self.orch_api.agents.get_payload = mock.MagicMock(return_value=payload)
+        self.orch_client.agents_get_payload = mock.MagicMock(
+            return_value=payload
+        )
 
         class CapDriver(FooCapDriver):
 
@@ -246,19 +254,19 @@ class TestUniversalAgent:
                 return super().create(resource)
 
         agent = agent_svc.UniversalAgentService(
+            agent_uuid=self.agent_uuid,
+            orch_client=self.orch_client,
             caps_drivers=[CapDriver()],
             facts_drivers=[],
-            orch_api=self.orch_api,
-            status_api=self.status_api,
             payload_path=self.PAYLOAD_PATH,
         )
 
         agent._iteration()
 
-        self.orch_api.agents.get_payload.assert_called_once()
-        assert self.status_api.resources("foo").create.call_count == 2
-        self.status_api.resources("foo").update.assert_not_called()
-        self.status_api.resources("foo").delete.assert_not_called()
+        self.orch_client.agents_get_payload.assert_called_once()
+        assert self.orch_client.resources_create.call_count == 2
+        self.orch_client.resources_update.assert_not_called()
+        self.orch_client.resources_delete.assert_not_called()
 
     def test_agent_mix_capability_actions(self):
         uuid_a = sys_uuid.uuid4()
@@ -274,7 +282,9 @@ class TestUniversalAgent:
         payload.add_facts_resource(resource_c.to_ua_resource(kind="foo"))
         payload.calculate_hash()
 
-        self.orch_api.agents.get_payload = mock.MagicMock(return_value=payload)
+        self.orch_client.agents_get_payload = mock.MagicMock(
+            return_value=payload
+        )
 
         class CapDriver(FooCapDriver):
 
@@ -296,22 +306,24 @@ class TestUniversalAgent:
                 return super().delete(resource)
 
         agent = agent_svc.UniversalAgentService(
+            agent_uuid=self.agent_uuid,
+            orch_client=self.orch_client,
             caps_drivers=[CapDriver()],
             facts_drivers=[],
-            orch_api=self.orch_api,
-            status_api=self.status_api,
             payload_path=self.PAYLOAD_PATH,
         )
 
         agent._iteration()
 
-        self.status_api.resources("foo").create.assert_called_once_with(
-            resource_a.to_ua_resource(kind="foo")
-        )
-        self.status_api.resources("foo").update.assert_not_called()
-        self.status_api.resources("foo").delete.assert_called_once_with(
-            str(uuid_c)
-        )
+        self.orch_client.resources_create.assert_called_once()
+        created_res = self.orch_client.resources_create.call_args.args[0]
+        assert isinstance(created_res, models.Resource)
+        assert created_res.uuid == uuid_a
+        self.orch_client.resources_update.assert_not_called()
+        self.orch_client.resources_delete.assert_called_once()
+        deleted_res = self.orch_client.resources_delete.call_args.args[0]
+        assert isinstance(deleted_res, models.Resource)
+        assert deleted_res.uuid == uuid_c
 
     def test_agent_new_fact(self):
         uuid = sys_uuid.uuid4()
@@ -320,7 +332,9 @@ class TestUniversalAgent:
         payload.facts = {"foo": {"resources": []}}
         payload.calculate_hash()
 
-        self.orch_api.agents.get_payload = mock.MagicMock(return_value=payload)
+        self.orch_client.agents_get_payload = mock.MagicMock(
+            return_value=payload
+        )
 
         class FactDriver(FooFactDriver):
 
@@ -329,21 +343,23 @@ class TestUniversalAgent:
                 return [resource.to_ua_resource(kind="foo")]
 
         agent = agent_svc.UniversalAgentService(
+            agent_uuid=self.agent_uuid,
+            orch_client=self.orch_client,
             caps_drivers=[],
             facts_drivers=[FactDriver()],
-            orch_api=self.orch_api,
-            status_api=self.status_api,
             payload_path=self.PAYLOAD_PATH,
         )
 
         agent._iteration()
 
-        self.orch_api.agents.get_payload.assert_called_once()
-        self.status_api.resources("foo").create.assert_called_once_with(
-            resource.to_ua_resource(kind="foo")
-        )
-        self.status_api.resources("foo").update.assert_not_called()
-        self.status_api.resources("foo").delete.assert_not_called()
+        self.orch_client.agents_get_payload.assert_called_once()
+        self.orch_client.resources_create.assert_called_once()
+        created_res = self.orch_client.resources_create.call_args.args[0]
+        assert isinstance(created_res, models.Resource)
+        assert created_res.uuid == uuid
+        assert created_res.kind == "foo"
+        self.orch_client.resources_update.assert_not_called()
+        self.orch_client.resources_delete.assert_not_called()
 
     def test_agent_update_fact(self):
         uuid = sys_uuid.uuid4()
@@ -356,7 +372,9 @@ class TestUniversalAgent:
         res["name"] = "foo-name-updated"
         res = conftest.FooResource.restore_from_simple_view(**res)
 
-        self.orch_api.agents.get_payload = mock.MagicMock(return_value=payload)
+        self.orch_client.agents_get_payload = mock.MagicMock(
+            return_value=payload
+        )
 
         class FactDriver(FooFactDriver):
 
@@ -365,25 +383,27 @@ class TestUniversalAgent:
                 return [res.to_ua_resource(kind="foo")]
 
         agent = agent_svc.UniversalAgentService(
+            agent_uuid=self.agent_uuid,
+            orch_client=self.orch_client,
             caps_drivers=[],
             facts_drivers=[FactDriver()],
-            orch_api=self.orch_api,
-            status_api=self.status_api,
             payload_path=self.PAYLOAD_PATH,
         )
 
         agent._iteration()
 
-        self.orch_api.agents.get_payload.assert_called_once()
-        self.status_api.resources("foo").create.assert_not_called()
-        self.status_api.resources("foo").delete.assert_not_called()
+        self.orch_client.agents_get_payload.assert_called_once()
+        self.orch_client.resources_create.assert_not_called()
+        self.orch_client.resources_delete.assert_not_called()
 
         data = res.to_ua_resource(kind="foo").dump_to_simple_view()
         data.pop("created_at", None)
         data.pop("updated_at", None)
         data.pop("res_uuid", None)
         data.pop("node", None)
-        self.status_api.resources("foo").update.assert_called_once_with(**data)
+        self.orch_client.resources_update.assert_called_once_with(
+            data["kind"], data["uuid"], **data
+        )
 
     def test_agent_delete_fact(self):
         uuid = sys_uuid.uuid4()
@@ -392,27 +412,30 @@ class TestUniversalAgent:
         payload.add_facts_resource(resource.to_ua_resource(kind="foo"))
         payload.calculate_hash()
 
-        self.orch_api.agents.get_payload = mock.MagicMock(return_value=payload)
+        self.orch_client.agents_get_payload = mock.MagicMock(
+            return_value=payload
+        )
 
         class FactDriver(FooFactDriver):
             pass
 
         agent = agent_svc.UniversalAgentService(
+            agent_uuid=self.agent_uuid,
+            orch_client=self.orch_client,
             caps_drivers=[],
             facts_drivers=[FactDriver()],
-            orch_api=self.orch_api,
-            status_api=self.status_api,
             payload_path=self.PAYLOAD_PATH,
         )
 
         agent._iteration()
 
-        self.orch_api.agents.get_payload.assert_called_once()
-        self.status_api.resources("foo").create.assert_not_called()
-        self.status_api.resources("foo").update.assert_not_called()
-        self.status_api.resources("foo").delete.assert_called_once_with(
-            str(uuid)
-        )
+        self.orch_client.agents_get_payload.assert_called_once()
+        self.orch_client.resources_create.assert_not_called()
+        self.orch_client.resources_update.assert_not_called()
+        self.orch_client.resources_delete.assert_called_once()
+        deleted_res = self.orch_client.resources_delete.call_args.args[0]
+        assert isinstance(deleted_res, models.Resource)
+        assert deleted_res.uuid == uuid
 
     def test_agent_new_facts(self):
         uuid_a = sys_uuid.uuid4()
@@ -423,7 +446,9 @@ class TestUniversalAgent:
         payload.facts = {"foo": {"resources": []}}
         payload.calculate_hash()
 
-        self.orch_api.agents.get_payload = mock.MagicMock(return_value=payload)
+        self.orch_client.agents_get_payload = mock.MagicMock(
+            return_value=payload
+        )
 
         class FactDriver(FooFactDriver):
 
@@ -435,19 +460,19 @@ class TestUniversalAgent:
                 ]
 
         agent = agent_svc.UniversalAgentService(
+            agent_uuid=self.agent_uuid,
+            orch_client=self.orch_client,
             caps_drivers=[],
             facts_drivers=[FactDriver()],
-            orch_api=self.orch_api,
-            status_api=self.status_api,
             payload_path=self.PAYLOAD_PATH,
         )
 
         agent._iteration()
 
-        self.orch_api.agents.get_payload.assert_called_once()
-        assert self.status_api.resources("foo").create.call_count == 2
-        self.status_api.resources("foo").update.assert_not_called()
-        self.status_api.resources("foo").delete.assert_not_called()
+        self.orch_client.agents_get_payload.assert_called_once()
+        assert self.orch_client.resources_create.call_count == 2
+        self.orch_client.resources_update.assert_not_called()
+        self.orch_client.resources_delete.assert_not_called()
 
     def test_agent_mix_fact_actions(self):
         uuid_a = sys_uuid.uuid4()
@@ -465,7 +490,9 @@ class TestUniversalAgent:
         res["name"] = "foo-name-updated"
         res = conftest.FooResource.restore_from_simple_view(**res)
 
-        self.orch_api.agents.get_payload = mock.MagicMock(return_value=payload)
+        self.orch_client.agents_get_payload = mock.MagicMock(
+            return_value=payload
+        )
 
         class FactDriver(FooFactDriver):
 
@@ -477,26 +504,30 @@ class TestUniversalAgent:
                 ]
 
         agent = agent_svc.UniversalAgentService(
+            agent_uuid=self.agent_uuid,
             caps_drivers=[],
             facts_drivers=[FactDriver()],
-            orch_api=self.orch_api,
-            status_api=self.status_api,
+            orch_client=self.orch_client,
             payload_path=self.PAYLOAD_PATH,
         )
 
         agent._iteration()
 
-        self.orch_api.agents.get_payload.assert_called_once()
-        self.status_api.resources("foo").create.assert_called_once_with(
-            resource_a.to_ua_resource(kind="foo")
-        )
-        self.status_api.resources("foo").delete.assert_called_once_with(
-            str(uuid_c)
-        )
+        self.orch_client.agents_get_payload.assert_called_once()
+        self.orch_client.resources_create.assert_called_once()
+        created_res = self.orch_client.resources_create.call_args.args[0]
+        assert isinstance(created_res, models.Resource)
+        assert created_res.uuid == uuid_a
+        self.orch_client.resources_delete.assert_called_once()
+        deleted_res = self.orch_client.resources_delete.call_args.args[0]
+        assert isinstance(deleted_res, models.Resource)
+        assert deleted_res.uuid == uuid_c
 
         data = res.to_ua_resource(kind="foo").dump_to_simple_view()
         data.pop("created_at", None)
         data.pop("updated_at", None)
         data.pop("res_uuid", None)
         data.pop("node", None)
-        self.status_api.resources("foo").update.assert_called_once_with(**data)
+        self.orch_client.resources_update.assert_called_once_with(
+            data["kind"], data["uuid"], **data
+        )
