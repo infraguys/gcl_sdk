@@ -69,7 +69,7 @@ class TestAuditApi:
         agent_a = UniversalAgentAuditMixin(
             name="Agent A", uuid=uuid_a, node=uuid_a
         )
-        agent_a.insert(force=True)
+        agent_a.insert()
         audit = AuditRecord.objects.get_one(
             filters={"object_uuid": agent_a.uuid}
         )
@@ -96,8 +96,8 @@ class TestAuditApi:
         agent_b = UniversalAgentAuditMixin(
             name="Agent B", uuid=uuid_b, node=uuid_b
         )
-        agent_a.insert(force=True)
-        agent_b.insert(force=True)
+        agent_a.insert()
+        agent_b.insert()
         audits = AuditRecord.objects.get_all()
         url = urljoin(audit_api.base_url, "audit/")
         contexts.get_context = mock.MagicMock(return_value=DummyContext)
