@@ -40,25 +40,22 @@ class AuditRecord(
 
 
 class AuditLogSQLStorableMixin(orm.SQLStorableMixin):
-    def insert(
-        self, session=None, force=False, action: str = None, object_type=None
-    ):
-        if force or self.is_dirty():
-            with self._get_engine().session_manager(session=session) as s:
-                super().insert(session)
-                self._write_audit_log(action, object_type, session=s)
+    def insert(self, session=None, action: str = None, object_type=None):
+        with self._get_engine().session_manager(session=session) as s:
+            super().insert(session=s)
+            self._write_audit_log(action, object_type, session=s)
 
     def update(
         self, session, force=False, action: str = None, object_type=None
     ):
         if force or self.is_dirty():
             with self._get_engine().session_manager(session=session) as s:
-                super().update(session)
+                super().update(session=s, force=force)
                 self._write_audit_log(action, object_type, session=s)
 
     def delete(self, session, action: str = None, object_type=None):
         with self._get_engine().session_manager(session=session) as s:
-            super().delete(session)
+            super().delete(session=s)
             self._write_audit_log(action, object_type, session=s)
 
     def _write_audit_log(
