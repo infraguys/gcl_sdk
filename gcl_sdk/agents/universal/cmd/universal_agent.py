@@ -18,6 +18,7 @@ import logging
 import sys
 import typing as tp
 import configparser
+import uuid as sys_uuid
 
 import bazooka
 from oslo_config import cfg
@@ -27,11 +28,11 @@ from restalchemy.storage.sql import engines
 from gcl_sdk.common import config
 from gcl_sdk.common import log as infra_log
 from gcl_sdk.common import utils
-from gcl_sdk.agents.universal.clients.http import orch
-from gcl_sdk.agents.universal.clients.http import status
 from gcl_sdk.agents.universal.services import agent
 from gcl_sdk.agents.universal.drivers import base as driver_base
 from gcl_sdk.agents.universal import constants as c
+from gcl_sdk.agents.universal import utils as ua_utils
+from gcl_sdk.agents.universal.clients.orch import http as orch
 
 
 DOMAIN = "universal_agent"
@@ -57,6 +58,27 @@ core_agent_opts = [
         "facts_drivers",
         default=None,
         help="List of agent facts drivers",
+    ),
+    cfg.StrOpt(
+        "uuid",
+        default=None,
+        help=(
+            "UUID of the agent, if not provided, "
+            "the system UUID will be used"
+        ),
+    ),
+    cfg.StrOpt(
+        "uuid5_name",
+        default=None,
+        help=(
+            "UUID5 name component to generate UUID of the agent. "
+            "This option is ignored if the `uuid` is set."
+        ),
+    ),
+    cfg.StrOpt(
+        "payload_path",
+        default=c.PAYLOAD_PATH,
+        help="Path to the payload file.",
     ),
 ]
 
@@ -117,14 +139,21 @@ def main():
 
     # Prepare clients
     http_client = bazooka.Client(default_timeout=20)
-    orch_api = orch.OrchAPI(
-        CONF[DOMAIN].orch_endpoint,
+    orch_client = orch.HttpOrchClient(
+        orch_endpoint=CONF[DOMAIN].orch_endpoint,
+        status_endpoint=CONF[DOMAIN].status_endpoint,
         http_client=http_client,
     )
-    status_api = status.StatusAPI(
-        CONF[DOMAIN].status_endpoint,
-        http_client=http_client,
-    )
+
+    # Detect the agent UUID.
+    if CONF[DOMAIN].uuid:
+        agent_uuid = sys_uuid.UUID(CONF[DOMAIN].uuid)
+    elif CONF[DOMAIN].uuid5_name:
+        agent_uuid = sys_uuid.uuid5(
+            ua_utils.system_uuid(), CONF[DOMAIN].uuid5_name
+        )
+    else:
+        agent_uuid = ua_utils.system_uuid()
 
     # Load drivers from entry points
     caps_drivers = []
@@ -171,10 +200,11 @@ def main():
         log.info("Loaded driver: %s", driver_name)
 
     service = agent.UniversalAgentService(
-        orch_api=orch_api,
-        status_api=status_api,
+        agent_uuid=agent_uuid,
+        orch_client=orch_client,
         caps_drivers=caps_drivers,
         facts_drivers=facts_drivers,
+        payload_path=CONF[DOMAIN].payload_path,
         iter_min_period=3,
     )
 
