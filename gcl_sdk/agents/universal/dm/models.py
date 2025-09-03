@@ -156,9 +156,12 @@ class Payload(models.Model, models.SimpleViewMixin):
         if not os.path.exists(payload_dir):
             os.makedirs(payload_dir)
 
-        with open(payload_path, "w") as f:
-            payload_data = self.dump_to_simple_view()
+        payload_data = self.dump_to_simple_view()
+
+        tmp_file = f"{payload_path}.tmp"
+        with open(tmp_file, "w") as f:
             json.dump(payload_data, f, indent=2)
+        os.replace(tmp_file, payload_path)
 
     @classmethod
     def _resources(
