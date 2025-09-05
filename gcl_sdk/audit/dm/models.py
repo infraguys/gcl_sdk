@@ -1,5 +1,6 @@
 import datetime
 import inspect
+import uuid as sys_uuid
 
 from restalchemy.common import contexts
 from restalchemy.dm import models
@@ -8,6 +9,7 @@ from restalchemy.dm import types
 from restalchemy.storage.sql import orm
 
 from gcl_sdk.audit import constants
+from gcl_iam import exceptions as iam_exceptions
 
 
 class AuditRecord(
@@ -46,14 +48,14 @@ class AuditLogSQLStorableMixin(orm.SQLStorableMixin):
             self._write_audit_log(action, object_type, session=s)
 
     def update(
-        self, session, force=False, action: str = None, object_type=None
+        self, session=None, force=False, action: str = None, object_type=None
     ):
         if force or self.is_dirty():
             with self._get_engine().session_manager(session=session) as s:
                 super().update(session=s, force=force)
                 self._write_audit_log(action, object_type, session=s)
 
-    def delete(self, session, action: str = None, object_type=None):
+    def delete(self, session=None, action: str = None, object_type=None):
         with self._get_engine().session_manager(session=session) as s:
             super().delete(session=s)
             self._write_audit_log(action, object_type, session=s)
@@ -67,13 +69,21 @@ class AuditLogSQLStorableMixin(orm.SQLStorableMixin):
         if object_type is None:
             object_type = self.get_table().name
         try:
-            ctx = contexts.get_context()
-            user_uuid = ctx.iam_context.token_info.user_uuid
-        except (contexts.ContextIsNotExistsInStorage, AttributeError):
+            iam_context = contexts.get_context().iam_context
+            user_uuid = getattr(
+                getattr(iam_context, "token_info", None), "user_uuid", None
+            )
+        except (
+            contexts.ContextIsNotExistsInStorage,
+            iam_exceptions.NoIamSessionStored,
+        ):
             user_uuid = None
-
         AuditRecord(
-            object_uuid=getattr(self, "uuid", None),
+            object_uuid=getattr(
+                self,
+                "uuid",
+                sys_uuid.UUID("00000000-0000-0000-0000-000000000000"),
+            ),
             object_type=object_type,
             user_uuid=user_uuid,
             action=action,
