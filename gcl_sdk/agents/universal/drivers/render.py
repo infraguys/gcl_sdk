@@ -49,6 +49,10 @@ class OnChangeNoAction(types_dynamic.AbstractKindModel, AbstractRenderHooks):
 class OnChangeShell(types_dynamic.AbstractKindModel, AbstractRenderHooks):
     KIND = "shell"
 
+    command = properties.property(
+        types.String(max_length=262144), required=True, default=""
+    )
+
     def on_change(self) -> None:
         subprocess.check_output(self.command, shell=True)
 

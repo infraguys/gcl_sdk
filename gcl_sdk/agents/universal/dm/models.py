@@ -263,11 +263,19 @@ class UniversalAgent(
     def list_facts(self) -> list[str]:
         return self.facts["facts"]
 
+    @property
+    def list_kinds(self) -> list[str]:
+        return self.list_capabilities + self.list_facts
+
     @classmethod
     def from_system_uuid(
-        cls, capabilities: tp.Iterable[str], facts: tp.Iterable[str]
+        cls,
+        capabilities: tp.Iterable[str],
+        facts: tp.Iterable[str],
+        agent_uuid: sys_uuid.UUID | None = None,
     ):
-        uuid = utils.system_uuid()
+        system_uuid = utils.system_uuid()
+        uuid = agent_uuid or system_uuid
         capabilities = {"capabilities": list(capabilities)}
         facts = {"facts": list(facts)}
         return cls(
@@ -279,7 +287,7 @@ class UniversalAgent(
             # Actually it's won't be true for some cases. For instance,
             # baremetal nodes added by hands. We dont' have such cases
             # so keep it simple so far.
-            node=uuid,
+            node=system_uuid,
         )
 
     def get_payload(self, hash: str = "", version: int = 0) -> Payload:
@@ -293,6 +301,7 @@ class UniversalAgent(
         facts_resources = Resource.objects.get_all(
             filters={
                 "node": dm_filters.EQ(str(self.node)),
+                "kind": dm_filters.In(self.list_kinds),
             }
         )
 
@@ -300,7 +309,14 @@ class UniversalAgent(
 
         payload.add_caps_resources(
             caps_resources,
-            skip_fields=("agent", "master", "tracked_at", "node"),
+            skip_fields=(
+                "agent",
+                "master",
+                "master_hash",
+                "master_full_hash",
+                "tracked_at",
+                "node",
+            ),
         )
         payload.add_facts_resources(
             facts_resources,
@@ -476,6 +492,14 @@ class Resource(
     def calculate_hash(self) -> None:
         self.hash = utils.calculate_hash(self.value)
 
+    def sync_with_origin(self, origin_object) -> None:
+        if self.uuid != origin_object.get_resource_uuid():
+            raise Exception("sync_with_origin: resource-object UUID mismatch")
+        value, target_data = origin_object.get_ua_all_and_target_values()
+        self.value = value
+        self.hash = utils.calculate_hash(target_data)
+        self.full_hash = utils.calculate_hash(value)
+
     def replace_value(
         self,
         value: dict[str, tp.Any],
@@ -535,9 +559,22 @@ class Resource(
 
 
 class TargetResource(Resource):
-    """This model is represent an abstract resource for the Universal Agent.
+    """This model is an abstract target resource for the Universal Agent.
 
-    Almost the same as `Resource` but it's used as a target resource.
+    It's pretty close to the `Resource` model but it's used as a target
+    resource.
+
+    The fields `master_hash` and `master_full_hash` are used to track
+    the master resource hash. It's useful to track the master resource
+    hash to determine if the master resource has been changed.
+
+    Args:
+        agent: The agent UUID that the resource belongs to.
+        master: The master UUID. It's a master resource UUID that the
+            resource is related to.
+        tracked_at: The tracked at timestamp.
+        master_hash: The master hash tracked last time.
+        master_full_hash: The master full hash tracked last time.
     """
 
     __tablename__ = "ua_target_resources"
@@ -547,6 +584,10 @@ class TargetResource(Resource):
     tracked_at = properties.property(
         types.UTCDateTimeZ(),
         default=lambda: datetime.datetime.now(datetime.timezone.utc),
+    )
+    master_hash = properties.property(types.String(max_length=256), default="")
+    master_full_hash = properties.property(
+        types.String(max_length=256), default=""
     )
 
     def update_value(self, other: TargetResource) -> None:
@@ -574,8 +615,7 @@ class ResourceMixin(models.SimpleViewMixin):
         """Return fields that should not belong to the resource."""
         return set()
 
-    def to_ua_resource(self, kind: str) -> Resource:
-        # It's considered as a data plane values
+    def get_ua_all_and_target_values(self):
         value = self.dump_to_simple_view(
             skip=self.get_resource_ignore_fields()
         )
@@ -589,7 +629,10 @@ class ResourceMixin(models.SimpleViewMixin):
             }
         else:
             target_data = value
+        return value, target_data
 
+    def to_ua_resource(self, kind: str) -> Resource:
+        value, target_data = self.get_ua_all_and_target_values()
         return Resource(
             uuid=self.get_resource_uuid(),
             kind=kind,
@@ -614,22 +657,12 @@ class TargetResourceMixin(ResourceMixin):
         self,
         kind: str,
         master: sys_uuid.UUID | None = None,
+        master_hash: str = "",
+        master_full_hash: str = "",
         tracked_at: datetime.datetime | None = None,
     ) -> TargetResource:
         tracked_at = tracked_at or datetime.datetime.now(datetime.timezone.utc)
-        value = self.dump_to_simple_view(
-            skip=self.get_resource_ignore_fields()
-        )
-
-        # Need to get only target fields with values to calculate hash
-        target_fields = self.get_resource_target_fields()
-
-        if target_fields:
-            target_data = {
-                k: v for k, v in value.items() if k in target_fields
-            }
-        else:
-            target_data = value
+        _, target_data = self.get_ua_all_and_target_values()
 
         return TargetResource(
             uuid=self.get_resource_uuid(),
@@ -641,6 +674,8 @@ class TargetResourceMixin(ResourceMixin):
             hash=utils.calculate_hash(target_data),
             full_hash="",
             master=master,
+            master_hash=master_hash,
+            master_full_hash=master_full_hash,
             tracked_at=tracked_at,
         )
 
@@ -754,3 +789,235 @@ class OutdatedResource(models.ModelWithUUID, orm.SQLStorableMixin):
         prefetch=True,
         required=True,
     )
+
+
+class OutdatedMasterHashResource(models.ModelWithUUID, orm.SQLStorableMixin):
+    __tablename__ = "ua_outdated_master_hash_resources_view"
+
+    kind = properties.property(types.String(max_length=64), required=True)
+    target_resource = relationships.relationship(
+        TargetResource,
+        prefetch=True,
+        required=True,
+    )
+    master = relationships.relationship(
+        TargetResource,
+        prefetch=True,
+        required=True,
+    )
+
+
+class OutdatedMasterFullHashResource(
+    models.ModelWithUUID, orm.SQLStorableMixin
+):
+    __tablename__ = "ua_outdated_master_full_hash_resources_view"
+
+    kind = properties.property(types.String(max_length=64), required=True)
+    target_resource = relationships.relationship(
+        TargetResource,
+        prefetch=True,
+        required=True,
+    )
+    master = relationships.relationship(
+        TargetResource,
+        prefetch=True,
+        required=True,
+    )
+
+
+class KindAwareMixin:
+    """A helpful mixin to get the resource kind."""
+
+    @classmethod
+    def get_resource_kind(cls) -> str:
+        """Return the resource kind."""
+        raise NotImplementedError
+
+
+class ResourceKindAwareMixin(KindAwareMixin, ResourceMixin):
+    """A helpful mixin to convert models to the resource model.
+
+    The difference from ResourceMixin is that it has method to get
+    the resource kind.
+    """
+
+    def to_ua_resource(self) -> Resource:
+        return super().to_ua_resource(kind=self.get_resource_kind())
+
+
+class TargetResourceKindAwareMixin(KindAwareMixin, TargetResourceMixin):
+    """A helpful mixin to convert models to the target resource model.
+
+    The difference from TargetResourceMixin is that it has method to get
+    the resource kind.
+    """
+
+    # The resource status to set on initialization if the default
+    # status is not set.
+    __init_resource_status__ = None
+
+    def to_ua_resource(
+        self,
+        master: sys_uuid.UUID | None = None,
+        master_hash: str = "",
+        master_full_hash: str = "",
+        tracked_at: datetime.datetime | None = None,
+        status: str | None = None,
+    ) -> TargetResource:
+        resource = super().to_ua_resource(
+            kind=self.get_resource_kind(),
+            master=master,
+            master_hash=master_hash,
+            master_full_hash=master_full_hash,
+            tracked_at=tracked_at,
+        )
+        resource.status = (
+            status or self.__init_resource_status__ or resource.status
+        )
+        return resource
+
+    @classmethod
+    def get_one_from_resource_storage(
+        cls, uuid: sys_uuid.UUID
+    ) -> "TargetResourceKindAwareMixin":
+        resource = TargetResource.objects.get_one(
+            filters={
+                "kind": dm_filters.EQ(cls.get_resource_kind()),
+                "uuid": dm_filters.EQ(uuid),
+            },
+        )
+        return cls.from_ua_resource(resource)
+
+    @classmethod
+    def get_all_from_resource_storage(
+        cls, filters: tp.Dict[str, tp.Any] | None = None
+    ) -> tuple["TargetResourceKindAwareMixin"]:
+        filters = filters.copy() if filters else {}
+        filters["kind"] = dm_filters.EQ(cls.get_resource_kind())
+
+        resources = TargetResource.objects.get_all(filters=filters)
+        return tuple(cls.from_ua_resource(resource) for resource in resources)
+
+
+class InstanceMixin(
+    orm.SQLStorableMixin,
+    TargetResourceKindAwareMixin,
+    TargetResourceSQLStorableMixin,
+):
+    """This is a core Mixin for models that is going to be used in builder.
+
+    Any models that is going to be used in universal builders should inherit
+    from this Mixin since it provides the necessary methods to work with the
+    universal builder. Two main group of methods are provided:
+    - methods to fetch entities from the database.
+    - methods to work with derivatives.
+
+    The derivatives objects are the objects that are created from the instance
+    object and strongly coupled with it. For example, the config instance has
+    derivatives like renders objects. Single config instance can have multiple
+    renders objects.
+
+    The default behavior for the `InstanceMixin` is to not have derivatives.
+    """
+
+    @classmethod
+    def _has_model_derivatives(cls) -> bool:
+        """Return `True` if the class has derivatives objects.
+
+        For example, config has derivatives like renders."""
+        return False
+
+    @classmethod
+    def derivative_kinds(cls) -> frozenset[str]:
+        """Return available derivative kinds for the instance class."""
+        return frozenset()
+
+    @classmethod
+    def get_new_instances(
+        cls, limit: int = c.DEF_SQL_LIMIT
+    ) -> list["InstanceMixin"]:
+        kind = cls.get_resource_kind()
+        return cls.get_new_entities(cls.__tablename__, kind, limit)
+
+    @classmethod
+    def get_updated_instances(
+        cls, limit: int = c.DEF_SQL_LIMIT
+    ) -> list["InstanceMixin"]:
+        kind = cls.get_resource_kind()
+        return cls.get_updated_entities(cls.__tablename__, kind, limit)
+
+    @classmethod
+    def get_deleted_instances(
+        cls, limit: int = c.DEF_SQL_LIMIT
+    ) -> list[TargetResource]:
+        kind = cls.get_resource_kind()
+        return cls.get_deleted_target_resources(cls.__tablename__, kind, limit)
+
+
+class InstanceWithDerivativesMixin(InstanceMixin):
+    """A core Mixin for models that is going to be used in builder.
+
+    See the `InstanceMixin` for core functionality. The key difference is
+    that this Mixin is focusing on instances that have derivatives.
+
+    The default behavior is to have derivatives objects.
+    """
+
+    # A map of derivative kinds to derivative models.
+    # Example:
+    # __derivative_model_map__ = {
+    #     "renders": Render,
+    # }
+    __derivative_model_map__: dict | None = None
+
+    # The master model for the instance. It's attribute is used in the case
+    # if the instance should track changes of the master.
+    # Example:
+    # __master_model__ = Config
+    __master_model__: type[InstanceMixin] | None = None
+
+    @classmethod
+    def _has_model_derivatives(cls) -> bool:
+        """Return `True` if the class has derivatives objects."""
+        return True
+
+    @classmethod
+    def derivative_kinds(cls) -> frozenset[str]:
+        """Return available derivative kinds for the instance class."""
+        if cls.__derivative_model_map__ is None:
+            return frozenset()
+
+        return frozenset(cls.__derivative_model_map__.keys())
+
+    @classmethod
+    def fetch_all_derivatives_on_outdate(cls) -> bool:
+        """Return `True` if need to fetch all derivatives on outdate.
+
+        If the class has derivatives this predicate is used to solve
+        how to actualize the instance if it is outdated.
+        There are two approaches:
+        1. Fetch all derivatives and update the instance.
+        2. Fetch only changed derivatives and update the instance.
+
+        Different classes can have different logic to actualize the instance.
+        The default implementation is to fetch all derivatives.
+        """
+        if cls._has_model_derivatives():
+            return True
+
+        return False
+
+    @classmethod
+    def derivative_model(
+        cls, kind: str
+    ) -> tp.Type[TargetResourceKindAwareMixin]:
+        """Return the derivative model by kind."""
+        if cls.__derivative_model_map__ is None:
+            raise ValueError("The derivative model map is not initialized.")
+
+        if kind not in cls.__derivative_model_map__:
+            raise ValueError(
+                f"The derivative model for kind {kind} is not found."
+            )
+
+        return cls.__derivative_model_map__[kind]
