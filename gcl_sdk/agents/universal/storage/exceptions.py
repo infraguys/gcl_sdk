@@ -14,18 +14,18 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 from gcl_sdk.common import exceptions
-from gcl_sdk.agents.universal.dm import models
+from gcl_sdk.agents.universal.storage import base
 
 
-class AgentStorageException(exceptions.UniversalAgentException):
-    __template__ = "An unknown agent storage exception occurred."
+class TargetFieldsStorageException(exceptions.UniversalAgentException):
+    __template__ = "An unknown target fields storage exception occurred."
 
 
-class ResourceAlreadyExists(AgentStorageException):
-    __template__ = "The resource already exists: {resource}"
-    resource: models.Resource
+class ItemAlreadyExists(TargetFieldsStorageException):
+    __template__ = "The item already exists: {item}"
+    item: base.TargetFieldItem
 
 
-class ResourceNotFound(AgentStorageException):
-    __template__ = "The resource not found: {resource}"
-    resource: models.Resource
+class ItemNotFound(TargetFieldsStorageException):
+    __template__ = "The item not found: {item}"
+    item: base.TargetFieldItem
