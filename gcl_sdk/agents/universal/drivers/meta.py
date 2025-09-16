@@ -15,11 +15,7 @@
 #    under the License.
 from __future__ import annotations
 
-import os
-import json
 import logging
-from pathlib import Path
-import threading
 import uuid as sys_uuid
 
 from restalchemy.dm import properties
@@ -29,6 +25,7 @@ from restalchemy.dm import models as ra_models
 from gcl_sdk.agents.universal.drivers import base
 from gcl_sdk.agents.universal.drivers import exceptions as driver_exc
 from gcl_sdk.agents.universal.dm import models
+from gcl_sdk.agents.universal.storage import common as storage_common
 
 
 LOG = logging.getLogger(__name__)
@@ -102,46 +99,6 @@ class MetaDataPlaneModel(
         """Update the resource on the data plane."""
 
 
-class MetaFileStorageSingleton(dict):
-    _instances = {}
-    _lock = threading.Lock()
-
-    def __new__(cls, meta_file: str):
-        if meta_file not in cls._instances:
-            with cls._lock:
-                if meta_file not in cls._instances:
-                    cls._instances[meta_file] = super(
-                        MetaFileStorageSingleton, cls
-                    ).__new__(cls)
-        return cls._instances[meta_file]
-
-    def __init__(self, meta_file: str):
-        self._meta_file = Path(meta_file)
-
-        super().__init__()
-        self.load()
-
-    def load(self) -> None:
-        if not os.path.exists(self._meta_file):
-            self.clear()
-            return
-
-        with open(self._meta_file) as f:
-            data = json.load(f)
-            self.clear()
-            self.update(data)
-
-    def persist(self) -> None:
-        # Create the directory if it doesn't exist
-        os.makedirs(os.path.dirname(self._meta_file), exist_ok=True)
-
-        # Save the new data
-        tmp_file = self._meta_file.with_suffix(".tmp")
-        with open(tmp_file, "w") as f:
-            json.dump(self, f, indent=2)
-        os.replace(tmp_file, self._meta_file)
-
-
 class MetaFileStorageAgentDriver(base.AbstractCapabilityDriver):
     """Meta driver. Handles models that partly are placed into the metafile.
 
@@ -161,7 +118,9 @@ class MetaFileStorageAgentDriver(base.AbstractCapabilityDriver):
     def __init__(self, *args, meta_file: str, **kwargs):
         super().__init__()
         self._meta_file = meta_file
-        self._storage = MetaFileStorageSingleton(self._meta_file)
+        self._storage = storage_common.JsonFileStorageSingleton(
+            self._meta_file
+        )
 
         # Check the model map is in the correct format
         for cap_models in self.__model_map__.values():
@@ -169,9 +128,6 @@ class MetaFileStorageAgentDriver(base.AbstractCapabilityDriver):
                 raise TypeError(
                     f"Model {cap_models} is not a MetaDataPlaneModel"
                 )
-
-    def persist_storage(self):
-        self._storage.persist()
 
     def _load_from_meta(self, capability: str) -> list[MetaDataPlaneModel]:
         """Load the resources from the meta file.
@@ -325,3 +281,15 @@ class MetaFileStorageAgentDriver(base.AbstractCapabilityDriver):
         meta_obj.delete_from_dp()
         self._delete_from_meta(resource.kind, resource.uuid)
         LOG.debug("Deleted resource: %s", resource.uuid)
+
+    def finalize(self) -> None:
+        """Perform some finalization after finishing all operations.
+
+        This method is called once after all other methods like list,
+        create, update, delete are called. It can be used to do some
+        finalization or cleanups like closing connections, files, etc.
+
+        The driver iteration:
+            start -> list -> [create | update | delete]* -> finalize
+        """
+        self._storage.persist()

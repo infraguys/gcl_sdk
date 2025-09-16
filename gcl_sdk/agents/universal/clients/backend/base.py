@@ -28,20 +28,58 @@ class AbstractBackendClient(abc.ABC):
     """
 
     @abc.abstractmethod
-    def get(self, resource: models.Resource) -> dict[str, tp.Any]:
-        """Get the resource value in dictionary format."""
+    def get(
+        self, resource: models.Resource
+    ) -> dict[str, tp.Any] | models.Resource | models.ResourceMixin:
+        """Get the resource.
+
+        The method can return resource in different formats:
+         - dictionary - raw data of the resource value
+         - Resource - ready to use resource model
+         - ResourceMixin - a custom model that extends ResourceMixin and
+            can be converted to Resource model.
+        """
 
     @abc.abstractmethod
-    def create(self, resource: models.Resource) -> dict[str, tp.Any]:
-        """Creates the resource. Returns the created resource."""
+    def create(
+        self, resource: models.Resource
+    ) -> dict[str, tp.Any] | models.Resource | models.ResourceMixin:
+        """Creates the resource. Returns the created resource.
+
+        The method can return resource in different formats:
+         - dictionary - raw data of the resource value
+         - Resource - ready to use resource model
+         - ResourceMixin - a custom model that extends ResourceMixin and
+            can be converted to Resource model.
+        """
 
     @abc.abstractmethod
-    def update(self, resource: models.Resource) -> dict[str, tp.Any]:
-        """Update the resource. Returns the updated resource."""
+    def update(
+        self, resource: models.Resource
+    ) -> dict[str, tp.Any] | models.Resource | models.ResourceMixin:
+        """Update the resource. Returns the updated resource.
+
+        The method can return resource in different formats:
+         - dictionary - raw data of the resource value
+         - Resource - ready to use resource model
+         - ResourceMixin - a custom model that extends ResourceMixin and
+            can be converted to Resource model.
+        """
 
     @abc.abstractmethod
-    def list(self, kind: str, **kwargs) -> list[dict[str, tp.Any]]:
-        """Lists all resources by kind."""
+    def list(
+        self, kind: str, **kwargs
+    ) -> tp.Collection[
+        dict[str, tp.Any] | models.Resource | models.ResourceMixin
+    ]:
+        """Lists all resources by kind.
+
+        The method returns collection of resources in different formats:
+         - dictionary - raw data of the resource value
+         - Resource - ready to use resource model
+         - ResourceMixin - a custom model that extends ResourceMixin and
+            can be converted to Resource model.
+        """
 
     @abc.abstractmethod
     def delete(self, resource: models.Resource) -> None:

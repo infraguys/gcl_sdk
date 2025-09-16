@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import logging
+import re
 import typing as tp
 import uuid as sys_uuid
 
@@ -115,6 +116,23 @@ class UniversalAgentService(looper_basic.BasicService):
         """
         Actualize resources and return a list of resources from data plane.
         """
+        try:
+            # Perform some preparations for the driver
+            driver.start()
+            return self._driver_cap_iteration(driver, capability, resources)
+        finally:
+            # Finalize the driver
+            driver.finalize()
+
+    def _driver_cap_iteration(
+        self,
+        driver: driver_base.AbstractCapabilityDriver,
+        capability: str,
+        resources: list[models.Resource],
+    ) -> list[models.Resource]:
+        """
+        Actualize resources and return a list of resources from data plane.
+        """
         target_resources = {r: r for r in resources}
         actual_resources = {r: r for r in driver.list(capability)}
 
@@ -156,10 +174,6 @@ class UniversalAgentService(looper_basic.BasicService):
                 collected_resources.append(resource)
             except Exception:
                 LOG.exception("Error updating resource %s", r.uuid)
-
-        # Persist meta storage if used
-        if isinstance(driver, driver_meta.MetaFileStorageAgentDriver):
-            driver.persist_storage()
 
         return collected_resources
 

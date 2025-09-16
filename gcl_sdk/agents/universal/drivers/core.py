@@ -15,20 +15,29 @@
 #    under the License.
 from __future__ import annotations
 
+import os
 import logging
+import uuid as sys_uuid
+import typing as tp
 
 import bazooka
+from restalchemy.storage import base as ra_storage
 
 from gcl_sdk.clients.http import base
 from gcl_sdk.agents.universal.drivers import direct
 from gcl_sdk.agents.universal.storage import fs
 
-from gcl_sdk.agents.universal.clients.backend import core as core_back
+from gcl_sdk.agents.universal.clients.backend import core as core_rest_back
+from gcl_sdk.agents.universal.clients.backend import db as db_back
 from gcl_sdk.agents.universal import constants as c
 
 LOG = logging.getLogger(__name__)
 
 
+CORE_TARGET_FIELDS_FILENAME = "core_target_fields.json"
+
+
+# DEPRECATED(akremenetsky): Use RestCoreCapabilityDriver instead.
 class CoreCapabilityDriver(direct.DirectAgentDriver):
     """Core capability driver for interacting with Genesis Core."""
 
@@ -53,8 +62,12 @@ class CoreCapabilityDriver(direct.DirectAgentDriver):
             http_client=http, base_url=user_api_base_url, auth=auth
         )
 
-        storage = fs.FileAgentStorage(agent_work_dir)
-        rest_client = core_back.GCRestApiBackendClient(
+        storage_path = os.path.join(
+            agent_work_dir, CORE_TARGET_FIELDS_FILENAME
+        )
+
+        storage = fs.TargetFieldsFileStorage(storage_path)
+        rest_client = core_rest_back.GCRestApiBackendClient(
             rest_client, collection_map, project_id
         )
 
@@ -63,3 +76,35 @@ class CoreCapabilityDriver(direct.DirectAgentDriver):
     def get_capabilities(self) -> list[str]:
         """Returns a list of capabilities supported by the driver."""
         return list(self._collection_map.keys())
+
+
+class RestCoreCapabilityDriver(CoreCapabilityDriver):
+    """Core capability driver for interacting with GC using REST API."""
+
+    pass
+
+
+class DatabaseCapabilityDriver(direct.DirectAgentDriver):
+    """Database capability driver for interacting with GC using database."""
+
+    def __init__(
+        self,
+        models: tp.Collection[
+            tuple[tp.Type[ra_storage.AbstractStorableMixin], str]
+        ],
+        project_id: sys_uuid.UUID,
+        target_fields_storage_path: str,
+    ):
+
+        model_specs = db_back.ModelSpec.from_collection(models, project_id)
+        client = db_back.DatabaseBackendClient(model_specs)
+
+        storage = fs.TargetFieldsFileStorage(target_fields_storage_path)
+
+        self._kinds = {m.kind for m in model_specs}
+
+        super().__init__(storage=storage, client=client)
+
+    def get_capabilities(self) -> list[str]:
+        """Returns a list of capabilities supported by the driver."""
+        return list(self._kinds)
