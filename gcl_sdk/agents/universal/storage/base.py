@@ -17,36 +17,58 @@ from __future__ import annotations
 
 import abc
 import typing as tp
+import uuid as sys_uuid
 
 from gcl_sdk.agents.universal.dm import models
 
 
-class AbstractAgentStorage(abc.ABC):
-    """Abstract agent storage."""
+class TargetFieldItem(tp.NamedTuple):
+    kind: str
+    uuid: sys_uuid.UUID
+    fields: frozenset[str]
+
+    @classmethod
+    def from_ua_resource(cls, resource: models.Resource) -> TargetFieldItem:
+        return cls(
+            resource.kind, resource.uuid, frozenset(resource.value.keys())
+        )
+
+
+class AbstractTargetFieldsStorage(abc.ABC):
+    """Abstract target fields storage.
+
+    Abstract class that represents a storage for target fields.
+    UUID of an item is unique across the kind.
+    """
 
     @abc.abstractmethod
-    def get(self, resource: models.Resource) -> dict[str, tp.Any]:
-        """Get the resource  item from the storage."""
+    def get(self, kind: str, uuid: sys_uuid.UUID) -> TargetFieldItem:
+        """Get the target fields item from the storage."""
 
     @abc.abstractmethod
     def create(
         self,
-        resource: models.Resource,
-        item: dict[str, tp.Any],
+        item: TargetFieldItem,
         force: bool = False,
-    ) -> dict[str, tp.Any]:
-        """Creates the resource item in the storage."""
+    ) -> TargetFieldItem:
+        """Creates the target fields item in the storage."""
 
     @abc.abstractmethod
-    def update(
-        self, resource: models.Resource, item: dict[str, tp.Any]
-    ) -> dict[str, tp.Any]:
-        """Update the resource item in the storage."""
+    def update(self, item: TargetFieldItem) -> TargetFieldItem:
+        """Update the target fields item in the storage."""
 
     @abc.abstractmethod
-    def list(self, kind: str) -> list[dict[str, tp.Any]]:
-        """Lists all resource items by kind."""
+    def list(self, kind: str) -> list[TargetFieldItem]:
+        """Lists all target fields items of a resource kind."""
 
     @abc.abstractmethod
-    def delete(self, resource: models.Resource, force: bool = False) -> None:
-        """Delete the resource item from the storage."""
+    def delete(self, item: TargetFieldItem, force: bool = False) -> None:
+        """Delete the target fields item from the storage."""
+
+    @abc.abstractmethod
+    def load(self) -> None:
+        """Load the storage."""
+
+    @abc.abstractmethod
+    def persist(self) -> None:
+        """Persist the storage."""

@@ -58,6 +58,30 @@ class AbstractCapabilityDriver(abc.ABC):
     def delete(self, resource: models.Resource) -> None:
         """Delete the resource."""
 
+    def start(self) -> None:
+        """Perform some initialization before starting any operations.
+
+        This method is called once before any other method like list,
+        create, update, delete are called. It can be used to do some
+        preparations like establishing connections, opening files, etc.
+
+        The driver iteration:
+            start -> list -> [create | update | delete]* -> finalize
+        """
+        pass
+
+    def finalize(self) -> None:
+        """Perform some finalization after finishing all operations.
+
+        This method is called once after all other methods like list,
+        create, update, delete are called. It can be used to do some
+        finalization or cleanups like closing connections, files, etc.
+
+        The driver iteration:
+            start -> list -> [create | update | delete]* -> finalize
+        """
+        pass
+
 
 class AbstractFactDriver(abc.ABC):
     """Abstract driver for facts.
