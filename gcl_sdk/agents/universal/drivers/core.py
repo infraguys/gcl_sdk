@@ -17,11 +17,9 @@ from __future__ import annotations
 
 import os
 import logging
-import uuid as sys_uuid
 import typing as tp
 
 import bazooka
-from restalchemy.storage import base as ra_storage
 
 from gcl_sdk.clients.http import base
 from gcl_sdk.agents.universal.drivers import direct
@@ -89,16 +87,11 @@ class DatabaseCapabilityDriver(direct.DirectAgentDriver):
 
     def __init__(
         self,
-        models: tp.Collection[
-            tuple[tp.Type[ra_storage.AbstractStorableMixin], str]
-        ],
-        project_id: sys_uuid.UUID,
+        model_specs: tp.Collection[db_back.ModelSpec],
         target_fields_storage_path: str,
     ):
 
-        model_specs = db_back.ModelSpec.from_collection(models, project_id)
         client = db_back.DatabaseBackendClient(model_specs)
-
         storage = fs.TargetFieldsFileStorage(target_fields_storage_path)
 
         self._kinds = {m.kind for m in model_specs}

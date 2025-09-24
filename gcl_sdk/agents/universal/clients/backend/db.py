@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import logging
 import typing as tp
-import uuid as sys_uuid
 
 from restalchemy.dm import filters as dm_filters
 from restalchemy.storage import exceptions as ra_exc
@@ -33,22 +32,23 @@ LOG = logging.getLogger(__name__)
 class ModelSpec(tp.NamedTuple):
     model: tp.Type[ra_storage.AbstractStorableMixin]
     kind: str
+    filters: dict[str, dm_filters.AbstractClause]
 
-    # TODO(akremenetsky): Actually we can do filtering more flexibly
-    # by using any filters from restalchemy and not using the project_id.
-    project_id: sys_uuid.UUID
+    # Inject filter fields into the model if the model does not have them
+    # This is used to be able to filter resources on the list method
+    inject_filter_fields: bool = True
 
     @classmethod
     def from_collection(
         cls,
         collection: tp.Collection[tuple[tp.Type, str]],
-        project_id: sys_uuid.UUID,
+        filters: dict[str, dm_filters.AbstractClause],
     ) -> tuple[ModelSpec, ...]:
         return tuple(
             cls(
                 model=model,
                 kind=kind,
-                project_id=project_id,
+                filters=filters,
             )
             for model, kind in collection
         )
@@ -66,6 +66,14 @@ class DatabaseBackendClient(base.AbstractBackendClient):
         self._session = session
         self._model_spec_map = {m.kind: m for m in model_specs}
 
+    def _get_resource_filters(
+        self, resource: models.Resource
+    ) -> dict[str, dm_filters.AbstractClause]:
+        model_spec = self._model_spec_map[resource.kind]
+        filters = {"uuid": dm_filters.EQ(str(resource.uuid))}
+        filters.update(model_spec.filters)
+        return filters
+
     def set_session(self, session: tp.Any) -> None:
         """Set the session to be used by the client."""
         self._session = session
@@ -77,14 +85,12 @@ class DatabaseBackendClient(base.AbstractBackendClient):
     def get(self, resource: models.Resource) -> models.ResourceMixin:
         """Find and return a resource by uuid and kind."""
         model_spec = self._model_spec_map[resource.kind]
+        filters = self._get_resource_filters(resource)
 
         try:
             return model_spec.model.objects.get_one(
                 session=self._session,
-                filters={
-                    "uuid": dm_filters.EQ(str(resource.uuid)),
-                    "project_id": dm_filters.EQ(str(model_spec.project_id)),
-                },
+                filters=filters,
             )
         except ra_exc.RecordNotFound:
             LOG.exception(
@@ -99,31 +105,43 @@ class DatabaseBackendClient(base.AbstractBackendClient):
         # Get all objects for the project from the database
         return model_spec.model.objects.get_all(
             session=self._session,
-            filters={
-                "project_id": dm_filters.EQ(str(model_spec.project_id)),
-            },
+            filters=model_spec.filters,
         )
 
     def create(self, resource: models.Resource) -> models.ResourceMixin:
         """Creates a resource."""
         model_spec = self._model_spec_map[resource.kind]
+        filters = self._get_resource_filters(resource)
 
         # Check if the resource already exists
         # We need to do this check since PG does not correctly handle
         # the case when the resource already exists and fails the transaction
         obj = model_spec.model.objects.get_one_or_none(
             session=self._session,
-            filters={
-                "uuid": dm_filters.EQ(str(resource.uuid)),
-                "project_id": dm_filters.EQ(str(model_spec.project_id)),
-            },
+            filters=filters,
         )
         if obj is not None:
             LOG.warning("The resource already exists: %s", resource.uuid)
             raise client_exc.ResourceAlreadyExists(resource=resource)
 
+        # Inject filter fields into the resource value if they are not present
+        if model_spec.inject_filter_fields:
+            value = resource.value.copy()
+            for field, _filter in model_spec.filters.items():
+                if field not in value:
+                    value[field] = _filter.value
+                else:
+                    LOG.warning(
+                        "The filter field %s is already present in "
+                        "the resource value: %s",
+                        field,
+                        resource.uuid,
+                    )
+            obj = model_spec.model.restore_from_simple_view(**value)
+        else:
+            obj = model_spec.model.from_ua_resource(resource)
+
         # Save to db
-        obj = model_spec.model.from_ua_resource(resource)
         obj.insert(session=self._session)
 
         return obj
@@ -131,14 +149,12 @@ class DatabaseBackendClient(base.AbstractBackendClient):
     def update(self, resource: models.Resource) -> models.ResourceMixin:
         """Update the resource."""
         model_spec = self._model_spec_map[resource.kind]
+        filters = self._get_resource_filters(resource)
 
         # Check if the resource already exists
         obj = model_spec.model.objects.get_one_or_none(
             session=self._session,
-            filters={
-                "uuid": dm_filters.EQ(str(resource.uuid)),
-                "project_id": dm_filters.EQ(str(model_spec.project_id)),
-            },
+            filters=filters,
         )
         if obj is None:
             LOG.warning("The resource does not exist: %s", resource.uuid)
@@ -159,14 +175,12 @@ class DatabaseBackendClient(base.AbstractBackendClient):
     def delete(self, resource: models.Resource) -> None:
         """Delete the resource."""
         model_spec = self._model_spec_map[resource.kind]
+        filters = self._get_resource_filters(resource)
 
         try:
             obj = model_spec.model.objects.get_one(
                 session=self._session,
-                filters={
-                    "uuid": dm_filters.EQ(str(resource.uuid)),
-                    "project_id": dm_filters.EQ(str(model_spec.project_id)),
-                },
+                filters=filters,
             )
             obj.delete(session=self._session)
             LOG.debug("Deleted resource: %s", resource.uuid)
