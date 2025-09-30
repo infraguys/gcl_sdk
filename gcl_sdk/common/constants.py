@@ -19,6 +19,7 @@ import enum
 
 GLOBAL_SERVICE_NAME = "gcl_sdk"
 DEF_SQL_LIMIT = 100
+EP_GC_SERVICES = "gcl_sdk.gservice.services"
 
 
 class EventStatus(str, enum.Enum):

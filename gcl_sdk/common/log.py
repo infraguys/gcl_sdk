@@ -62,9 +62,11 @@ class ConfigNotFound(Exception):
     pass
 
 
-def configure():
-    config = cfg.CONF.logging.config
-    config_file = cfg.CONF.find_file(config)
+def configure(conf: cfg.ConfigOpts | None = None):
+    if conf is None:
+        conf = cfg.CONF
+    config = conf.logging.config
+    config_file = conf.find_file(config)
 
     if config_file is None:
         config_data = DEFAULT_CONFIG
