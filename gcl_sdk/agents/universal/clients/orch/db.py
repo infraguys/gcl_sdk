@@ -58,6 +58,31 @@ class DatabaseOrchClient(base.AbstractOrchClient):
         except ra_exc.ConflictRecords:
             raise exceptions.AgentAlreadyExists(uuid=agent.uuid)
 
+    def agents_update(
+        self,
+        agent: models.UniversalAgent,
+        session: tp.Any = None,
+    ) -> models.UniversalAgent:
+        """Update an instance of Universal agent."""
+        try:
+            with self._session_context(session=session) as s:
+                # Fetch the origin agent
+                origin_agent = models.UniversalAgent.objects.get_one(
+                    filters={
+                        "uuid": dm_filters.EQ(str(agent.uuid)),
+                    }
+                )
+
+                # Update fields
+                origin_agent.capabilities = agent.capabilities
+                origin_agent.facts = agent.facts
+
+                origin_agent.save()
+
+                return origin_agent
+        except ra_exc.RecordNotFound:
+            raise exceptions.AgentNotFound(uuid=agent.uuid)
+
     def agents_get_payload(
         self,
         uuid: sys_uuid.UUID,
