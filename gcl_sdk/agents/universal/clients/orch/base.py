@@ -35,6 +35,12 @@ class AbstractOrchClient(abc.ABC):
         """Create an instance of Universal agent."""
 
     @abc.abstractmethod
+    def agents_update(
+        self, agent: models.UniversalAgent, **kwargs: tp.Any
+    ) -> models.UniversalAgent:
+        """Update an instance of Universal agent."""
+
+    @abc.abstractmethod
     def agents_get_payload(
         self,
         uuid: sys_uuid.UUID,

@@ -66,6 +66,23 @@ class HttpOrchClient(base.AbstractOrchClient):
 
         return agent
 
+    def agents_update(
+        self, agent: models.UniversalAgent, **kwargs: tp.Any
+    ) -> models.UniversalAgent:
+        """Update an instance of Universal agent."""
+        try:
+            data = {
+                "capabilities": agent.capabilities,
+                "facts": agent.facts,
+            }
+
+            agent = self._status_api.agents.update(agent.uuid, **data)
+            LOG.info("Agent updated: %s", agent.uuid)
+        except baz_exc.NotFoundError:
+            raise exceptions.AgentNotFound(uuid=agent.uuid)
+
+        return agent
+
     def agents_get_payload(
         self,
         uuid: sys_uuid.UUID,
