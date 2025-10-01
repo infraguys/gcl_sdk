@@ -129,10 +129,7 @@ class NodeSet(
         ra_types.Enum([type_.value for type_ in pc.NodeSetType]),
         default=pc.NodeSetType.SET.value,
     )
-    nodes = properties.property(
-        ra_types.TypedList(ra_types.UUID()),
-        default=lambda: [],
-    )
+    nodes = properties.property(ra_types.Dict(), default=lambda: {})
 
     @classmethod
     def get_resource_kind(cls) -> str:

@@ -286,3 +286,41 @@ class PaaSBuilder(builder.UniversalBuilderService):
                 for derivative in derivatives:
                     if derivative.uuid == paas_object.uuid:
                         derivative.agent = agent_uuid
+
+    def post_update_instance_resource(
+        self,
+        instance: ua_models.InstanceMixin,
+        resource: ua_models.TargetResource,
+        derivatives: tp.Collection[ua_models.TargetResource] = tuple(),
+    ) -> None:
+        """The hook is performed after updating instance resource."""
+        super().post_update_instance_resource(instance, resource, derivatives)
+
+        if not self.enable_schedule_paas_objects():
+            return
+
+        # Choose paas objects to schedule
+        paas_objects = []
+        for derivative in derivatives:
+            if derivative.agent is not None:
+                continue
+            class_ = self._instance_model.derivative_model(derivative.kind)
+            paas_objects.append(class_.from_ua_resource(derivative))
+
+        if not paas_objects:
+            return
+
+        schedule_map = self.schedule_paas_objects(
+            instance,
+            paas_objects,
+        )
+
+        # Schedule PaaS objects
+        # We don't expect to have a lot of derivatives.
+        # So it's not a big problem to have nested loop here
+        for agent_uuid, paas_objects in schedule_map.items():
+            for paas_object in paas_objects:
+                for derivative in derivatives:
+                    if derivative.uuid == paas_object.uuid:
+                        derivative.agent = agent_uuid
+                        derivative.update()
