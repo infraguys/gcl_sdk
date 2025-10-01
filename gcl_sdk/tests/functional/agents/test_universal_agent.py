@@ -110,6 +110,33 @@ class TestUniversalAgent:
 
         self.orch_client.agents_create.assert_called_once()
 
+    def test_agent_updates_capabilities_and_facts_on_start(self):
+        # Simulate that agent already exists on orchestrator
+        self.orch_client.agents_create = mock.MagicMock(
+            side_effect=orch_exc.AgentAlreadyExists(uuid=self.agent_uuid)
+        )
+        self.orch_client.agents_update = mock.MagicMock()
+
+        agent = agent_svc.UniversalAgentService(
+            agent_uuid=self.agent_uuid,
+            orch_client=self.orch_client,
+            caps_drivers=[FooCapDriver()],
+            facts_drivers=[FooFactDriver()],
+        )
+
+        # Startup path should register and then update capabilities and facts
+        agent._setup()
+
+        # Ensure create attempted and then update called with agent containing
+        # capabilities and facts derived from drivers
+        self.orch_client.agents_create.assert_called_once()
+        self.orch_client.agents_update.assert_called_once()
+
+        updated_agent = self.orch_client.agents_update.call_args.args[0]
+        assert isinstance(updated_agent, models.UniversalAgent)
+        assert set(updated_agent.capabilities["capabilities"]) == {"foo"}
+        assert set(updated_agent.facts["facts"]) == {"foo"}
+
     def test_agent_new_capability(self):
         uuid = sys_uuid.uuid4()
         resource = conftest.FooResource(uuid=uuid)

@@ -76,6 +76,9 @@ class UniversalAgentService(looper_basic.BasicService):
         except orch_exc.AgentAlreadyExists:
             LOG.warning("Agent already registered: %s", agent.uuid)
 
+            # Update the agent capabilities and facts if they were changed
+            self._orch_client.agents_update(agent)
+
     def _create_resource(
         self,
         driver: driver_base.AbstractCapabilityDriver,
@@ -252,6 +255,10 @@ class UniversalAgentService(looper_basic.BasicService):
             target_resources = target_facts[fact]["resources"]
             actual_resources = actual_facts[fact]["resources"]
             self._actualize_resource_facts(target_resources, actual_resources)
+
+    def _setup(self):
+        # Call registry at start to update capabilities and facts
+        self._register_agent()
 
     def _iteration(self):
         # The payload is collected every iteration from the data plane.
