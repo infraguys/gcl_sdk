@@ -14,13 +14,9 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-import os
-import resource
 import pytest
-import tempfile
 import typing as tp
 import uuid as sys_uuid
-from types import SimpleNamespace
 from unittest import mock
 
 from gcl_sdk.agents.universal.dm import models as ua_models
@@ -53,7 +49,9 @@ class DummyBuilder(builder_svc.UniversalBuilderService):
         self.pre_update_called = True
         instance.status = ua_c.InstanceStatus.IN_PROGRESS.value
 
-    def post_update_instance_resource(self, instance, resource):
+    def post_update_instance_resource(
+        self, instance, resource, derivatives=tuple()
+    ):
         self.post_update_called = True
 
     def pre_delete_instance_resource(self, resource):
