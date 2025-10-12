@@ -25,26 +25,44 @@ from restalchemy.dm import filters as dm_filters
 from gcl_looper.services import basic as looper_basic
 
 from gcl_sdk.common import constants as c
-
-# from gcl_sdk.infra import constants as pc
+from gcl_sdk.agents.universal.services import common as svc_common
 from gcl_sdk.agents.universal.dm import models
 from gcl_sdk.agents.universal import constants as ua_c
 
 LOG = logging.getLogger(__name__)
 
 
-class UniversalBuilderService(looper_basic.BasicService):
+class UniversalBuilderService(
+    svc_common.RegistrableUAServiceMixin, looper_basic.BasicService
+):
+    """The universal builder service."""
 
     def __init__(
         self,
         instance_model: type[models.InstanceMixin],
+        service_spec: svc_common.UAServiceSpec | None = None,
         iter_min_period: float = 3,
         iter_pause: float = 0.1,
     ):
         super().__init__(iter_min_period, iter_pause)
         self._instance_model = instance_model
+        self._service_spec = service_spec
+        self._iteration_context: dict[str, tp.Any] = {}
+
+    # RegistrableUAServiceMixin interface
+
+    @property
+    def ua_service_spec(self) -> svc_common.UAServiceSpec | None:
+        return self._service_spec
 
     # Builder interface
+
+    def prepare_iteration(self) -> dict[str, tp.Any]:
+        """Perform actions before iteration and return the iteration context.
+
+        The result is a dictionary that is passed to the iteration context.
+        """
+        return {}
 
     def can_create_instance_resource(
         self, instance: models.InstanceMixin
@@ -326,6 +344,58 @@ class UniversalBuilderService(looper_basic.BasicService):
 
     # Internal methods
 
+    def _get_new_instances(self) -> tp.Collection[models.InstanceMixin]:
+        """Fetch new instances."""
+        # Fetch all new instances if the service is nameless
+        if self.is_nameless_ua_service:
+            return self._instance_model.get_new_instances()
+
+        # TODO(akremenetsky): Perhaps we need to more specific type for
+        # the iteration context than an original dict. Let's do it later.
+        clause_filters = self._iteration_context.get("clause_filters", {})
+
+        clause = self._instance_model.get_filter_clause(**clause_filters)
+
+        # Fetch new instances only for this service
+        return self._instance_model.get_new_instances(
+            clause=clause,
+        )
+
+    def _get_deleted_instances(self) -> tp.Collection[models.TargetResource]:
+        """Fetch resources of deleted instances."""
+        return self._instance_model.get_deleted_instances()
+
+    def _get_updated_instances(self) -> tp.Collection[models.InstanceMixin]:
+        """Fetch updated instances."""
+        # Fetch all updated instances if the service is nameless
+        if self.is_nameless_ua_service:
+            return self._instance_model.get_updated_instances()
+
+        # TODO(akremenetsky): Perhaps we need to more specific type for
+        # the iteration context than an original dict. Let's do it later.
+        clause_filters = self._iteration_context.get("clause_filters", {})
+
+        clause = self._instance_model.get_filter_clause(**clause_filters)
+
+        # Fetch updated instances only for this service
+        return self._instance_model.get_updated_instances(
+            clause=clause,
+        )
+
+    def _get_outdated_resources(
+        self,
+        filters: dict[str, dm_filters.AbstractClause],
+        limit: int = c.DEF_SQL_LIMIT,
+    ) -> tuple[models.ResourcePair, ...]:
+        """Fetch outdated resources."""
+        return tuple(
+            r.to_pair()
+            for r in models.OutdatedResource.objects.get_all(
+                filters=filters,
+                limit=limit,
+            )
+        )
+
     def _are_target_resources_equal(
         self,
         resources_left: tp.Collection[models.TargetResource],
@@ -376,9 +446,7 @@ class UniversalBuilderService(looper_basic.BasicService):
 
     def _actualize_derivative_resources_hash_status(
         self,
-        derivatives: tp.Collection[
-            tuple[models.TargetResource, models.Resource]
-        ],
+        derivatives: tp.Collection[models.ResourcePair],
         active_status: str = ua_c.InstanceStatus.ACTIVE.value,
     ) -> None:
         """Actualize derivative resources hash and status."""
@@ -505,9 +573,7 @@ class UniversalBuilderService(looper_basic.BasicService):
         instance: models.InstanceWithDerivativesMixin,
         target_resource: models.TargetResource,
         actual_resource: models.Resource | None = None,
-        changed_derivatives: tp.Collection[
-            tuple[models.TargetResource, models.Resource]
-        ] = tuple(),
+        changed_derivatives: tp.Collection[models.ResourcePair] = tuple(),
         active_status: str | None = ua_c.InstanceStatus.ACTIVE.value,
     ) -> None:
         """Actualize outdated instance.
@@ -587,12 +653,8 @@ class UniversalBuilderService(looper_basic.BasicService):
         instance: models.InstanceWithDerivativesMixin,
         target_resource: models.TargetResource,
         actual_resource: models.Resource | None = None,
-        changed_derivatives: tp.Collection[
-            tuple[models.TargetResource, models.Resource]
-        ] = tuple(),
-        all_derivatives: tp.Collection[
-            tuple[models.TargetResource, models.Resource | None]
-        ] = tuple(),
+        changed_derivatives: tp.Collection[models.ResourcePair] = tuple(),
+        all_derivatives: tp.Collection[models.ResourcePair] = tuple(),
         active_status: str | None = ua_c.InstanceStatus.ACTIVE.value,
     ) -> None:
         """Actualize outdated instance.
@@ -719,13 +781,17 @@ class UniversalBuilderService(looper_basic.BasicService):
 
         instance_resource.update()
 
-        LOG.info("Instance resource %s created", instance_resource.uuid)
+        LOG.info(
+            "Instance resource(%s) %s created",
+            instance_resource.kind,
+            instance_resource.uuid,
+        )
 
     def _actualize_new_instances(
         self, instances: tp.Collection[models.InstanceMixin] = tuple()
     ) -> None:
         """Actualize new PaaS instances."""
-        instances = instances or self._instance_model.get_new_instances()
+        instances = instances or self._get_new_instances()
 
         if len(instances) == 0:
             return
@@ -748,9 +814,7 @@ class UniversalBuilderService(looper_basic.BasicService):
         self,
         instance: models.InstanceMixin,
         resource: models.TargetResource,
-        derivatives: tp.Collection[
-            tuple[models.TargetResource, models.Resource | None]
-        ] = tuple(),
+        derivatives: tp.Collection[models.ResourcePair] = tuple(),
     ) -> None:
         """Actualize updated instance by user."""
         # Perform some additional actions before updating
@@ -826,7 +890,7 @@ class UniversalBuilderService(looper_basic.BasicService):
 
     def _actualize_updated_instances(self) -> None:
         """Actualize updated instances changed by user."""
-        updated_instances = self._instance_model.get_updated_instances()
+        updated_instances = self._get_updated_instances()
 
         if len(updated_instances) == 0:
             return
@@ -873,19 +937,28 @@ class UniversalBuilderService(looper_basic.BasicService):
         limit: int = c.DEF_SQL_LIMIT,
     ) -> dict[
         sys_uuid.UUID,  # Resource UUID
-        tuple[models.TargetResource, models.Resource],
+        models.ResourcePair,
     ]:
-        kind = self._instance_model.get_resource_kind()
-        outdated = models.OutdatedResource.objects.get_all(
-            filters={"kind": dm_filters.EQ(kind)},
-            limit=limit,
-        )
-        return {
-            pair.target_resource.uuid: (
-                pair.target_resource,
-                pair.actual_resource,
+        if self.is_nameless_ua_service:
+            kind = self._instance_model.get_resource_kind()
+            outdated = self._get_outdated_resources(
+                filters={"kind": dm_filters.EQ(kind)},
+                limit=limit,
             )
-            for pair in outdated
+            return {pair.target_resource.uuid: pair for pair in outdated}
+
+        # TODO(akremenetsky): Perhaps we need to more specific type for
+        # the iteration context than an original dict. Let's do it later.
+        clause_filters = self._iteration_context.get("clause_filters", {})
+
+        clause = self._instance_model.get_filter_clause(**clause_filters)
+
+        return {
+            pair.target_resource.uuid: pair
+            for pair in self._instance_model.get_outdated_resources(
+                clause=clause,
+                limit=limit,
+            )
         }
 
     def _actualize_outdated_instances_no_derivatives(self) -> None:
@@ -915,6 +988,15 @@ class UniversalBuilderService(looper_basic.BasicService):
         # the status and full_hash
         for instance in instances:
             target, actual = resource_map[instance.uuid]
+            # It's not supposed the actual resource is None for this case
+            if actual is None:
+                LOG.error(
+                    "Actual resource is not found for instance(%s) %s",
+                    kind,
+                    instance.uuid,
+                )
+                continue
+
             try:
                 # Check if the instance can be actualized
                 if not self.can_actualize_outdated_instance_resource(instance):
@@ -932,19 +1014,18 @@ class UniversalBuilderService(looper_basic.BasicService):
         limit: int = c.DEF_SQL_LIMIT,
     ) -> dict[
         sys_uuid.UUID,  # Master UUID
-        list[tuple[models.TargetResource, models.Resource]],
+        list[models.ResourcePair],
     ]:
-        outdated = models.OutdatedResource.objects.get_all(
+        outdated = self._get_outdated_resources(
             filters={
                 "kind": dm_filters.In(self._instance_model.derivative_kinds())
             },
             limit=limit,
         )
+
         key_map = {}
         for pair in outdated:
-            key_map.setdefault(pair.target_resource.master, []).append(
-                (pair.target_resource, pair.actual_resource)
-            )
+            key_map.setdefault(pair.target_resource.master, []).append(pair)
 
         return key_map
 
@@ -978,7 +1059,7 @@ class UniversalBuilderService(looper_basic.BasicService):
         masters: tp.Collection[sys_uuid.UUID],
     ) -> dict[
         sys_uuid.UUID,  # Master UUID
-        list[tuple[models.TargetResource, models.Resource | None]],
+        list[models.ResourcePair],
     ]:
         kinds = self._instance_model.derivative_kinds()
         target_resources = models.TargetResource.objects.get_all(
@@ -1008,7 +1089,7 @@ class UniversalBuilderService(looper_basic.BasicService):
                 (target_resource.uuid, target_resource.kind)
             )
             resource_map.setdefault(target_resource.master, []).append(
-                (target_resource, actual_resource)
+                models.ResourcePair(target_resource, actual_resource)
             )
 
         return resource_map
@@ -1035,7 +1116,8 @@ class UniversalBuilderService(looper_basic.BasicService):
             tuple(changed_resource_map.keys())
         )
 
-        # Also fetch all derivatives if needed
+        # Also fetch all derivatives related to all instances and
+        # not only changed derivatives
         if need_all:
             all_resource_map = self._get_resources_by_masters(
                 tuple(changed_resource_map.keys())
@@ -1067,7 +1149,9 @@ class UniversalBuilderService(looper_basic.BasicService):
                     )
             except Exception:
                 LOG.exception(
-                    "Error actualizing outdated instance %s", instance.uuid
+                    "Error actualizing outdated instance(%s) %s",
+                    self._instance_model.get_resource_kind(),
+                    instance.uuid,
                 )
 
     def _actualize_outdated_instances(self) -> None:
@@ -1085,9 +1169,7 @@ class UniversalBuilderService(looper_basic.BasicService):
 
     def _actualize_deleted_instances(self) -> None:
         """Actualize deleted instances."""
-        deleted_instance_resources = (
-            self._instance_model.get_deleted_instances()
-        )
+        deleted_instance_resources = self._get_deleted_instances()
 
         if len(deleted_instance_resources) == 0:
             return
@@ -1111,7 +1193,10 @@ class UniversalBuilderService(looper_basic.BasicService):
 
                 self.pre_delete_instance_resource(instance_res)
 
-                for resource in derivatives + [instance_res]:
+                resources_to_delete = tuple(t for t, _ in derivatives) + (
+                    instance_res,
+                )
+                for resource in resources_to_delete:
                     resource.delete()
                     LOG.info(
                         "Outdated resource(%s) %s deleted",
@@ -1289,42 +1374,110 @@ class UniversalBuilderService(looper_basic.BasicService):
             resources, tracked_field="full_hash"
         )
 
-    # Misc methods
+    # BasicService interface
+
+    def _model_iteration(self) -> None:
+        """Perfrom iteration for the particular instance model."""
+        try:
+            self._actualize_new_instances()
+        except Exception:
+            LOG.exception(
+                "Error actualizing new instances(%s)",
+                self._instance_model.__name__,
+            )
+
+        try:
+            self._actualize_deleted_instances()
+        except Exception:
+            LOG.exception(
+                "Error actualizing deleted instances(%s)",
+                self._instance_model.__name__,
+            )
+
+        try:
+            self._actualize_updated_instances()
+        except Exception:
+            LOG.exception(
+                "Error actualizing updated instances(%s)",
+                self._instance_model.__name__,
+            )
+
+        try:
+            self._actualize_outdated_instances()
+        except Exception:
+            LOG.exception(
+                "Error actualizing outdated instances(%s)",
+                self._instance_model.__name__,
+            )
+
+        if self.track_outdated_master_hash_instances():
+            try:
+                self._actualize_outdated_master_hash_instances()
+            except Exception:
+                LOG.exception(
+                    "Error actualizing outdated master hash instances(%s)",
+                    self._instance_model.__name__,
+                )
+
+        if self.track_outdated_master_full_hash_instances():
+            try:
+                self._actualize_outdated_master_full_hash_instances()
+            except Exception:
+                LOG.exception(
+                    "Error actualizing outdated master full "
+                    "hash instances(%s)",
+                    self._instance_model.__name__,
+                )
+
+    def _setup(self):
+        """Setup the service."""
+        self.register_ua_service()
 
     def _iteration(self) -> None:
+        """Service iteration."""
         with contexts.Context().session_manager():
-            try:
-                self._actualize_new_instances()
-            except Exception:
-                LOG.exception("Error actualizing new instances")
+            self._iteration_context = self.prepare_iteration()
+            self._model_iteration()
 
-            try:
-                self._actualize_deleted_instances()
-            except Exception:
-                LOG.exception("Error actualizing deleted instances")
 
-            try:
-                self._actualize_updated_instances()
-            except Exception:
-                LOG.exception("Error actualizing updated instances")
+class CollectionUniversalBuilderService(UniversalBuilderService):
+    """The universal builder service for collections."""
 
-            try:
-                self._actualize_outdated_instances()
-            except Exception:
-                LOG.exception("Error actualizing outdated instances")
+    def __init__(
+        self,
+        instance_models: tp.Collection[type[models.InstanceMixin]],
+        service_spec: svc_common.UAServiceSpec | None = None,
+        iter_min_period: float = 3,
+        iter_pause: float = 0.1,
+    ):
+        if len(instance_models) == 0:
+            raise ValueError("The instance models collection is empty.")
 
-            if self.track_outdated_master_hash_instances():
-                try:
-                    self._actualize_outdated_master_hash_instances()
-                except Exception:
-                    LOG.exception(
-                        "Error actualizing outdated master hash instances"
-                    )
+        super().__init__(
+            # Just use the first instance model for the service.
+            instance_model=instance_models[0],
+            service_spec=service_spec,
+            iter_min_period=iter_min_period,
+            iter_pause=iter_pause,
+        )
 
-            if self.track_outdated_master_full_hash_instances():
-                try:
-                    self._actualize_outdated_master_full_hash_instances()
-                except Exception:
-                    LOG.exception(
-                        "Error actualizing outdated master full hash instances"
-                    )
+        self._instance_models = instance_models
+
+    def _iteration(self) -> None:
+        """Service iteration."""
+        context_ready = False
+
+        for instance_model in self._instance_models:
+            # Focus on the particular instance model.
+            self._instance_model = instance_model
+
+            with contexts.Context().session_manager():
+                # Prepare iteration context only once.
+                if not context_ready:
+                    self._iteration_context = self.prepare_iteration()
+                    context_ready = True
+
+                self._model_iteration()
+
+        # Reset the instance model.
+        self._instance_model = None
