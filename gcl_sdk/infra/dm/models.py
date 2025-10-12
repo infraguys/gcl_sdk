@@ -29,11 +29,11 @@ from gcl_sdk.infra import constants as pc
 
 
 class Node(
+    ua_models.TargetResourceKindAwareMixin,
     ra_models.ModelWithRequiredUUID,
     ra_models.ModelWithProject,
     ra_models.ModelWithNameDesc,
     ra_models.ModelWithTimestamp,
-    ua_models.TargetResourceKindAwareMixin,
 ):
     """The model represents a node in Genesis Core infrastructure.
 
