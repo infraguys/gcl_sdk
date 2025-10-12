@@ -76,6 +76,7 @@ class DatabaseOrchClient(base.AbstractOrchClient):
                 # Update fields
                 origin_agent.capabilities = agent.capabilities
                 origin_agent.facts = agent.facts
+                origin_agent.name = agent.name
 
                 origin_agent.save()
 
