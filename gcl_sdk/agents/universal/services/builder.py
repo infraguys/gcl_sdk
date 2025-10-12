@@ -22,27 +22,38 @@ import uuid as sys_uuid
 
 from restalchemy.common import contexts
 from restalchemy.dm import filters as dm_filters
+from restalchemy.storage.sql import filters as sql_filters
 from gcl_looper.services import basic as looper_basic
 
 from gcl_sdk.common import constants as c
-
-# from gcl_sdk.infra import constants as pc
+from gcl_sdk.agents.universal.services import common as svc_common
 from gcl_sdk.agents.universal.dm import models
 from gcl_sdk.agents.universal import constants as ua_c
 
 LOG = logging.getLogger(__name__)
 
 
-class UniversalBuilderService(looper_basic.BasicService):
+class UniversalBuilderService(
+    svc_common.RegistrableUAServiceMixin, looper_basic.BasicService
+):
+    """The universal builder service."""
 
     def __init__(
         self,
         instance_model: type[models.InstanceMixin],
+        service_spec: svc_common.UAServiceSpec | None = None,
         iter_min_period: float = 3,
         iter_pause: float = 0.1,
     ):
         super().__init__(iter_min_period, iter_pause)
         self._instance_model = instance_model
+        self._service_spec = service_spec
+
+    # RegistrableUAServiceMixin interface
+
+    @property
+    def ua_service_spec(self) -> svc_common.UAServiceSpec | None:
+        return self._service_spec
 
     # Builder interface
 
@@ -253,7 +264,67 @@ class UniversalBuilderService(looper_basic.BasicService):
         """
         return tuple(p[0] for p in derivatives)
 
+    def get_filter_clause(self) -> sql_filters.AbstractClause | None:
+        """Get filter clause for the service.
+
+        For nameless services it returns None.
+        For named services it returns a clause that filters instances.
+
+        For example,
+        sql_filters.In(
+            column="service",
+            value_type=String(),
+            value="1111",
+            session=None,
+        )
+        """
+        return None
+
     # Internal methods
+
+    def _get_new_instances(self) -> tp.Collection[models.InstanceMixin]:
+        """Fetch new instances."""
+        # Fetch all new instances if the service is nameless
+        if self.is_nameless_ua_service:
+            return self._instance_model.get_new_instances()
+
+        # Fetch new instances only for this service
+        return self._instance_model.get_new_instances(
+            clause=self.get_filter_clause(),
+        )
+
+    def _get_deleted_instances(self) -> tp.Collection[models.TargetResource]:
+        """Fetch resources of deleted instances."""
+        return self._instance_model.get_deleted_instances()
+
+    def _get_updated_instances(self) -> tp.Collection[models.InstanceMixin]:
+        """Fetch updated instances."""
+        # Fetch all updated instances if the service is nameless
+        if self.is_nameless_ua_service:
+            return self._instance_model.get_updated_instances()
+
+        # Fetch updated instances only for this service
+        return self._instance_model.get_updated_instances(
+            clause=self.get_filter_clause(),
+        )
+
+    def _get_outdated_resources(
+        self,
+        filters: dict[str, dm_filters.AbstractClause],
+        limit: int = c.DEF_SQL_LIMIT,
+    ) -> tp.Collection[models.TargetResource]:
+        """Fetch outdated resources."""
+        # Fetch all outdated resources if the service is nameless
+        if self.is_nameless_ua_service:
+            return models.OutdatedResource.objects.get_all(
+                filters=filters,
+                limit=limit,
+            )
+
+        return self._instance_model.get_outdated_resources(
+            clause=self.get_filter_clause(),
+            limit=limit,
+        )
 
     def _are_target_resources_equal(
         self,
@@ -619,7 +690,7 @@ class UniversalBuilderService(looper_basic.BasicService):
         self, instances: tp.Collection[models.InstanceMixin] = tuple()
     ) -> None:
         """Actualize new PaaS instances."""
-        instances = instances or self._instance_model.get_new_instances()
+        instances = instances or self._get_new_instances()
 
         if len(instances) == 0:
             return
@@ -710,7 +781,7 @@ class UniversalBuilderService(looper_basic.BasicService):
 
     def _actualize_updated_instances(self) -> None:
         """Actualize updated instances changed by user."""
-        updated_instances = self._instance_model.get_updated_instances()
+        updated_instances = self._get_updated_instances()
 
         if len(updated_instances) == 0:
             return
@@ -758,7 +829,7 @@ class UniversalBuilderService(looper_basic.BasicService):
         tuple[models.TargetResource, models.Resource],
     ]:
         kind = self._instance_model.get_resource_kind()
-        outdated = models.OutdatedResource.objects.get_all(
+        outdated = self._get_outdated_resources(
             filters={"kind": dm_filters.EQ(kind)},
             limit=limit,
         )
@@ -812,12 +883,13 @@ class UniversalBuilderService(looper_basic.BasicService):
         sys_uuid.UUID,  # Master UUID
         list[tuple[models.TargetResource, models.Resource]],
     ]:
-        outdated = models.OutdatedResource.objects.get_all(
+        outdated = self._get_outdated_resources(
             filters={
                 "kind": dm_filters.In(self._instance_model.derivative_kinds())
             },
             limit=limit,
         )
+
         key_map = {}
         for pair in outdated:
             key_map.setdefault(pair.target_resource.master, []).append(
@@ -959,9 +1031,7 @@ class UniversalBuilderService(looper_basic.BasicService):
 
     def _actualize_deleted_instances(self) -> None:
         """Actualize deleted instances."""
-        deleted_instance_resources = (
-            self._instance_model.get_deleted_instances()
-        )
+        deleted_instance_resources = self._get_deleted_instances()
 
         if len(deleted_instance_resources) == 0:
             return
@@ -1150,7 +1220,11 @@ class UniversalBuilderService(looper_basic.BasicService):
             resources, tracked_field="full_hash"
         )
 
-    # Misc methods
+    # BasicService interface
+
+    def _setup(self):
+        """Setup the service."""
+        self.register_ua_service()
 
     def _iteration(self) -> None:
         with contexts.Context().session_manager():

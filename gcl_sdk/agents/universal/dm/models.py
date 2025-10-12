@@ -31,6 +31,7 @@ from restalchemy.dm import filters as dm_filters
 from restalchemy.dm import types
 from restalchemy.storage.sql import engines
 from restalchemy.storage.sql import orm
+from restalchemy.storage.sql import filters as sql_filters
 
 from gcl_sdk.agents.universal import utils
 from gcl_sdk.agents.universal import constants as c
@@ -699,8 +700,18 @@ class TargetResourceSQLStorableMixin:
 
     @classmethod
     def get_new_entities(
-        cls, table: str, kind: str, limit: int = 100, session=None
+        cls,
+        table: str,
+        kind: str,
+        limit: int = 100,
+        clause: sql_filters.AbstractClause | None = None,
+        session=None,
     ) -> list["TargetResourceSQLStorableMixin"]:
+        if clause is None:
+            clause = ""
+        else:
+            clause = f"AND {table}.{clause.construct_expression()} "
+
         expression = (
             "SELECT "
             "    {table}.uuid as uuid "
@@ -712,9 +723,9 @@ class TargetResourceSQLStorableMixin:
             "    WHERE kind = %s "
             ") AS ua_target_resources_by_kind "
             "ON {table}.uuid = ua_target_resources_by_kind.uuid "
-            "WHERE ua_target_resources_by_kind.uuid is NULL "
+            "WHERE ua_target_resources_by_kind.uuid is NULL {clause}"
             "LIMIT %s;"
-        ).format(table=table)
+        ).format(table=table, clause=clause)
         params = (kind, limit)
 
         response = cls._execute_expression(expression, params, session)
@@ -727,17 +738,27 @@ class TargetResourceSQLStorableMixin:
 
     @classmethod
     def get_updated_entities(
-        cls, table: str, kind: str, limit: int = 100, session=None
+        cls,
+        table: str,
+        kind: str,
+        limit: int = 100,
+        clause: sql_filters.AbstractClause | None = None,
+        session=None,
     ) -> list["TargetResourceSQLStorableMixin"]:
+        if clause is None:
+            clause = ""
+        else:
+            clause = f"AND {table}.{clause.construct_expression()} "
+
         expression = (
             "SELECT "
             "    {table}.uuid as uuid "
             "FROM {table} INNER JOIN ua_target_resources ON  "
             "    {table}.uuid = ua_target_resources.uuid "
             "WHERE {table}.updated_at != ua_target_resources.tracked_at "
-            "AND ua_target_resources.kind = %s "
+            "AND ua_target_resources.kind = %s {clause}"
             "LIMIT %s;"
-        ).format(table=table)
+        ).format(table=table, clause=clause)
         params = (kind, limit)
 
         response = cls._execute_expression(expression, params, session)
@@ -761,10 +782,7 @@ class TargetResourceSQLStorableMixin:
             "    AND {table}.uuid is NULL "
             "LIMIT %s;"
         ).format(table=table)
-        params = (
-            kind,
-            limit,
-        )
+        params = (kind, limit)
 
         response = cls._execute_expression(expression, params, session)
         if not response:
@@ -773,6 +791,65 @@ class TargetResourceSQLStorableMixin:
         return TargetResource.objects.get_all(
             filters={"uuid": dm_filters.In(str(r["uuid"]) for r in response)},
         )
+
+    @classmethod
+    def get_outdated_entities(
+        cls,
+        table: str,
+        kind: str,
+        clause: sql_filters.AbstractClause,
+        limit: int = 100,
+        session=None,
+    ) -> list["OutdatedResource"]:
+        clause = f"AND {table}.{clause.construct_expression()} "
+
+        expression = (
+            "SELECT "
+            "    * "
+            "FROM ua_outdated_resources_view INNER JOIN {table} ON  "
+            "    ua_outdated_resources_view.uuid = {table}.uuid "
+            "WHERE ua_outdated_resources_view.kind = %s {clause} "
+            "LIMIT %s;"
+        ).format(table=table, clause=clause)
+        params = (kind, limit)
+
+        response = cls._execute_expression(expression, params, session)
+        if not response:
+            return []
+
+        targets = {
+            r.uuid: r
+            for r in TargetResource.objects.get_all(
+                filters={
+                    "uuid": dm_filters.In(str(r["uuid"]) for r in response),
+                    "kind": dm_filters.EQ(kind),
+                },
+            )
+        }
+
+        actuals = {
+            r.uuid: r
+            for r in Resource.objects.get_all(
+                filters={
+                    "uuid": dm_filters.In(str(r["uuid"]) for r in response),
+                    "kind": dm_filters.EQ(kind),
+                },
+            )
+        }
+
+        resources = []
+        for target in targets.values():
+            actual = actuals[target.uuid]
+            resources.append(
+                OutdatedResource(
+                    uuid=target.uuid,
+                    kind=target.kind,
+                    target_resource=target,
+                    actual_resource=actual,
+                )
+            )
+
+        return resources
 
 
 class OutdatedResource(models.ModelWithUUID, orm.SQLStorableMixin):
@@ -934,17 +1011,32 @@ class InstanceMixin(
 
     @classmethod
     def get_new_instances(
-        cls, limit: int = c.DEF_SQL_LIMIT
+        cls,
+        clause: sql_filters.AbstractClause | None = None,
+        limit: int = c.DEF_SQL_LIMIT,
     ) -> list["InstanceMixin"]:
         kind = cls.get_resource_kind()
-        return cls.get_new_entities(cls.__tablename__, kind, limit)
+        return cls.get_new_entities(cls.__tablename__, kind, limit, clause)
 
     @classmethod
     def get_updated_instances(
-        cls, limit: int = c.DEF_SQL_LIMIT
+        cls,
+        clause: sql_filters.AbstractClause | None = None,
+        limit: int = c.DEF_SQL_LIMIT,
     ) -> list["InstanceMixin"]:
         kind = cls.get_resource_kind()
-        return cls.get_updated_entities(cls.__tablename__, kind, limit)
+        return cls.get_updated_entities(cls.__tablename__, kind, limit, clause)
+
+    @classmethod
+    def get_outdated_resources(
+        cls,
+        clause: sql_filters.AbstractClause,
+        limit: int = c.DEF_SQL_LIMIT,
+    ) -> list["OutdatedResource"]:
+        kind = cls.get_resource_kind()
+        return cls.get_outdated_entities(
+            cls.__tablename__, kind, clause, limit
+        )
 
     @classmethod
     def get_deleted_instances(
