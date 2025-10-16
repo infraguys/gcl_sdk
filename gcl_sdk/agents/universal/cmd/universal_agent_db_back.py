@@ -16,8 +16,6 @@
 
 import logging
 import sys
-import typing as tp
-import collections
 import uuid as sys_uuid
 
 import bazooka
@@ -58,11 +56,6 @@ core_agent_opts = [
         ),
     ),
     cfg.StrOpt(
-        "project_id",
-        default=None,
-        help="Project ID to use for the core agent.",
-    ),
-    cfg.StrOpt(
         "target_fields_path",
         default="/var/lib/genesis/universal_agent/db_back_target_fields.json",
         help="Path to the target fields storage file.",
@@ -94,13 +87,8 @@ ra_config_opts.register_posgresql_db_opts(CONF)
 CONF.register_cli_opts(core_agent_opts, DOMAIN)
 
 
-def load_filters(
-    project_id: str,
-) -> tp.DefaultDict[str, dict[str, dm_filters.AbstractClause]]:
-    # Default filter is project_id
-    filters = collections.defaultdict(
-        lambda: {"project_id": dm_filters.EQ(project_id)}
-    )
+def load_filters() -> dict[str, dict[str, dm_filters.AbstractClause]]:
+    filters = {}
 
     for kind, _filter in ua_utils.cfg_load_section_map(
         CONF.config_file, "filters"
@@ -136,9 +124,6 @@ def main():
     else:
         agent_uuid = ua_utils.system_uuid()
 
-    if not CONF[DOMAIN].project_id:
-        raise ValueError("Project ID is not set")
-
     # Prepare drivers
     facts_drivers = []
 
@@ -151,7 +136,7 @@ def main():
         LOG.info("Loaded model: %s by %s", core_model, model_path)
 
     # Prepare filters
-    filters = load_filters(CONF[DOMAIN].project_id)
+    filters = load_filters()
 
     # Prepare model specs
     specs = []
@@ -159,7 +144,7 @@ def main():
         spec = db_back.ModelSpec(
             kind=kind,
             model=model,
-            filters=filters[kind],
+            filters=filters.get(kind),
         )
         specs.append(spec)
 
