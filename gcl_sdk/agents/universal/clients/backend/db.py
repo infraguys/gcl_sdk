@@ -24,7 +24,7 @@ from restalchemy.storage import base as ra_storage
 from gcl_sdk.agents.universal.clients.backend import base
 from gcl_sdk.agents.universal.clients.backend import exceptions as client_exc
 from gcl_sdk.agents.universal.dm import models
-
+from gcl_sdk.agents.universal.storage import base as storage_base
 
 LOG = logging.getLogger(__name__)
 
@@ -32,7 +32,22 @@ LOG = logging.getLogger(__name__)
 class ModelSpec(tp.NamedTuple):
     model: tp.Type[ra_storage.AbstractStorableMixin]
     kind: str
-    filters: dict[str, dm_filters.AbstractClause]
+
+    # Special case if the filters are `None` it means the target fields
+    # storage will be used as filters.
+    # Example:
+    # filters = None
+    # target_fields = {
+    #     "kind_foo": {
+    #         "uuid1": ["field1", "field2"],
+    #         "uuid2": ["field1"],
+    #     }
+    # }
+    # The `list` method will use the following filters:
+    # filters = {
+    #     "uuid": dm_filters.In(["uuid1", "uuid2"]),
+    # }
+    filters: dict[str, dm_filters.AbstractClause] | None = None
 
     # Inject filter fields into the model if the model does not have them
     # This is used to be able to filter resources on the list method
@@ -60,19 +75,40 @@ class DatabaseBackendClient(base.AbstractBackendClient):
     def __init__(
         self,
         model_specs: tp.Collection[ModelSpec],
+        tf_storage: storage_base.AbstractTargetFieldsStorage,
         session: tp.Any | None = None,
     ):
         super().__init__()
         self._session = session
         self._model_spec_map = {m.kind: m for m in model_specs}
+        self._tf_storage = tf_storage
 
     def _get_resource_filters(
         self, resource: models.Resource
     ) -> dict[str, dm_filters.AbstractClause]:
         model_spec = self._model_spec_map[resource.kind]
         filters = {"uuid": dm_filters.EQ(str(resource.uuid))}
-        filters.update(model_spec.filters)
+        if model_spec.filters is not None:
+            filters.update(model_spec.filters)
         return filters
+
+    def _get_filters(self, kind: str) -> dict[str, dm_filters.AbstractClause]:
+        """Get filters for the kind.
+
+        If the model spec has filters, return them.
+        Otherwise, construct them from the target fields
+        from the storage.
+        """
+        model_spec = self._model_spec_map[kind]
+        if model_spec.filters is not None:
+            return model_spec.filters
+
+        # Construct filters from the target fields
+        target_fields: dict = self._tf_storage.storage()
+        if kind not in target_fields or not target_fields[kind]:
+            return {}
+
+        return {"uuid": dm_filters.In(tuple(target_fields[kind].keys()))}
 
     def set_session(self, session: tp.Any) -> None:
         """Set the session to be used by the client."""
@@ -101,31 +137,35 @@ class DatabaseBackendClient(base.AbstractBackendClient):
     def list(self, capability: str) -> list[models.ResourceMixin]:
         """Lists all resources by capability."""
         model_spec = self._model_spec_map[capability]
+        filters = self._get_filters(capability)
+
+        if not filters:
+            return []
 
         # Get all objects for the project from the database
         return model_spec.model.objects.get_all(
             session=self._session,
-            filters=model_spec.filters,
+            filters=filters,
         )
 
     def create(self, resource: models.Resource) -> models.ResourceMixin:
         """Creates a resource."""
         model_spec = self._model_spec_map[resource.kind]
-        filters = self._get_resource_filters(resource)
+        res_filters = self._get_resource_filters(resource)
 
         # Check if the resource already exists
         # We need to do this check since PG does not correctly handle
         # the case when the resource already exists and fails the transaction
         obj = model_spec.model.objects.get_one_or_none(
             session=self._session,
-            filters=filters,
+            filters=res_filters,
         )
         if obj is not None:
             LOG.warning("The resource already exists: %s", resource.uuid)
             raise client_exc.ResourceAlreadyExists(resource=resource)
 
         # Inject filter fields into the resource value if they are not present
-        if model_spec.inject_filter_fields:
+        if model_spec.inject_filter_fields and model_spec.filters:
             value = resource.value.copy()
             for field, _filter in model_spec.filters.items():
                 if field not in value:
@@ -149,12 +189,12 @@ class DatabaseBackendClient(base.AbstractBackendClient):
     def update(self, resource: models.Resource) -> models.ResourceMixin:
         """Update the resource."""
         model_spec = self._model_spec_map[resource.kind]
-        filters = self._get_resource_filters(resource)
+        res_filters = self._get_resource_filters(resource)
 
         # Check if the resource already exists
         obj = model_spec.model.objects.get_one_or_none(
             session=self._session,
-            filters=filters,
+            filters=res_filters,
         )
         if obj is None:
             LOG.warning("The resource does not exist: %s", resource.uuid)
@@ -175,12 +215,12 @@ class DatabaseBackendClient(base.AbstractBackendClient):
     def delete(self, resource: models.Resource) -> None:
         """Delete the resource."""
         model_spec = self._model_spec_map[resource.kind]
-        filters = self._get_resource_filters(resource)
+        res_filters = self._get_resource_filters(resource)
 
         try:
             obj = model_spec.model.objects.get_one(
                 session=self._session,
-                filters=filters,
+                filters=res_filters,
             )
             obj.delete(session=self._session)
             LOG.debug("Deleted resource: %s", resource.uuid)

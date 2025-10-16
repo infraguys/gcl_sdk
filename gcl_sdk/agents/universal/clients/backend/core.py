@@ -23,6 +23,7 @@ from gcl_sdk.agents.universal.dm import models
 from gcl_sdk.clients.http import base as http
 from gcl_sdk.agents.universal.clients.backend import rest
 from gcl_sdk.agents.universal.clients.backend import exceptions
+from gcl_sdk.agents.universal.storage import base as storage_base
 
 
 class ResourceProjectMismatch(exceptions.BackendClientException):
@@ -37,12 +38,38 @@ class GCRestApiBackendClient(rest.RestApiBackendClient):
         self,
         http_client: http.CollectionBaseClient,
         collection_map: dict[str, str],
-        project_id: sys_uuid.UUID,
+        project_id: sys_uuid.UUID | None = None,
+        tf_storage: storage_base.AbstractTargetFieldsStorage | None = None,
     ) -> None:
         super().__init__(
             http_client=http_client, collection_map=collection_map
         )
-        self._project_id = str(project_id)
+        self._project_id = project_id
+        self._tf_storage = tf_storage
+
+    def _get_filters(self, kind: str) -> dict[str, str]:
+        """Get filters for the kind.
+
+        If the project_id is set, return it.
+        Otherwise, construct filters from the target fields
+        from the storage.
+        """
+        if self._project_id is not None:
+            return {"project_id": str(self._project_id)}
+
+        # Construct filters from the target fields
+        target_fields: dict = self._tf_storage.storage()
+        if kind not in target_fields or not target_fields[kind]:
+            return {}
+
+        uuids = tuple(target_fields[kind].keys())
+        if len(uuids) == 1:
+            return {"uuid": str(uuids[0])}
+
+        filter_str = "&".join(f"uuid={str(u)}" for u in uuids)
+
+        # Remove "uuid=" prefix
+        return {"uuid": filter_str[5:]}
 
     def create(self, resource: models.Resource) -> dict[str, tp.Any]:
         """Creates the resource. Returns the created resource."""
@@ -50,9 +77,10 @@ class GCRestApiBackendClient(rest.RestApiBackendClient):
         resource.value["uuid"] = str(resource.uuid)
 
         # Simple validation for project_id. Only one project is supported.
-        res_project_id = resource.value.get("project_id", None)
-        if res_project_id and res_project_id != self._project_id:
-            raise ResourceProjectMismatch(resource=resource)
+        if self._project_id is not None:
+            res_project_id = resource.value.get("project_id", None)
+            if res_project_id and res_project_id != str(self._project_id):
+                raise ResourceProjectMismatch(resource=resource)
 
         return super().create(resource)
 
@@ -75,4 +103,4 @@ class GCRestApiBackendClient(rest.RestApiBackendClient):
 
     def list(self, kind: str) -> list[dict[str, tp.Any]]:
         """Lists all resources by kind."""
-        return super().list(kind, project_id=self._project_id)
+        return super().list(kind, **self._get_filters(kind))
