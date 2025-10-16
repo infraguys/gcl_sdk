@@ -93,3 +93,7 @@ class TargetFieldsFileStorage(base.AbstractTargetFieldsStorage):
     def persist(self) -> None:
         """Persist the storage."""
         self._storage.persist()
+
+    def storage(self) -> dict[str, dict[str, list[str]]]:
+        """Return the raw storage."""
+        return self._storage

@@ -72,3 +72,7 @@ class AbstractTargetFieldsStorage(abc.ABC):
     @abc.abstractmethod
     def persist(self) -> None:
         """Persist the storage."""
+
+    @abc.abstractmethod
+    def storage(self) -> tp.Any:
+        """Return the raw storage."""

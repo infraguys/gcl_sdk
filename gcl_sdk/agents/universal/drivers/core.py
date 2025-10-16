@@ -18,6 +18,7 @@ from __future__ import annotations
 import os
 import logging
 import typing as tp
+import uuid as sys_uuid
 
 import bazooka
 
@@ -43,7 +44,7 @@ class CoreCapabilityDriver(direct.DirectAgentDriver):
         self,
         username: str,
         password: str,
-        project_id: str,
+        project_id: sys_uuid.UUID,
         user_api_base_url: str,
         agent_work_dir: str = c.WORK_DIR,
         **collection_map,
@@ -66,7 +67,10 @@ class CoreCapabilityDriver(direct.DirectAgentDriver):
 
         storage = fs.TargetFieldsFileStorage(storage_path)
         rest_client = core_rest_back.GCRestApiBackendClient(
-            rest_client, collection_map, project_id
+            rest_client,
+            collection_map,
+            project_id=project_id,
+            tf_storage=storage,
         )
 
         super().__init__(storage=storage, client=rest_client)
@@ -76,10 +80,47 @@ class CoreCapabilityDriver(direct.DirectAgentDriver):
         return list(self._collection_map.keys())
 
 
-class RestCoreCapabilityDriver(CoreCapabilityDriver):
+class RestCoreCapabilityDriver(direct.DirectAgentDriver):
     """Core capability driver for interacting with GC using REST API."""
 
-    pass
+    def __init__(
+        self,
+        username: str,
+        password: str,
+        user_api_base_url: str,
+        project_id: sys_uuid.UUID | None = None,
+        agent_work_dir: str = c.WORK_DIR,
+        **collection_map,
+    ):
+        http = bazooka.Client()
+        auth = base.CoreIamAuthenticator(
+            user_api_base_url, username, password, http_client=http
+        )
+        self._collection_map = {
+            k: v.strip() for k, v in collection_map.items()
+        }
+
+        rest_client = base.CollectionBaseClient(
+            http_client=http, base_url=user_api_base_url, auth=auth
+        )
+
+        storage_path = os.path.join(
+            agent_work_dir, CORE_TARGET_FIELDS_FILENAME
+        )
+
+        storage = fs.TargetFieldsFileStorage(storage_path)
+        rest_client = core_rest_back.GCRestApiBackendClient(
+            rest_client,
+            collection_map,
+            project_id=project_id,
+            tf_storage=storage,
+        )
+
+        super().__init__(storage=storage, client=rest_client)
+
+    def get_capabilities(self) -> list[str]:
+        """Returns a list of capabilities supported by the driver."""
+        return list(self._collection_map.keys())
 
 
 class DatabaseCapabilityDriver(direct.DirectAgentDriver):
@@ -91,8 +132,8 @@ class DatabaseCapabilityDriver(direct.DirectAgentDriver):
         target_fields_storage_path: str,
     ):
 
-        client = db_back.DatabaseBackendClient(model_specs)
         storage = fs.TargetFieldsFileStorage(target_fields_storage_path)
+        client = db_back.DatabaseBackendClient(model_specs, storage)
 
         self._kinds = {m.kind for m in model_specs}
 
