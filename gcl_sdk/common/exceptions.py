@@ -15,8 +15,6 @@
 #    under the License.
 from izulu import root
 
-from gcl_sdk.agents.universal.dm import models
-
 
 class UniversalAgentException(root.Error):
     __toggles__ = root.Toggles.DEFAULT ^ root.Toggles.FORBID_UNANNOTATED_FIELDS
