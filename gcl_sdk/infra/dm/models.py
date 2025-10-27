@@ -22,7 +22,6 @@ from restalchemy.dm import properties
 from restalchemy.dm import types as ra_types
 from restalchemy.dm import types_dynamic
 from restalchemy.dm import models as ra_models
-from restalchemy.dm import filters as dm_filters
 
 from gcl_sdk.agents.universal.dm import models as ua_models
 from gcl_sdk.infra import constants as pc
@@ -62,6 +61,10 @@ class Node(
     )
     default_network = properties.property(ra_types.Dict(), default=lambda: {})
 
+    placement_policies = properties.property(
+        ra_types.TypedList(ra_types.UUID()), default=list
+    )
+
     @classmethod
     def get_resource_kind(cls) -> str:
         """Return the resource kind."""
@@ -82,6 +85,7 @@ class Node(
                 "node_type",
                 "image",
                 "project_id",
+                "placement_policies",
             )
         )
 
