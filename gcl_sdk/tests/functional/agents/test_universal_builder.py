@@ -754,3 +754,156 @@ class TestUniversalBuilderService:
 
         assert master.full_hash == instance.master_full_hash
         assert instance.full_hash != "1111"
+
+    def test_schedule_instance_on_create_when_schedulable(
+        self,
+        dummy_instance_factory: tp.Callable,
+    ):
+        class SchedulableDummyInstance(
+            conftest.DummyInstance, ua_models.SchedulableToAgentMixin
+        ):
+            pass
+
+        storage = {"new": [], "updated": [], "deleted": [], "existing": []}
+        uuid = sys_uuid.uuid5(SchedulableDummyInstance.NAMESPACE, "new-0")
+
+        # Prepare the agent for scheduling
+        agent = ua_models.UniversalAgent(uuid=uuid, node=uuid, name="agent-0")
+        agent.save()
+
+        inst = SchedulableDummyInstance(uuid=uuid, name="inst-new-0")
+        storage["new"].append(inst)
+        SchedulableDummyInstance.__dummy_storage__ = storage
+
+        svc = DummyBuilder(instance_model=SchedulableDummyInstance)
+        svc._iteration()
+
+        resources = ua_models.TargetResource.objects.get_all()
+        assert len(resources) == 1
+        r = resources[0]
+        assert r.uuid == inst.uuid
+        assert r.agent == inst.uuid
+
+    def test_schedule_instance_and_derivative_on_create_when_schedulable(
+        self,
+    ):
+        class SchedulableDummyDerivative(
+            conftest.DummyDerivative, ua_models.SchedulableToAgentMixin
+        ):
+            pass
+
+        class SchedulableInstanceWithDerivatives(
+            conftest.DummyInstanceWithDerivatives,
+            ua_models.SchedulableToAgentMixin,
+        ):
+            __derivative_model_map__ = {
+                "foo-derivative": SchedulableDummyDerivative,
+            }
+
+            def to_derivative(self) -> SchedulableDummyDerivative:
+                return SchedulableDummyDerivative(
+                    uuid=sys_uuid.uuid5(self.uuid, self.name),
+                    name=self.name,
+                    project_id=self.project_id,
+                )
+
+        storage = {"new": [], "updated": [], "deleted": [], "existing": []}
+        uuid = sys_uuid.uuid5(
+            SchedulableInstanceWithDerivatives.NAMESPACE, "new-0"
+        )
+        name = "inst-new-0"
+
+        # Prepare the agents for scheduling
+        agent = ua_models.UniversalAgent(uuid=uuid, node=uuid, name="agent-0")
+        agent.save()
+
+        agent = ua_models.UniversalAgent(
+            uuid=sys_uuid.uuid5(uuid, name), node=uuid, name="agent-1"
+        )
+        agent.save()
+
+        inst = SchedulableInstanceWithDerivatives(uuid=uuid, name=name)
+        storage["new"].append(inst)
+        SchedulableInstanceWithDerivatives.__dummy_storage__ = storage
+
+        svc = DummyBuilderWithDerivatives(
+            instance_model=SchedulableInstanceWithDerivatives
+        )
+        svc._iteration()
+
+        resources = ua_models.TargetResource.objects.get_all()
+        assert len(resources) == 2
+        inst_res = [r for r in resources if r.master is None][0]
+        der_res = [r for r in resources if r.master == inst_res.uuid][0]
+        assert inst_res.agent == inst.uuid
+        assert der_res.agent == sys_uuid.uuid5(inst.uuid, inst.name)
+
+    def test_schedule_new_derivative_on_update_when_schedulable(self):
+        class SchedulableDummyDerivative(
+            conftest.DummyDerivative, ua_models.SchedulableToAgentMixin
+        ):
+            pass
+
+        class SchedulableInstanceWithDerivatives(
+            conftest.DummyInstanceWithDerivatives
+        ):
+            __derivative_model_map__ = {
+                "foo-derivative": SchedulableDummyDerivative,
+            }
+
+            def to_derivative(self) -> SchedulableDummyDerivative:
+                return SchedulableDummyDerivative(
+                    uuid=sys_uuid.uuid5(self.uuid, self.name),
+                    name=self.name,
+                    project_id=self.project_id,
+                )
+
+        storage = {"new": [], "updated": [], "deleted": [], "existing": []}
+        uuid = sys_uuid.uuid5(
+            SchedulableInstanceWithDerivatives.NAMESPACE, "updated-0"
+        )
+        name = "inst-updated-0"
+
+        inst = SchedulableInstanceWithDerivatives(uuid=uuid, name=name)
+
+        base_resource = inst.to_ua_resource()
+        base_resource.save()
+        # existing derivative with old name
+        old_der = SchedulableDummyDerivative(
+            uuid=sys_uuid.uuid5(inst.uuid, base_resource.value["name"]),
+            name=base_resource.value["name"],
+            project_id=inst.project_id,
+        )
+        old_der_res = old_der.to_ua_resource(
+            master=base_resource.uuid,
+            master_hash=base_resource.hash,
+            master_full_hash=base_resource.full_hash,
+        )
+        old_der_res.save()
+
+        # Prepare the agents for scheduling
+        agent = ua_models.UniversalAgent(
+            uuid=sys_uuid.uuid5(uuid, f"{name}-updated"),
+            node=uuid,
+            name="agent-0",
+        )
+        agent.save()
+
+        inst.name = f"{name}-updated"
+        storage["updated"].append(inst)
+        SchedulableInstanceWithDerivatives.__dummy_storage__ = storage
+
+        svc = DummyBuilderWithDerivatives(
+            instance_model=SchedulableInstanceWithDerivatives
+        )
+        svc._iteration()
+
+        resources = ua_models.TargetResource.objects.get_all()
+        inst_res = [r for r in resources if r.uuid == inst.uuid][0]
+        new_der_uuid = sys_uuid.uuid5(inst.uuid, inst.name)
+        der_res = [
+            r
+            for r in resources
+            if r.master == inst_res.uuid and r.uuid == new_der_uuid
+        ][0]
+        assert der_res.agent == new_der_uuid
