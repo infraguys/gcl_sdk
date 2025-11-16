@@ -825,6 +825,57 @@ class OutdatedMasterFullHashResource(
     )
 
 
+class SchedulableToAgentMixin:
+    """A helpful mixin to schedule resources to the UA agent for simple cases.
+
+    Actually scheduling is a responsibility of a separated scheduler
+    service but in some simple cases an UA agent is known right after
+    a resource is created. The mixin provides a way to schedule the
+    resource if the UA agent is able to get or calculate from the
+    internal data.
+    """
+
+    def schedule_to_ua_agent(self, **kwargs) -> sys_uuid.UUID | None:
+        """Schedule the resource to the UA agent.
+
+        The method returns the UA agent UUID.
+
+        The UA agent UUID is the same as the resource UUID
+        for the simplest case when the resource is scheduled
+        to the UA agent. It's convenient if relation between
+        the resource and the UA agent is one-to-one.
+        """
+        return self.uuid
+
+
+class SchedulableToAgentFromNodeMixin(SchedulableToAgentMixin):
+
+    def schedule_to_ua_agent(self, **kwargs) -> sys_uuid.UUID | None:
+        """Schedule the resource to the UA agent.
+
+        The method returns the node UUID that is equal to the
+        agent UUID.
+        """
+        return self.node
+
+
+class SchedulableToAgentFromAgentUUIDMixin(
+    SchedulableToAgentMixin,
+    models.Model,
+):
+
+    agent_uuid = properties.property(
+        types.AllowNone(types.UUID()), default=None
+    )
+
+    def schedule_to_ua_agent(self, **kwargs) -> sys_uuid.UUID | None:
+        """Schedule the resource to the UA agent.
+
+        The method returns the agent UUID.
+        """
+        return self.agent_uuid
+
+
 class KindAwareMixin:
     """A helpful mixin to get the resource kind."""
 

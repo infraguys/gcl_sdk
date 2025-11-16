@@ -265,6 +265,21 @@ class UniversalBuilderService(looper_basic.BasicService):
         right_hash = hash(frozenset(r.hash for r in resources_right))
         return left_hash == right_hash
 
+    def _schedule_to_ua_agent(
+        self,
+        schedulable: models.SchedulableToAgentMixin,
+        resource: models.TargetResource,
+    ) -> None:
+        """Schedule the resource to the UA agent for simple cases.
+
+        Actually scheduling is a responsibility of a separated scheduler
+        service but in some simple cases the UA agent is known right after
+        the resource is created. For this case the method schedules the
+        resource to the UA agent.
+        """
+        agent_uuid = schedulable.schedule_to_ua_agent()
+        resource.agent = agent_uuid
+
     def _actualize_resource_hash_status(
         self,
         target_resource: models.TargetResource,
@@ -473,13 +488,19 @@ class UniversalBuilderService(looper_basic.BasicService):
             )
         self._actualize_derivative_resources_hash_status(changed_derivatives)
 
-        new_target_resources = frozenset(
-            d.to_ua_resource(master=target_resource.uuid)
-            for d in new_derivatives
-        )
+        # Convert derivatives to new target resources
+        # Also perform simple scheduling if needed
+        new_target_resources = []
+        for d in new_derivatives:
+            new_tgt_resource = d.to_ua_resource(master=target_resource.uuid)
+            if isinstance(d, models.SchedulableToAgentMixin):
+                self._schedule_to_ua_agent(d, new_tgt_resource)
+            new_target_resources.append(new_tgt_resource)
+
         # Actualize derivative target resources if they are changed
         self._actualize_derivative_target_resources(
-            new_target_resources, frozenset(d for d, _ in changed_derivatives)
+            frozenset(new_target_resources),
+            frozenset(d for d, _ in changed_derivatives),
         )
 
         # Commit the tracked_at timestamp
@@ -554,14 +575,19 @@ class UniversalBuilderService(looper_basic.BasicService):
             )
         self._actualize_derivative_resources_hash_status(changed_derivatives)
 
-        new_target_resources = frozenset(
-            d.to_ua_resource(master=target_resource.uuid)
-            for d in new_derivatives
-        )
+        # Convert derivatives to new target resources
+        # Also perform simple scheduling if needed
+        new_target_resources = []
+        for d in new_derivatives:
+            new_tgt_resource = d.to_ua_resource(master=target_resource.uuid)
+            if isinstance(d, models.SchedulableToAgentMixin):
+                self._schedule_to_ua_agent(d, new_tgt_resource)
+            new_target_resources.append(new_tgt_resource)
 
         # Actualize derivative target resources if they are changed
         self._actualize_derivative_target_resources(
-            new_target_resources, frozenset(d for d, _ in all_derivatives)
+            frozenset(new_target_resources),
+            frozenset(d for d, _ in all_derivatives),
         )
 
         # Commit the tracked_at timestamp
@@ -590,6 +616,10 @@ class UniversalBuilderService(looper_basic.BasicService):
         instance_resource = instance.to_ua_resource()
         instance_resource.insert()
 
+        # Schedule instance to the UA agent for simple cases
+        if isinstance(instance, models.SchedulableToAgentMixin):
+            self._schedule_to_ua_agent(instance, instance_resource)
+
         # Save the derivative objects
         derivative_resources = []
         for derivative_object in derivative_objects:
@@ -597,6 +627,11 @@ class UniversalBuilderService(looper_basic.BasicService):
                 master=instance_resource.uuid
             )
             derivative_resources.append(derivative_resource)
+            # Schedule derivatives to the UA agent for simple cases
+            if isinstance(derivative_object, models.SchedulableToAgentMixin):
+                self._schedule_to_ua_agent(
+                    derivative_object, derivative_resource
+                )
             derivative_resource.save()
 
         self.post_create_instance_resource(
@@ -680,13 +715,20 @@ class UniversalBuilderService(looper_basic.BasicService):
             new_derivatives = self.update_instance_derivatives(
                 instance, resource, current_derivatives
             )
-            new_target_resources = frozenset(
-                d.to_ua_resource(master=resource.uuid) for d in new_derivatives
-            )
+
+            # Convert derivatives to new target resources
+            # Also perform simple scheduling if needed
+            new_target_resources = []
+            for d in new_derivatives:
+                new_tgt_resource = d.to_ua_resource(master=resource.uuid)
+                if isinstance(d, models.SchedulableToAgentMixin):
+                    self._schedule_to_ua_agent(d, new_tgt_resource)
+                new_target_resources.append(new_tgt_resource)
 
             # Actualize derivative target resources if they are changed
             target_resources = self._actualize_derivative_target_resources(
-                new_target_resources, frozenset(d for d, _ in derivatives)
+                frozenset(new_target_resources),
+                frozenset(d for d, _ in derivatives),
             )
         else:
             target_resources = tuple()
@@ -1076,14 +1118,19 @@ class UniversalBuilderService(looper_basic.BasicService):
                 )
             )
 
-        new_target_resources = frozenset(
-            d.to_ua_resource(master=target_resource.uuid)
-            for d in new_derivatives
-        )
+        # Convert derivatives to new target resources
+        # Also perform simple scheduling if needed
+        new_target_resources = []
+        for d in new_derivatives:
+            new_tgt_resource = d.to_ua_resource(master=target_resource.uuid)
+            if isinstance(d, models.SchedulableToAgentMixin):
+                self._schedule_to_ua_agent(d, new_tgt_resource)
+            new_target_resources.append(new_tgt_resource)
 
         # Actualize derivative target resources if they are changed
         self._actualize_derivative_target_resources(
-            new_target_resources, frozenset(d for d, _ in derivatives)
+            frozenset(new_target_resources),
+            frozenset(d for d, _ in derivatives),
         )
 
         # Commit the master hash
