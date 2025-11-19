@@ -39,6 +39,20 @@ from gcl_sdk.agents.universal import constants as c
 LOG = logging.getLogger(__name__)
 
 
+class ResourceIdentifier(tp.NamedTuple):
+    """A resource identifier.
+
+    The resource identifier is a tuple of kind and UUID.
+    """
+
+    kind: str
+    uuid: sys_uuid.UUID
+
+
+# short alias
+RI = ResourceIdentifier
+
+
 class Payload(models.Model, models.SimpleViewMixin):
     """This model is used to represent the payload of the agent.
 
@@ -874,6 +888,86 @@ class SchedulableToAgentFromAgentUUIDMixin(
         The method returns the agent UUID.
         """
         return self.agent_uuid
+
+
+class ReadinessMixin:
+    """A helpful mixin to check the resource readiness.
+
+    The mixin provides a way to check if the resource is ready
+    to create, update, delete or actualize.
+    Returns:
+        bool: True if the resource is ready to create, update,
+              delete or actualize.
+    """
+
+    def is_ready_to_create(self) -> bool:
+        """Check if the resource is ready to create."""
+        return self.is_ready_to_actualize()
+
+    def is_ready_to_update(self) -> bool:
+        """Check if the resource is ready to update."""
+        return self.is_ready_to_actualize()
+
+    def is_ready_to_delete(self) -> bool:
+        """Check if the resource is ready to delete."""
+        return True
+
+    def is_ready_to_actualize(self) -> bool:
+        """Check if the resource is ready to actualize."""
+        return True
+
+
+class DependenciesActiveReadinessMixin(ReadinessMixin):
+    """Check the dependencies exist and are active.
+
+    The resource is considered ready to actualize if all its dependencies
+    exist and are active.
+    """
+
+    def get_readiness_dependencies(
+        self,
+    ) -> tp.Collection["ResourceKindAwareMixin" | ResourceIdentifier]:
+        """Get the dependencies to check readiness.
+
+        Returns:
+            tp.Collection["ResourceKindAwareMixin" | ResourceIdentifier]:
+                The dependencies to check readiness.
+        """
+        return tuple()
+
+    def is_ready_to_actualize(self) -> bool:
+        """Check if the resource is ready to actualize.
+
+        Fetches all dependencies and checks if they exist and are active.
+        """
+        # Fetch dependencies
+        dependencies = set()
+        for dep in self.get_readiness_dependencies():
+            if isinstance(dep, ResourceIdentifier):
+                dependencies.add(dep)
+            else:
+                dependencies.add(RI(dep.get_resource_kind(), dep.uuid))
+
+        if len(dependencies) == 0:
+            return True
+
+        # Get all possible target resources
+        dep_resources = {
+            RI(r.kind, r.uuid): r
+            for r in TargetResource.objects.get_all(
+                filters={
+                    "kind": dm_filters.In(r.kind for r in dependencies),
+                    "uuid": dm_filters.In(r.uuid for r in dependencies),
+                }
+            )
+        }
+
+        # Ensure all dependencies exist
+        if dependencies - dep_resources.keys():
+            return False
+
+        # Ensure all dependencies are active
+        return all(dep_resources[i].status == "ACTIVE" for i in dependencies)
 
 
 class KindAwareMixin:

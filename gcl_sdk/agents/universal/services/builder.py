@@ -46,6 +46,24 @@ class UniversalBuilderService(looper_basic.BasicService):
 
     # Builder interface
 
+    def can_create_instance_resource(
+        self, instance: models.InstanceMixin
+    ) -> bool:
+        """The hook to check if the instance can be created.
+
+        If the hook returns `False`, the code related to the instance:
+        - `pre_create_instance_resource`
+        - `create_instance_derivatives`
+        - `post_create_instance_resource`
+        will be skipped for the current iteration. The
+        `can_create_instance_resource` will be called again on the next
+        iteration until it returns `True`.
+        """
+        if isinstance(instance, models.ReadinessMixin):
+            return instance.is_ready_to_create()
+
+        return True
+
     def pre_create_instance_resource(
         self, instance: models.InstanceMixin
     ) -> None:
@@ -88,6 +106,23 @@ class UniversalBuilderService(looper_basic.BasicService):
         """The hook is performed before updating instance resource."""
         pass
 
+    def can_update_instance_resource(
+        self, instance: models.InstanceMixin
+    ) -> bool:
+        """The hook to check if the instance can be updated.
+
+        If the hook returns `False`, the code related to the instance:
+        - `update_instance_derivatives`
+        - `post_update_instance_resource`
+        will be skipped for the current iteration. The
+        `can_update_instance_resource` will be called again on the next
+        iteration until it returns `True`.
+        """
+        if isinstance(instance, models.ReadinessMixin):
+            return instance.is_ready_to_update()
+
+        return True
+
     def update_instance_derivatives(
         self,
         instance: models.InstanceWithDerivativesMixin,
@@ -116,6 +151,23 @@ class UniversalBuilderService(looper_basic.BasicService):
     ) -> None:
         """The hook is performed after updating instance resource."""
         pass
+
+    def can_actualize_outdated_instance_resource(
+        self, instance: models.InstanceMixin
+    ) -> bool:
+        """The hook to check if the instance can be actualized.
+
+        If the hook returns `False`, the code related to the instance:
+        - `actualize_outdated_instance`
+        - `actualize_outdated_instance_derivatives`
+        will be skipped for the current iteration. The
+        `can_actualize_outdated_instance_resource` will be called again on
+        the next iteration until it returns `True`.
+        """
+        if isinstance(instance, models.ReadinessMixin):
+            return instance.is_ready_to_actualize()
+
+        return True
 
     def actualize_outdated_instance(
         self,
@@ -176,6 +228,25 @@ class UniversalBuilderService(looper_basic.BasicService):
             derivative_pairs: Changed or all derivatives of the instance.
         """
         return tuple(p[0] for p in derivative_pairs)
+
+    def can_delete_instance_resource(
+        self, resource: models.TargetResource
+    ) -> bool:
+        """The hook to check if the instance can be deleted.
+
+        If the hook returns `False`, the code related to the instance:
+        - `pre_delete_instance_resource`
+        will be skipped for the current iteration. The
+        `can_delete_instance_resource` will be called again on the next
+        iteration until it returns `True`.
+        """
+        if issubclass(self._instance_model, models.ReadinessMixin):
+            instance = self._instance_model.restore_from_simple_view(
+                **resource.value
+            )
+            return instance.is_ready_to_delete()
+
+        return True
 
     def pre_delete_instance_resource(
         self, resource: models.TargetResource
@@ -662,7 +733,10 @@ class UniversalBuilderService(looper_basic.BasicService):
         # Create resources for new instances
         for instance in instances:
             try:
-                self._actualize_new_instance(instance)
+                # Check if the instance can be created
+                # If not, skip it and try again on the next iteration
+                if self.can_create_instance_resource(instance):
+                    self._actualize_new_instance(instance)
             except Exception:
                 LOG.exception(
                     "Error creating instance resource %s", instance.uuid
@@ -767,9 +841,9 @@ class UniversalBuilderService(looper_basic.BasicService):
         )
 
         # Derivatives resources if the model class has derivatives
-        if updated_instances[0]._has_model_derivatives():
+        if self._instance_model._has_model_derivatives():
             resource_derivative_map = self._get_resources_by_masters(
-                tuple(r.uuid for r in instance_resources)
+                r.uuid for r in instance_resources
             )
         else:
             resource_derivative_map = {}
@@ -782,9 +856,11 @@ class UniversalBuilderService(looper_basic.BasicService):
             derivatives = resource_derivative_map.get(resource.uuid, tuple())
 
             try:
-                self._actualize_updated_instance(
-                    instance, resource, derivatives
-                )
+                # Check we can update the instance resource
+                if self.can_update_instance_resource(instance):
+                    self._actualize_updated_instance(
+                        instance, resource, derivatives
+                    )
             except Exception:
                 LOG.exception(
                     "Error updating instance(%s) resource %s",
@@ -840,6 +916,10 @@ class UniversalBuilderService(looper_basic.BasicService):
         for instance in instances:
             target, actual = resource_map[instance.uuid]
             try:
+                # Check if the instance can be actualized
+                if not self.can_actualize_outdated_instance_resource(instance):
+                    continue
+
                 self._actualize_outdated_instance(instance, target, actual)
                 LOG.debug("Instance(%s) %s actualized", kind, instance.uuid)
             except Exception:
@@ -965,6 +1045,10 @@ class UniversalBuilderService(looper_basic.BasicService):
             changed_derivatives = changed_resource_map[resource.uuid]
 
             try:
+                # Check if the instance can be actualized
+                if not self.can_actualize_outdated_instance_resource(instance):
+                    continue
+
                 # Actualize instance with all derivatives
                 if need_all:
                     all_derivatives = all_resource_map[resource.uuid]
@@ -1008,31 +1092,42 @@ class UniversalBuilderService(looper_basic.BasicService):
         if len(deleted_instance_resources) == 0:
             return
 
+        # Fetch derivatives related to deleted instances
         if self._instance_model._has_model_derivatives():
-            derivative_resources = models.TargetResource.objects.get_all(
-                filters={
-                    "master": dm_filters.In(
-                        str(m.uuid) for m in deleted_instance_resources
-                    ),
-                }
+            derivative_resources = self._get_resources_by_masters(
+                m.uuid for m in deleted_instance_resources
             )
         else:
-            derivative_resources = tuple()
+            derivative_resources = {}
 
         # Delete all outdated resources
-        for resource in itertools.chain(
-            deleted_instance_resources, derivative_resources
-        ):
+        for instance_res in deleted_instance_resources:
+            derivatives = derivative_resources.get(instance_res.uuid, [])
+
             try:
-                self.pre_delete_instance_resource(resource)
-                resource.delete()
-                LOG.info(
-                    "Outdated resource(%s) %s deleted",
-                    resource.kind,
-                    resource.uuid,
+                # Check we can delete the instance resource
+                if not self.can_delete_instance_resource(instance_res):
+                    continue
+
+                self.pre_delete_instance_resource(instance_res)
+
+                resources_to_delete = tuple(t for t, _ in derivatives) + (
+                    instance_res,
                 )
+                for resource in resources_to_delete:
+                    resource.delete()
+                    LOG.info(
+                        "Outdated resource(%s) %s deleted",
+                        resource.kind,
+                        resource.uuid,
+                    )
+
             except Exception:
-                LOG.exception("Error deleting resource %s", resource.uuid)
+                LOG.exception(
+                    "Error deleting resource(%s) %s",
+                    instance_res.kind,
+                    instance_res.uuid,
+                )
 
     # Outdated master hash (full hash) instances
 
