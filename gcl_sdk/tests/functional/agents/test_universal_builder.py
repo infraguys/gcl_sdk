@@ -331,6 +331,158 @@ class TestUniversalBuilderService:
 
         assert Builder.actualized
 
+    def test_skip_create_when_not_ready(
+        self, dummy_instance_factory: tp.Callable
+    ):
+        class DummyInstanceNotReadyCreate(
+            conftest.DummyInstance, ua_models.ReadinessMixin
+        ):
+            def is_ready_to_create(self) -> bool:
+                return False
+
+        storage = {"new": [], "updated": [], "deleted": [], "existing": []}
+        project_id = sys_uuid.uuid4()
+        uuid = sys_uuid.uuid5(DummyInstanceNotReadyCreate.NAMESPACE, "new-0")
+        inst = DummyInstanceNotReadyCreate(
+            uuid=uuid, name="inst-new-0", project_id=project_id
+        )
+        storage["new"].append(inst)
+        DummyInstanceNotReadyCreate.__dummy_storage__ = storage
+
+        svc = DummyBuilder(instance_model=DummyInstanceNotReadyCreate)
+        svc._iteration()
+
+        resources = ua_models.TargetResource.objects.get_all()
+        assert len(resources) == 0
+        assert not svc.pre_create_called
+        assert not svc.post_create_called
+        assert not svc.create_instance_derivatives_called
+
+    def test_skip_update_when_not_ready(
+        self, dummy_instance_factory: tp.Callable
+    ):
+        class DummyInstanceNotReadyUpdate(
+            conftest.DummyInstance, ua_models.ReadinessMixin
+        ):
+            def is_ready_to_update(self) -> bool:
+                return False
+
+        # Prepare storage for the subclass
+        storage = {"new": [], "updated": [], "deleted": [], "existing": []}
+        project_id = sys_uuid.uuid4()
+        uuid = sys_uuid.uuid5(
+            DummyInstanceNotReadyUpdate.NAMESPACE, "updated-0"
+        )
+        instance = DummyInstanceNotReadyUpdate(
+            uuid=uuid, name="inst-updated-0", project_id=project_id
+        )
+        resource = instance.to_ua_resource()
+        instance.name = f"{instance.name}-updated"
+        resource.save()
+        storage["updated"].append(instance)
+        DummyInstanceNotReadyUpdate.__dummy_storage__ = storage
+
+        svc = DummyBuilder(instance_model=DummyInstanceNotReadyUpdate)
+        svc._iteration()
+
+        resources = ua_models.TargetResource.objects.get_all()
+        assert len(resources) == 1
+        target = resources[0]
+        assert target.value["name"] != instance.name
+        assert not svc.pre_update_called
+        assert not svc.post_update_called
+
+        # No new actual resources should appear
+        actual_resources = ua_models.Resource.objects.get_all()
+        assert len(actual_resources) == 0
+
+    def test_skip_actualize_outdated_when_not_ready(
+        self, dummy_instance_factory: tp.Callable
+    ):
+        class DummyInstanceNotReadyActualize(
+            conftest.DummyInstance, ua_models.ReadinessMixin
+        ):
+            def is_ready_to_actualize(self) -> bool:
+                return False
+
+        class Builder(DummyBuilder):
+            actualized = False
+
+            def actualize_outdated_instance(
+                self, current_instance, actual_instance
+            ):
+                self.__class__.actualized = True
+
+        storage = {"new": [], "updated": [], "deleted": [], "existing": []}
+        project_id = sys_uuid.uuid4()
+        uuid = sys_uuid.uuid5(
+            DummyInstanceNotReadyActualize.NAMESPACE, "existing-0"
+        )
+        instance = DummyInstanceNotReadyActualize(
+            uuid=uuid, name="inst-existing-0", project_id=project_id
+        )
+        instance._instance_model = DummyInstanceNotReadyActualize
+        instance._instance_model.objects = mock.MagicMock()
+        instance._instance_model.objects.get_all = mock.MagicMock(
+            return_value=[instance]
+        )
+        target = instance.to_ua_resource()
+        target.save()
+        storage["existing"].append(instance)
+        DummyInstanceNotReadyActualize.__dummy_storage__ = storage
+
+        actual_value = instance.dump_to_simple_view()
+        actual = ua_models.Resource.from_value(
+            value=actual_value, kind=target.kind
+        )
+        actual.save()
+
+        before_full_hash = target.full_hash
+        before_status = target.status
+
+        svc = Builder(instance_model=DummyInstanceNotReadyActualize)
+        svc._iteration()
+
+        t_resources = ua_models.TargetResource.objects.get_all()
+        a_resources = ua_models.Resource.objects.get_all()
+        assert len(t_resources) == 1
+        assert len(a_resources) == 1
+
+        target = t_resources[0]
+        assert target.full_hash == before_full_hash
+        assert target.status == before_status
+        assert not Builder.actualized
+
+    def test_skip_delete_when_not_ready(
+        self, dummy_instance_factory: tp.Callable
+    ):
+        class DummyInstanceNotReadyDelete(
+            conftest.DummyInstance, ua_models.ReadinessMixin
+        ):
+            def is_ready_to_delete(self) -> bool:
+                return False
+
+        storage = {"new": [], "updated": [], "deleted": [], "existing": []}
+        project_id = sys_uuid.uuid4()
+        uuid = sys_uuid.uuid5(
+            DummyInstanceNotReadyDelete.NAMESPACE, "deleted-0"
+        )
+        instance = DummyInstanceNotReadyDelete(
+            uuid=uuid, name="inst-deleted-0", project_id=project_id
+        )
+        resource = instance.to_ua_resource()
+        resource.save()
+        storage["deleted"].append(resource)
+        DummyInstanceNotReadyDelete.__dummy_storage__ = storage
+
+        svc = DummyBuilder(instance_model=DummyInstanceNotReadyDelete)
+        svc._iteration()
+
+        resources = ua_models.TargetResource.objects.get_all()
+        assert len(resources) == 1
+        assert resources[0].uuid == resource.uuid
+        assert svc.deleted_pre_called == []
+
     def test_actualize_outdated_instances_failed(
         self, dummy_instance_factory: tp.Callable
     ):
