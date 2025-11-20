@@ -43,3 +43,10 @@ class NodeType(str, enum.Enum):
 
 class NodeSetType(str, enum.Enum):
     SET = "SET"
+
+
+class VolumeStatus(str, enum.Enum):
+    NEW = "NEW"
+    IN_PROGRESS = "IN_PROGRESS"
+    ACTIVE = "ACTIVE"
+    ERROR = "ERROR"

@@ -46,7 +46,7 @@ class CoreIamAuthenticator(AbstractAuthenticator):
         username: str,
         password: str,
         client_id: str = "GenesisCoreClientId",
-        client_secret: str = "GenesisCoreClientSecret",
+        client_secret: str = "GenesisCoreSecret",
         client_uuid: sys_uuid.UUID = DEFAULT_CLIENT_UUID,
         scope: str | None = None,
         ttl: int = 86400,  # 1 day

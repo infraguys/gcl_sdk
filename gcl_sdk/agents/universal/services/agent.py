@@ -16,7 +16,7 @@
 from __future__ import annotations
 
 import logging
-import re
+import itertools
 import typing as tp
 import uuid as sys_uuid
 
@@ -51,22 +51,16 @@ class UniversalAgentService(looper_basic.BasicService):
         self._orch_client = orch_client
         self._payload_path = payload_path
         self._agent_uuid = agent_uuid
-
-        # Make driver maps by capability and facts:
-        # For instance, {"config": ConfigDriver, "service": ServiceDriver}
-        self._caps_driver_map = {}
-        for d in caps_drivers:
-            for capability in d.get_capabilities():
-                self._caps_driver_map[capability] = d
-
-        self._facts_driver_map = {}
-        for d in facts_drivers:
-            for fact in d.get_facts():
-                self._facts_driver_map[fact] = d
+        self._caps_drivers = caps_drivers
+        self._facts_drivers = facts_drivers
 
     def _register_agent(self) -> None:
-        capabilities = self._caps_driver_map.keys()
-        facts = self._facts_driver_map.keys()
+        capabilities = itertools.chain.from_iterable(
+            d.get_capabilities() for d in self._caps_drivers
+        )
+        facts = itertools.chain.from_iterable(
+            d.get_facts() for d in self._facts_drivers
+        )
         agent = models.UniversalAgent.from_system_uuid(
             capabilities, facts, self._agent_uuid
         )
@@ -110,24 +104,61 @@ class UniversalAgentService(looper_basic.BasicService):
         dp_resource = driver.update(resource)
         return dp_resource
 
-    def _actualize_resources(
+    def _cap_driver_iteration(
         self,
         driver: driver_base.AbstractCapabilityDriver,
-        capability: str,
-        resources: list[models.Resource],
+        payload: models.Payload,
+        collected_payload: models.Payload,
     ) -> list[models.Resource]:
-        """
-        Actualize resources and return a list of resources from data plane.
-        """
         try:
             # Perform some preparations for the driver
             driver.start()
-            return self._driver_cap_iteration(driver, capability, resources)
+
+            for capability in driver.get_capabilities():
+                # Skip capabilities that are not in the payload
+                if capability not in payload.capabilities:
+                    LOG.debug("Skipping capability %s", capability)
+                    continue
+
+                self._capability_iteration(
+                    driver, capability, payload, collected_payload
+                )
+        except Exception:
+            LOG.exception(
+                "Error actualizing driver %s", driver.__class__.__name__
+            )
         finally:
             # Finalize the driver
             driver.finalize()
 
-    def _driver_cap_iteration(
+    def _capability_iteration(
+        self,
+        driver: driver_base.AbstractCapabilityDriver,
+        capability: str,
+        payload: models.Payload,
+        collected_payload: models.Payload,
+    ) -> None:
+        target_resources = payload.caps_resources(capability)
+
+        try:
+            # Perform some preparations for the capability
+            driver.start_capability(capability)
+
+            collected_resources = self._actualize_capability(
+                driver, capability, target_resources
+            )
+            collected_payload.add_caps_resources(collected_resources)
+
+            # All gathered resources for capabilities are considered
+            # as facts too
+            collected_payload.add_facts_resources(collected_resources)
+        except Exception:
+            LOG.exception("Error actualizing resources for %s", capability)
+        finally:
+            # Finalize the capability
+            driver.finalize_capability(capability)
+
+    def _actualize_capability(
         self,
         driver: driver_base.AbstractCapabilityDriver,
         capability: str,
@@ -149,7 +180,9 @@ class UniversalAgentService(looper_basic.BasicService):
                 resource = self._create_resource(driver, r)
                 collected_resources.append(resource)
             except Exception:
-                LOG.exception("Error creating resource %s", r.uuid)
+                LOG.exception(
+                    "Error creating resource(%s) %s", capability, r.uuid
+                )
 
         # Delete outdated resources
         for r in actual_resources.keys() - target_resources.keys():
@@ -285,38 +318,25 @@ class UniversalAgentService(looper_basic.BasicService):
         # TODO(akremenetsky): Implement actions
 
         # Capabilities
-        for capability, driver in self._caps_driver_map.items():
-            # Skip capabilities that are not in the payload
-            if capability not in payload.capabilities:
-                LOG.debug("Skipping capability %s", capability)
-                continue
+        for driver in self._caps_drivers:
+            self._cap_driver_iteration(driver, payload, collected_payload)
 
-            target_resources = payload.caps_resources(capability)
-
-            try:
-                collected_resources = self._actualize_resources(
-                    driver, capability, target_resources
-                )
-                collected_payload.add_caps_resources(collected_resources)
-
-                # All gathered resources for capabilities are considered
-                # as facts too
-                collected_payload.add_facts_resources(collected_resources)
-            except Exception:
-                LOG.exception("Error actualizing resources for %s", capability)
-
+        # TODO(akremenetsky): Implement facts iterations like capabilities iteration
         # Facts
-        for fact, driver in self._facts_driver_map.items():
-            # Skip facts that are not in the payload
-            if fact not in payload.facts:
-                LOG.debug("Skipping fact %s", fact)
-                continue
+        for driver in self._facts_drivers:
+            for fact in driver.get_facts():
+                # Skip facts that are not in the payload
+                if fact not in payload.facts:
+                    LOG.debug("Skipping fact %s", fact)
+                    continue
 
-            try:
-                collected_facts = driver.list(fact)
-                collected_payload.add_facts_resources(collected_facts)
-            except Exception:
-                LOG.exception("Error collecting resources for fact: %s", fact)
+                try:
+                    collected_facts = driver.list(fact)
+                    collected_payload.add_facts_resources(collected_facts)
+                except Exception:
+                    LOG.exception(
+                        "Error collecting resources for fact: %s", fact
+                    )
 
         # All work done. The target resources are applied and facts collected.
         # Calculate the hash of the collected payload
