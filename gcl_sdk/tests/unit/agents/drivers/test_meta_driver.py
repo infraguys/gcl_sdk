@@ -47,6 +47,7 @@ class DummyModel(meta.MetaDataPlaneModel):
     # Custom fields that may appear in resource.value
     foo = properties.property(types.Integer(), default=0)
     raise_on_restore = properties.property(types.Boolean(), default=False)
+    invalid_dp = properties.property(types.Boolean(), default=False)
 
     def get_meta_model_fields(self) -> set[str] | None:
         # Save all fields into meta file (including any service flags)
@@ -65,6 +66,11 @@ class DummyModel(meta.MetaDataPlaneModel):
                 resource=models.Resource.from_value(
                     {"uuid": str(self.uuid)}, "dummy", frozenset({"uuid"})
                 )
+            )
+        # Optional flag to simulate invalid DP object
+        if getattr(self, "invalid_dp", False):
+            raise driver_exc.InvalidDataPlaneObjectError(
+                obj={"uuid": str(self.uuid)}
             )
         self._log("restore_from_dp")
 
@@ -145,6 +151,26 @@ class TestMetaDriver:
         with pytest.raises(driver_exc.ResourceAlreadyExists):
             drv.create(res)
 
+    def test_create_recreates_on_invalid_dp_object(self, tmp_path):
+        meta_file = tmp_path / "meta.json"
+        drv = _Driver(meta_file=str(meta_file))
+
+        res = _make_resource("dummy")
+        drv.create(res)
+
+        # Mark the existing meta entry as invalid so that get() will raise
+        drv._storage["dummy"]["resources"][str(res.uuid)]["invalid_dp"] = True
+
+        # Should not raise ResourceAlreadyExists; should proceed to recreate
+        created_again = drv.create(res)
+
+        assert created_again.uuid == res.uuid
+        assert created_again.kind == res.kind
+
+        # Ensure DP create called twice
+        log = DummyModel.call_log[str(res.uuid)]
+        assert log.count("dump_to_dp") >= 2
+
     def test_list_skips_objects_not_on_dp(self, tmp_path):
         meta_file = tmp_path / "meta.json"
         drv = _Driver(meta_file=str(meta_file))
@@ -166,6 +192,31 @@ class TestMetaDriver:
         resources = drv.list("dummy")
 
         # Only the one that could be restored from DP should be returned
+        assert len(resources) == 1
+        assert resources[0].uuid == uuid1
+        assert resources[0].kind == "dummy"
+
+    def test_list_skips_invalid_dp_objects(self, tmp_path):
+        meta_file = tmp_path / "meta.json"
+        drv = _Driver(meta_file=str(meta_file))
+
+        # Create two resources, one will be marked invalid on DP
+        uuid1, uuid2 = sys_uuid.uuid4(), sys_uuid.uuid4()
+        res1 = _make_resource(
+            "dummy", uuid=uuid1, value={"uuid": str(uuid1), "foo": 1}
+        )
+        res2 = _make_resource(
+            "dummy",
+            uuid=uuid2,
+            value={"uuid": str(uuid2), "foo": 2, "invalid_dp": True},
+        )
+
+        drv.create(res1)
+        drv.create(res2)
+
+        resources = drv.list("dummy")
+
+        # Only the valid object should be returned
         assert len(resources) == 1
         assert resources[0].uuid == uuid1
         assert resources[0].kind == "dummy"
