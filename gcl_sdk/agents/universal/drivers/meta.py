@@ -209,6 +209,16 @@ class MetaFileStorageAgentDriver(base.AbstractCapabilityDriver):
             try:
                 obj.restore_from_dp()
                 dp_objects.append(obj)
+            except driver_exc.InvalidDataPlaneObjectError:
+                # TODO(akremenetsky): Seems some destructive actions happened
+                # on the data plane. It's not clear what happened but the
+                # object is invalid. We need to save this information in the
+                # audit journal.
+
+                LOG.error(
+                    "Invalid data plane object: %s. It will be recreated.",
+                    obj.uuid,
+                )
             except driver_exc.ResourceNotFound:
                 LOG.error("Resource %s not found on the data plane", obj.uuid)
 
@@ -222,6 +232,16 @@ class MetaFileStorageAgentDriver(base.AbstractCapabilityDriver):
         # Check the resource does not exist
         try:
             self.get(resource)
+        except driver_exc.InvalidDataPlaneObjectError:
+            # TODO(akremenetsky): Seems some destructive actions happened
+            # on the data plane. It's not clear what happened but the
+            # object is invalid. We need to save this information in the
+            # audit journal.
+
+            LOG.error(
+                "Invalid data plane object: %s. It will be recreated.",
+                resource.uuid,
+            )
         except driver_exc.ResourceNotFound:
             # Desirable behavior, the resource should not exist
             pass
