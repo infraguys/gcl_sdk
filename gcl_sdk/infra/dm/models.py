@@ -20,19 +20,285 @@ import uuid as sys_uuid
 
 from restalchemy.dm import properties
 from restalchemy.dm import types as ra_types
+from restalchemy.dm import types_network as ra_nettypes
 from restalchemy.dm import types_dynamic
 from restalchemy.dm import models as ra_models
 
 from gcl_sdk.agents.universal.dm import models as ua_models
 from gcl_sdk.infra import constants as pc
+from gcl_sdk.common import types as common_types
 
 
-class Node(
+class Volume(
+    ua_models.TargetResourceKindAwareMixin,
     ra_models.ModelWithRequiredUUID,
     ra_models.ModelWithProject,
     ra_models.ModelWithNameDesc,
     ra_models.ModelWithTimestamp,
+):
+    node = properties.property(
+        ra_types.AllowNone(ra_types.UUID()), default=None
+    )
+    size = properties.property(
+        ra_types.Integer(min_value=1, max_value=1000000)
+    )
+    image = properties.property(
+        ra_types.AllowNone(ra_types.String(max_length=255)), default=None
+    )
+    boot = properties.property(ra_types.Boolean(), default=True)
+    label = properties.property(
+        ra_types.AllowNone(ra_types.String(max_length=127)), default=None
+    )
+    device_type = properties.property(
+        ra_types.String(max_length=64), default=""
+    )
+    index = properties.property(
+        ra_types.Integer(min_value=0, max_value=4096), default=4096
+    )
+    status = properties.property(
+        ra_types.Enum([s.value for s in pc.VolumeStatus]),
+    )
+
+    @classmethod
+    def get_resource_kind(cls) -> str:
+        """Return the resource kind."""
+        return "volume"
+
+    def get_resource_target_fields(self) -> tp.Collection[str]:
+        """Return the collection of target fields.
+
+        Refer to the Resource model for more details about target fields.
+        """
+        return frozenset(
+            (
+                "uuid",
+                "name",
+                "node",
+                "size",
+                "image",
+                "boot",
+                "index",
+                "device_type",
+                "project_id",
+            )
+        )
+
+
+class AbstractDiskSpec(
+    ra_models.SimpleViewMixin,
+    types_dynamic.AbstractKindModel,
+):
+    """The abstract model for disk specification.
+
+    This model is used to represent the disks specification in scope of node.
+    For instance, which disk is a root disk and which disks are extra disks.
+    Partition tables, mount points, etc. are defined in scope of this model.
+    """
+
+    def volumes(
+        self, node: Node, project_id: sys_uuid.UUID | None = None
+    ) -> tp.Collection[Volume]:
+        """Lists all volumes that should be created or modified on the node."""
+        self.validate()
+        return tuple()
+
+    def validate(self) -> None:
+        """Validate the disk spec."""
+        pass
+
+
+class RootDiskSpec(AbstractDiskSpec):
+    """The model represents the root disk specification.
+
+    The simplest specification consist of only a single root disk.
+    """
+
+    KIND = "root_disk"
+
+    image = properties.property(ra_types.String(max_length=255), required=True)
+    size = properties.property(
+        ra_types.Integer(min_value=1, max_value=1000000),
+        required=True,
+        default=pc.DEF_ROOT_DISK_SIZE,
+    )
+
+    def volumes(
+        self, node: Node, project_id: sys_uuid.UUID | None = None
+    ) -> tp.Collection[Volume]:
+        """Return a collection of volumes in according to the disk spec.
+
+        Return single volume for the root disk spec.
+        """
+        self.validate()
+
+        if node.node_type == pc.NodeType.HW:
+            return tuple()
+
+        # Use `root-volume` name for backward compatibility
+        volume_uuid = sys_uuid.uuid5(node.uuid, "root-volume")
+        volume = Volume(
+            uuid=volume_uuid,
+            name="root-volume",
+            node=node.uuid,
+            size=self.size,
+            image=self.image,
+            index=0,
+            project_id=project_id or node.project_id,
+            status=pc.VolumeStatus.NEW.value,
+        )
+        return (volume,)
+
+
+class DisksSpecDiskType(common_types.SchematicType):
+    __scheme__ = {
+        "size": ra_types.Integer(min_value=1, max_value=1000000),
+        "label": ra_types.String(max_length=128),
+        "image": ra_types.String(max_length=256),
+        "mount_point": ra_types.String(max_length=512),
+        "fs": ra_types.String(max_length=256),
+    }
+    __mandatory__ = {"size"}
+
+
+class DisksSpec(AbstractDiskSpec):
+    """The model represents the collection of disks.
+
+    The collection of disks where the first disk is a
+    root disk and the rest are extra disks.
+
+    Example:
+    $core.compute.nodes:
+      node:
+        name: node
+        project_id: "12345678-c625-4fee-81d5-f691897b8142"
+        cores: 1
+        ram: 1024
+        disk_spec:
+          kind: "disks"
+          disks:
+            - size: 10
+              image: "https://repository.genesis-core.tech/genesis-base/latest/genesis-base.raw.gz"
+            - size: 100
+              label: "data"
+              mount_point: "/var/data"
+              fs: "ext4"
+            - size: 50
+              label: "logs"
+              mount_point: "/var/log"
+              fs: "ext4"
+    """
+
+    KIND = "disks"
+    ROOT_LABEL = "root-volume"
+
+    disks = properties.property(
+        ra_types.TypedList(DisksSpecDiskType()), default=list
+    )
+
+    def validate(self) -> None:
+        """Validate the disk spec."""
+        # FIXME(akremenetsky): It's fine for diskless systems
+        if len(self.disks) == 0:
+            return
+
+        # Validate the root disk
+        root = self.disks[0]
+        if root.get("image") is None:
+            raise ValueError("Root disk image is not specified")
+
+        if root.get("mount_point") and root["mount_point"] != "/":
+            raise ValueError("Root disk mount point should be '/'")
+
+        extra_disks = self.disks[1:]
+
+        if not extra_disks:
+            return
+
+        mount_points = set()
+        labels = {self.ROOT_LABEL}
+        for disk in extra_disks:
+            # Check for duplicate mount points
+            if mount_point := disk.get("mount_point"):
+                if mount_point in mount_points:
+                    raise ValueError("Duplicate mount point")
+                mount_points.add(mount_point)
+
+            # Check fs or image, but not both
+            if disk.get("fs") and disk.get("image"):
+                raise ValueError(
+                    "Disk can have either fs or image, but not both"
+                )
+
+            # Check labels, the labels are mandatory and unique for extra disks
+            if not disk.get("label") or disk["label"] in labels:
+                raise ValueError("Disk label is not specified or duplicate")
+
+            labels.add(disk["label"])
+
+            # TODO(akremenetsky): Add specific validation for fs like `swap`.
+
+    def volumes(
+        self, node: Node, project_id: sys_uuid.UUID | None = None
+    ) -> tp.Collection[Volume]:
+        """Return a collection of volumes in according to the disk spec.
+
+        Return single volume for the root disk spec.
+        """
+        self.validate()
+
+        if node.node_type == pc.NodeType.HW:
+            return tuple()
+
+        # FIXME(akremenetsky): It's fine for diskless systems
+        if len(self.disks) == 0:
+            return tuple()
+
+        # Prepare the root disk
+        root = self.disks[0]
+
+        # Use `root-volume` name for backward compatibility
+        root_volume_uuid = sys_uuid.uuid5(node.uuid, "root-volume")
+        root_volume = Volume(
+            uuid=root_volume_uuid,
+            name="root-volume",
+            node=node.uuid,
+            size=int(root["size"]),
+            image=root["image"],
+            index=0,
+            project_id=project_id or node.project_id,
+            status=pc.VolumeStatus.NEW.value,
+        )
+
+        extra_disks = self.disks[1:]
+
+        if not extra_disks:
+            return (root_volume,)
+
+        volumes = []
+        for idx, disk in enumerate(extra_disks):
+            volume_uuid = sys_uuid.uuid5(node.uuid, disk["label"])
+            volume = Volume(
+                uuid=volume_uuid,
+                name=disk["label"],
+                label=disk["label"],
+                node=node.uuid,
+                size=int(disk["size"]),
+                image=disk.get("image"),
+                index=idx + 1,
+                project_id=project_id or node.project_id,
+                status=pc.VolumeStatus.NEW.value,
+            )
+            volumes.append(volume)
+
+        return (root_volume, *volumes)
+
+
+class Node(
     ua_models.TargetResourceKindAwareMixin,
+    ra_models.ModelWithRequiredUUID,
+    ra_models.ModelWithProject,
+    ra_models.ModelWithNameDesc,
+    ra_models.ModelWithTimestamp,
 ):
     """The model represents a node in Genesis Core infrastructure.
 
@@ -47,11 +313,6 @@ class Node(
         ra_types.Integer(min_value=1, max_value=4096), required=True
     )
     ram = properties.property(ra_types.Integer(min_value=1), required=True)
-    root_disk_size = properties.property(
-        ra_types.AllowNone(ra_types.Integer(min_value=1, max_value=1000000)),
-        default=pc.DEF_ROOT_DISK_SIZE,
-    )
-    image = properties.property(ra_types.String(max_length=255), required=True)
     status = properties.property(
         ra_types.Enum([s.value for s in pc.NodeStatus]),
     )
@@ -59,10 +320,20 @@ class Node(
         ra_types.Enum([t.value for t in pc.NodeType]),
         default=pc.NodeType.VM.value,
     )
-    default_network = properties.property(ra_types.Dict(), default=lambda: {})
+    default_network = properties.property(ra_types.Dict(), default=dict)
+    disk_spec = properties.property(
+        types_dynamic.KindModelSelectorType(
+            types_dynamic.KindModelType(RootDiskSpec),
+            types_dynamic.KindModelType(DisksSpec),
+        ),
+        required=True,
+    )
 
     placement_policies = properties.property(
         ra_types.TypedList(ra_types.UUID()), default=list
+    )
+    hostname = properties.property(
+        ra_types.AllowNone(ra_nettypes.Hostname()), default=None
     )
 
     @classmethod
@@ -81,13 +352,109 @@ class Node(
                 "name",
                 "cores",
                 "ram",
-                "root_disk_size",
                 "node_type",
-                "image",
                 "project_id",
                 "placement_policies",
+                "disk_spec",
+                "hostname",
             )
         )
+
+
+class AbstractSetDiskSpec(
+    ra_models.SimpleViewMixin,
+    types_dynamic.AbstractKindModel,
+):
+    """The abstract model for disk specification of node set.
+
+    This model is used to represent the disks specification in scope of
+    node sets. For instance, which disk is a root disk and which disks
+    are extra disks. Partition tables, mount points, etc. are defined in
+    scope of this model.
+    """
+
+    def volumes(
+        self, node_set: NodeSet, project_id: sys_uuid.UUID | None = None
+    ) -> tp.Collection[Volume]:
+        """Lists all volumes that should be created or modified on the node."""
+        self.validate()
+        return tuple()
+
+    def validate(self) -> None:
+        """Validate the disk spec."""
+        pass
+
+    def node_spec(
+        self, node_set: NodeSet, node: sys_uuid.UUID
+    ) -> AbstractDiskSpec:
+        """Lists all volumes that should be created or modified on the node."""
+        raise NotImplementedError("Subclasses must implement this method.")
+
+
+class SetRootDiskSpec(RootDiskSpec, AbstractSetDiskSpec):
+    """The model represents the root disk specification.
+
+    The simplest specification consist of only a single root disk.
+    """
+
+    def volumes(
+        self, node_set: NodeSet, project_id: sys_uuid.UUID | None = None
+    ) -> tp.Collection[Volume]:
+        """Lists all volumes that should be created or modified on the node."""
+        self.validate()
+        return tuple()
+
+    def node_spec(
+        self, node_set: NodeSet, node: sys_uuid.UUID
+    ) -> AbstractDiskSpec:
+        """Return the disk specification for the node."""
+        return RootDiskSpec(
+            image=self.image,
+            size=self.size,
+        )
+
+
+class SetDisksSpec(DisksSpec, AbstractSetDiskSpec):
+    """The model represents the collection of disks.
+
+    The collection of disks where the first disk is a
+    root disk and the rest are extra disks.
+
+    Example:
+    $core.compute.sets:
+      node_set:
+        name: node_set
+        project_id: "12345678-c625-4fee-81d5-f691897b8142"
+        cores: 1
+        ram: 1024
+        replicas: 3
+        disk_spec:
+          kind: "disks"
+          disks:
+            - size: 10
+              image: "https://repository.genesis-core.tech/genesis-base/latest/genesis-base.raw.gz"
+            - size: 100
+              label: "data"
+              mount_point: "/var/data"
+              fs: "ext4"
+            - size: 50
+              label: "logs"
+              mount_point: "/var/log"
+              fs: "ext4"
+    """
+
+    def volumes(
+        self, node_set: NodeSet, project_id: sys_uuid.UUID | None = None
+    ) -> tp.Collection[Volume]:
+        """Lists all volumes that should be created or modified on the node."""
+        self.validate()
+        return tuple()
+
+    def node_spec(
+        self, node_set: NodeSet, node: sys_uuid.UUID
+    ) -> AbstractDiskSpec:
+        """Return the disk specification for the node."""
+        return DisksSpec(disks=self.disks)
 
 
 class NodeSet(
@@ -112,14 +479,9 @@ class NodeSet(
         ra_types.Integer(min_value=0, max_value=4096), default=1
     )
     cores = properties.property(
-        ra_types.Integer(min_value=1, max_value=4096), required=True
+        ra_types.Integer(min_value=0, max_value=4096), required=True
     )
-    ram = properties.property(ra_types.Integer(min_value=1), required=True)
-    root_disk_size = properties.property(
-        ra_types.AllowNone(ra_types.Integer(min_value=1, max_value=1000000)),
-        default=pc.DEF_ROOT_DISK_SIZE,
-    )
-    image = properties.property(ra_types.String(max_length=255), required=True)
+    ram = properties.property(ra_types.Integer(min_value=0), required=True)
     status = properties.property(
         ra_types.Enum([s.value for s in pc.NodeStatus]),
     )
@@ -127,13 +489,20 @@ class NodeSet(
         ra_types.Enum([t.value for t in pc.NodeType]),
         default=pc.NodeType.VM.value,
     )
-    default_network = properties.property(ra_types.Dict(), default=lambda: {})
+    default_network = properties.property(ra_types.Dict(), default=dict)
+    disk_spec = properties.property(
+        types_dynamic.KindModelSelectorType(
+            types_dynamic.KindModelType(SetRootDiskSpec),
+            types_dynamic.KindModelType(SetDisksSpec),
+        ),
+        required=True,
+    )
 
     set_type = properties.property(
         ra_types.Enum([type_.value for type_ in pc.NodeSetType]),
         default=pc.NodeSetType.SET.value,
     )
-    nodes = properties.property(ra_types.Dict(), default=lambda: {})
+    nodes = properties.property(ra_types.Dict(), default=dict)
 
     @classmethod
     def get_resource_kind(cls) -> str:
@@ -152,11 +521,10 @@ class NodeSet(
                 "replicas",
                 "cores",
                 "ram",
-                "root_disk_size",
                 "node_type",
                 "set_type",
-                "image",
                 "project_id",
+                "disk_spec",
             )
         )
 

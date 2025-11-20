@@ -58,27 +58,51 @@ class AbstractCapabilityDriver(abc.ABC):
     def delete(self, resource: models.Resource) -> None:
         """Delete the resource."""
 
-    def start(self) -> None:
-        """Perform some initialization before starting any operations.
+    def start_capability(self, capability: str) -> None:
+        """Perform `capability` initialization.
 
-        This method is called once before any other method like list,
+        This method is called once before any other capability method like list,
         create, update, delete are called. It can be used to do some
         preparations like establishing connections, opening files, etc.
 
         The driver iteration:
-            start -> list -> [create | update | delete]* -> finalize
+            start -> [start_capability -> list -> [create | update | delete]* -> \
+                finalize_capability]* -> finalize
+        """
+        pass
+
+    def finalize_capability(self, capability: str) -> None:
+        """Perform `capability` finalization.
+
+        This method is called once after all other capability methods like list,
+        create, update, delete are called. It can be used to do some
+        finalization or cleanups like closing connections, files, etc.
+
+        The driver iteration:
+            start -> [start_capability -> list -> [create | update | delete]* -> \
+                finalize_capability]* -> finalize
+        """
+        pass
+
+    def start(self) -> None:
+        """Perform some initialization before starting any operations.
+
+        This method is called once at driver begin of its workflow.
+
+        The driver iteration:
+            start -> [start_capability -> list -> [create | update | delete]* -> \
+                finalize_capability]* -> finalize
         """
         pass
 
     def finalize(self) -> None:
         """Perform some finalization after finishing all operations.
 
-        This method is called once after all other methods like list,
-        create, update, delete are called. It can be used to do some
-        finalization or cleanups like closing connections, files, etc.
+        This method is called once at driver end of its workflow.
 
         The driver iteration:
-            start -> list -> [create | update | delete]* -> finalize
+            start -> [start_capability -> list -> [create | update | delete]* -> \
+                finalize_capability]* -> finalize
         """
         pass
 
