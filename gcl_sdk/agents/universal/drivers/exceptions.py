@@ -13,6 +13,9 @@
 #    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 #    License for the specific language governing permissions and limitations
 #    under the License.
+
+import typing as tp
+
 from gcl_sdk.common import exceptions
 from gcl_sdk.agents.universal.dm import models
 
@@ -29,3 +32,14 @@ class ResourceAlreadyExists(AgentDriverException):
 class ResourceNotFound(AgentDriverException):
     __template__ = "The resource not found: {resource}"
     resource: models.Resource
+
+
+class InvalidDataPlaneObjectError(AgentDriverException):
+    """The data plane object is invalid exception.
+
+    The exception is thrown when the data plane object is invalid
+    and driver expects it will be called to recreate the DP object.
+    """
+
+    __template__ = "The data plane object is invalid: {obj}"
+    obj: tp.Any
