@@ -31,12 +31,34 @@ from restalchemy.dm import filters as dm_filters
 from restalchemy.dm import types
 from restalchemy.storage.sql import engines
 from restalchemy.storage.sql import orm
+from restalchemy.storage.sql import filters as sql_filters
 
 from gcl_sdk.agents.universal import utils
 from gcl_sdk.agents.universal import constants as c
 
 
 LOG = logging.getLogger(__name__)
+
+
+class ResourceIdentifier(tp.NamedTuple):
+    """A resource identifier.
+
+    The resource identifier is a tuple of kind and UUID.
+    """
+
+    kind: str
+    uuid: sys_uuid.UUID
+
+
+# short alias
+RI = ResourceIdentifier
+
+
+class ResourcePair(tp.NamedTuple):
+    """A pair of target and actual resources."""
+
+    target_resource: TargetResource
+    actual_resource: Resource | None = None
 
 
 class Payload(models.Model, models.SimpleViewMixin):
@@ -273,6 +295,7 @@ class UniversalAgent(
         capabilities: tp.Iterable[str],
         facts: tp.Iterable[str],
         agent_uuid: sys_uuid.UUID | None = None,
+        agent_name: str | None = None,
     ):
         system_uuid = utils.system_uuid()
         uuid = agent_uuid or system_uuid
@@ -280,7 +303,7 @@ class UniversalAgent(
         facts = {"facts": list(facts)}
         return cls(
             uuid=uuid,
-            name=f"Universal Agent {str(uuid)[:8]}",
+            name=agent_name or f"Universal Agent {str(uuid)[:8]}",
             status=c.AgentStatus.ACTIVE.value,
             capabilities=capabilities,
             facts=facts,
@@ -698,9 +721,45 @@ class TargetResourceSQLStorableMixin:
         return response
 
     @classmethod
+    def _to_sql_clause(
+        cls, clause: dict[str, dm_filters.AbstractClause]
+    ) -> sql_filters.AbstractClause:
+        """Fast method to convert clause to the SQL clause."""
+        # TODO(akremenetsky): support multiple clauses
+        property_name, abs_clause = next(iter(clause.items()))
+        property_type = cls.properties.properties[
+            property_name
+        ].get_property_type()
+
+        engine = engines.engine_factory.get_engine()
+        sql_clause_class = sql_filters.FILTER_MAPPING[engine.dialect.name][
+            abs_clause.__class__
+        ]
+
+        return sql_clause_class(
+            property_name,
+            property_type,
+            abs_clause.value,
+            # No need to pass the session
+            None,
+        )
+
+    @classmethod
     def get_new_entities(
-        cls, table: str, kind: str, limit: int = 100, session=None
+        cls,
+        table: str,
+        kind: str,
+        clause: dict[str, dm_filters.AbstractClause] | None = None,
+        limit: int = 100,
+        session=None,
     ) -> list["TargetResourceSQLStorableMixin"]:
+        if clause is None:
+            raw_clause = ""
+        else:
+            clause_value = next(iter(clause.values())).value
+            sql_clause = cls._to_sql_clause(clause)
+            raw_clause = f"AND {table}.{sql_clause.construct_expression()} "
+
         expression = (
             "SELECT "
             "    {table}.uuid as uuid "
@@ -712,10 +771,10 @@ class TargetResourceSQLStorableMixin:
             "    WHERE kind = %s "
             ") AS ua_target_resources_by_kind "
             "ON {table}.uuid = ua_target_resources_by_kind.uuid "
-            "WHERE ua_target_resources_by_kind.uuid is NULL "
+            "WHERE ua_target_resources_by_kind.uuid is NULL {clause}"
             "LIMIT %s;"
-        ).format(table=table)
-        params = (kind, limit)
+        ).format(table=table, clause=raw_clause)
+        params = (kind, clause_value, limit) if raw_clause else (kind, limit)
 
         response = cls._execute_expression(expression, params, session)
         if not response:
@@ -727,18 +786,30 @@ class TargetResourceSQLStorableMixin:
 
     @classmethod
     def get_updated_entities(
-        cls, table: str, kind: str, limit: int = 100, session=None
+        cls,
+        table: str,
+        kind: str,
+        clause: dm_filters.AbstractClause | None = None,
+        limit: int = 100,
+        session=None,
     ) -> list["TargetResourceSQLStorableMixin"]:
+        if clause is None:
+            raw_clause = ""
+        else:
+            clause_value = next(iter(clause.values())).value
+            sql_clause = cls._to_sql_clause(clause)
+            raw_clause = f"AND {table}.{sql_clause.construct_expression()} "
+
         expression = (
             "SELECT "
             "    {table}.uuid as uuid "
             "FROM {table} INNER JOIN ua_target_resources ON  "
             "    {table}.uuid = ua_target_resources.uuid "
             "WHERE {table}.updated_at != ua_target_resources.tracked_at "
-            "AND ua_target_resources.kind = %s "
+            "AND ua_target_resources.kind = %s {clause}"
             "LIMIT %s;"
-        ).format(table=table)
-        params = (kind, limit)
+        ).format(table=table, clause=raw_clause)
+        params = (kind, clause_value, limit) if raw_clause else (kind, limit)
 
         response = cls._execute_expression(expression, params, session)
         if not response:
@@ -761,10 +832,7 @@ class TargetResourceSQLStorableMixin:
             "    AND {table}.uuid is NULL "
             "LIMIT %s;"
         ).format(table=table)
-        params = (
-            kind,
-            limit,
-        )
+        params = (kind, limit)
 
         response = cls._execute_expression(expression, params, session)
         if not response:
@@ -773,6 +841,61 @@ class TargetResourceSQLStorableMixin:
         return TargetResource.objects.get_all(
             filters={"uuid": dm_filters.In(str(r["uuid"]) for r in response)},
         )
+
+    @classmethod
+    def get_outdated_entities(
+        cls,
+        table: str,
+        kind: str,
+        clause: dm_filters.AbstractClause,
+        limit: int = 100,
+        session=None,
+    ) -> list["ResourcePair"]:
+        clause_value = next(iter(clause.values())).value
+        sql_clause = cls._to_sql_clause(clause)
+        clause = f"AND {table}.{sql_clause.construct_expression()} "
+
+        expression = (
+            "SELECT "
+            "    * "
+            "FROM ua_outdated_resources_view INNER JOIN {table} ON  "
+            "    ua_outdated_resources_view.uuid = {table}.uuid "
+            "WHERE ua_outdated_resources_view.kind = %s {clause} "
+            "LIMIT %s;"
+        ).format(table=table, clause=clause)
+        params = (kind, clause_value, limit)
+
+        response = cls._execute_expression(expression, params, session)
+        if not response:
+            return []
+
+        targets = {
+            r.uuid: r
+            for r in TargetResource.objects.get_all(
+                filters={
+                    "uuid": dm_filters.In(str(r["uuid"]) for r in response),
+                    "kind": dm_filters.EQ(kind),
+                },
+            )
+        }
+
+        actuals = {
+            r.uuid: r
+            for r in Resource.objects.get_all(
+                filters={
+                    "uuid": dm_filters.In(str(r["uuid"]) for r in response),
+                    "kind": dm_filters.EQ(kind),
+                },
+            )
+        }
+
+        return [
+            ResourcePair(
+                target_resource=target,
+                actual_resource=actuals.get(target.uuid),
+            )
+            for target in targets.values()
+        ]
 
 
 class OutdatedResource(models.ModelWithUUID, orm.SQLStorableMixin):
@@ -789,6 +912,12 @@ class OutdatedResource(models.ModelWithUUID, orm.SQLStorableMixin):
         prefetch=True,
         required=True,
     )
+
+    def to_pair(self) -> "ResourcePair":
+        return ResourcePair(
+            target_resource=self.target_resource,
+            actual_resource=self.actual_resource,
+        )
 
 
 class OutdatedMasterHashResource(models.ModelWithUUID, orm.SQLStorableMixin):
@@ -874,6 +1003,86 @@ class SchedulableToAgentFromAgentUUIDMixin(
         The method returns the agent UUID.
         """
         return self.agent_uuid
+
+
+class ReadinessMixin:
+    """A helpful mixin to check the resource readiness.
+
+    The mixin provides a way to check if the resource is ready
+    to create, update, delete or actualize.
+    Returns:
+        bool: True if the resource is ready to create, update,
+              delete or actualize.
+    """
+
+    def is_ready_to_create(self) -> bool:
+        """Check if the resource is ready to create."""
+        return self.is_ready_to_actualize()
+
+    def is_ready_to_update(self) -> bool:
+        """Check if the resource is ready to update."""
+        return self.is_ready_to_actualize()
+
+    def is_ready_to_delete(self) -> bool:
+        """Check if the resource is ready to delete."""
+        return True
+
+    def is_ready_to_actualize(self) -> bool:
+        """Check if the resource is ready to actualize."""
+        return True
+
+
+class DependenciesActiveReadinessMixin(ReadinessMixin):
+    """Check the dependencies exist and are active.
+
+    The resource is considered ready to actualize if all its dependencies
+    exist and are active.
+    """
+
+    def get_readiness_dependencies(
+        self,
+    ) -> tp.Collection["ResourceKindAwareMixin" | ResourceIdentifier]:
+        """Get the dependencies to check readiness.
+
+        Returns:
+            tp.Collection["ResourceKindAwareMixin" | ResourceIdentifier]:
+                The dependencies to check readiness.
+        """
+        return tuple()
+
+    def is_ready_to_actualize(self) -> bool:
+        """Check if the resource is ready to actualize.
+
+        Fetches all dependencies and checks if they exist and are active.
+        """
+        # Fetch dependencies
+        dependencies = {
+            RI(r.kind, r.uuid) for r in self.get_readiness_dependencies()
+        }
+
+        if len(dependencies) == 0:
+            return True
+
+        # Get all possible target resources
+        dep_resources = {
+            RI(r.kind, r.uuid): r
+            for r in TargetResource.objects.get_all(
+                filters={
+                    "kind": dm_filters.In(r.kind for r in dependencies),
+                    "uuid": dm_filters.In(r.uuid for r in dependencies),
+                }
+            )
+        }
+
+        # Ensure all dependencies exist
+        if dependencies - dep_resources.keys():
+            return False
+
+        # Ensure all dependencies are active
+        if all(dep_resources[i].status == "ACTIVE" for i in dependencies):
+            return True
+
+        return False
 
 
 class KindAwareMixin:
@@ -985,17 +1194,32 @@ class InstanceMixin(
 
     @classmethod
     def get_new_instances(
-        cls, limit: int = c.DEF_SQL_LIMIT
+        cls,
+        clause: dm_filters.AbstractClause | None = None,
+        limit: int = c.DEF_SQL_LIMIT,
     ) -> list["InstanceMixin"]:
         kind = cls.get_resource_kind()
-        return cls.get_new_entities(cls.__tablename__, kind, limit)
+        return cls.get_new_entities(cls.__tablename__, kind, clause, limit)
 
     @classmethod
     def get_updated_instances(
-        cls, limit: int = c.DEF_SQL_LIMIT
+        cls,
+        clause: dm_filters.AbstractClause | None = None,
+        limit: int = c.DEF_SQL_LIMIT,
     ) -> list["InstanceMixin"]:
         kind = cls.get_resource_kind()
-        return cls.get_updated_entities(cls.__tablename__, kind, limit)
+        return cls.get_updated_entities(cls.__tablename__, kind, clause, limit)
+
+    @classmethod
+    def get_outdated_resources(
+        cls,
+        clause: dm_filters.AbstractClause,
+        limit: int = c.DEF_SQL_LIMIT,
+    ) -> list["ResourcePair"]:
+        kind = cls.get_resource_kind()
+        return cls.get_outdated_entities(
+            cls.__tablename__, kind, clause, limit
+        )
 
     @classmethod
     def get_deleted_instances(
@@ -1003,6 +1227,20 @@ class InstanceMixin(
     ) -> list[TargetResource]:
         kind = cls.get_resource_kind()
         return cls.get_deleted_target_resources(cls.__tablename__, kind, limit)
+
+    @classmethod
+    def get_filter_clause(
+        cls, **kwargs
+    ) -> dict[str, dm_filters.AbstractClause] | None:
+        """Get filter clause for the instance model.
+
+        The clause is returned back to the service to take a chance for
+        the service enrich the clause. After that the clause is used in
+        the database queries. The service haven't must call method
+        `get_new_instances` and other with the clause if it was returned.
+        It depends on the service implementation.
+        """
+        return None
 
 
 class InstanceWithDerivativesMixin(InstanceMixin):
