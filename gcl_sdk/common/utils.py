@@ -16,9 +16,11 @@
 
 import os
 import logging
+import functools
 import typing as tp
 import importlib_metadata
 
+from restalchemy.common import contexts
 from restalchemy.storage.sql import migrations
 
 LOG = logging.getLogger(__name__)
@@ -93,3 +95,27 @@ class MigrationEngine(migrations.MigrationEngine):
         else:
             LOG.info("Rolling back migration '%s'", migration.name)
             migrations[filename].rollback(session, migrations)
+
+
+def rollback_to_savepoint(func):
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        name = "gcl_sdk_utils_savepoint"
+
+        savepoint_exp = f"SAVEPOINT {name};"
+        rollback_exp = f"ROLLBACK TO SAVEPOINT {name};"
+        release_exp = f"RELEASE SAVEPOINT {name};"
+
+        session = contexts.Context().get_session()
+        session.execute(savepoint_exp, tuple())
+
+        try:
+            return func(*args, **kwargs)
+        except Exception:
+            LOG.error("Exception occurred, rolling back to savepoint")
+            session.execute(rollback_exp, tuple())
+            raise
+        finally:
+            session.execute(release_exp, tuple())
+
+    return wrapper

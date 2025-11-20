@@ -56,10 +56,10 @@ class DummyModel(meta.MetaDataPlaneModel):
     def _log(self, action: str) -> None:
         self.call_log.setdefault(str(self.uuid), []).append(action)
 
-    def dump_to_dp(self) -> None:  # create
+    def dump_to_dp(self, coordinator=None) -> None:  # create
         self._log("dump_to_dp")
 
-    def restore_from_dp(self) -> None:  # get/list
+    def restore_from_dp(self, coordinator=None) -> None:  # get/list
         # Optional flag to simulate not-found on DP for this object
         if getattr(self, "raise_on_restore", False):
             raise driver_exc.ResourceNotFound(
@@ -74,10 +74,10 @@ class DummyModel(meta.MetaDataPlaneModel):
             )
         self._log("restore_from_dp")
 
-    def delete_from_dp(self) -> None:
+    def delete_from_dp(self, coordinator=None) -> None:
         self._log("delete_from_dp")
 
-    def update_on_dp(self) -> None:
+    def update_on_dp(self, coordinator=None) -> None:
         self._log("update_on_dp")
 
 
