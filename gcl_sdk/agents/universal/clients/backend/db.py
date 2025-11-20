@@ -18,6 +18,7 @@ from __future__ import annotations
 import logging
 import typing as tp
 
+from restalchemy.common import contexts
 from restalchemy.dm import filters as dm_filters
 from restalchemy.storage import exceptions as ra_exc
 from restalchemy.storage import base as ra_storage
@@ -79,9 +80,9 @@ class DatabaseBackendClient(base.AbstractBackendClient):
         session: tp.Any | None = None,
     ):
         super().__init__()
-        self._session = session
         self._model_spec_map = {m.kind: m for m in model_specs}
         self._tf_storage = tf_storage
+        self.set_session(session)
 
     def _get_resource_filters(
         self, resource: models.Resource
@@ -110,22 +111,16 @@ class DatabaseBackendClient(base.AbstractBackendClient):
 
         return {"uuid": dm_filters.In(tuple(target_fields[kind].keys()))}
 
-    def set_session(self, session: tp.Any) -> None:
-        """Set the session to be used by the client."""
-        self._session = session
-
-    def clear_session(self) -> None:
-        """Clear the session."""
-        self._session = None
-
-    def get(self, resource: models.Resource) -> models.ResourceMixin:
+    def _get(
+        self, session: tp.Any, resource: models.Resource
+    ) -> models.ResourceMixin:
         """Find and return a resource by uuid and kind."""
         model_spec = self._model_spec_map[resource.kind]
         filters = self._get_resource_filters(resource)
 
         try:
             return model_spec.model.objects.get_one(
-                session=self._session,
+                session=session,
                 filters=filters,
             )
         except ra_exc.RecordNotFound:
@@ -134,7 +129,9 @@ class DatabaseBackendClient(base.AbstractBackendClient):
             )
             raise client_exc.ResourceNotFound(resource=resource)
 
-    def list(self, capability: str) -> list[models.ResourceMixin]:
+    def _list(
+        self, session: tp.Any, capability: str
+    ) -> list[models.ResourceMixin]:
         """Lists all resources by capability."""
         model_spec = self._model_spec_map[capability]
         filters = self._get_filters(capability)
@@ -144,11 +141,13 @@ class DatabaseBackendClient(base.AbstractBackendClient):
 
         # Get all objects for the project from the database
         return model_spec.model.objects.get_all(
-            session=self._session,
+            session=session,
             filters=filters,
         )
 
-    def create(self, resource: models.Resource) -> models.ResourceMixin:
+    def _create(
+        self, session: tp.Any, resource: models.Resource
+    ) -> models.ResourceMixin:
         """Creates a resource."""
         model_spec = self._model_spec_map[resource.kind]
         res_filters = self._get_resource_filters(resource)
@@ -157,7 +156,7 @@ class DatabaseBackendClient(base.AbstractBackendClient):
         # We need to do this check since PG does not correctly handle
         # the case when the resource already exists and fails the transaction
         obj = model_spec.model.objects.get_one_or_none(
-            session=self._session,
+            session=session,
             filters=res_filters,
         )
         if obj is not None:
@@ -182,18 +181,20 @@ class DatabaseBackendClient(base.AbstractBackendClient):
             obj = model_spec.model.from_ua_resource(resource)
 
         # Save to db
-        obj.insert(session=self._session)
+        obj.insert(session=session)
 
         return obj
 
-    def update(self, resource: models.Resource) -> models.ResourceMixin:
+    def _update(
+        self, session: tp.Any, resource: models.Resource
+    ) -> models.ResourceMixin:
         """Update the resource."""
         model_spec = self._model_spec_map[resource.kind]
         res_filters = self._get_resource_filters(resource)
 
         # Check if the resource already exists
         obj = model_spec.model.objects.get_one_or_none(
-            session=self._session,
+            session=session,
             filters=res_filters,
         )
         if obj is None:
@@ -208,21 +209,69 @@ class DatabaseBackendClient(base.AbstractBackendClient):
             if not prop or prop.is_read_only():
                 continue
             setattr(obj, field_name, getattr(updated_obj, field_name))
-        obj.update(session=self._session)
+        obj.update(session=session)
 
         return obj
 
-    def delete(self, resource: models.Resource) -> None:
+    def _delete(self, session: tp.Any, resource: models.Resource) -> None:
         """Delete the resource."""
         model_spec = self._model_spec_map[resource.kind]
         res_filters = self._get_resource_filters(resource)
 
         try:
             obj = model_spec.model.objects.get_one(
-                session=self._session,
+                session=session,
                 filters=res_filters,
             )
-            obj.delete(session=self._session)
+            obj.delete(session=session)
             LOG.debug("Deleted resource: %s", resource.uuid)
         except ra_exc.RecordNotFound:
             LOG.warning("The resource is already deleted: %s", resource.uuid)
+
+    def set_session(self, session: tp.Any) -> None:
+        """Set the session to be used by the client."""
+        self._session = session
+
+    def clear_session(self) -> None:
+        """Clear the session."""
+        self._session = None
+
+    def get(self, resource: models.Resource) -> models.ResourceMixin:
+        """Find and return a resource by uuid and kind."""
+        if self._session:
+            return self._get(self._session, resource)
+
+        with contexts.Context().session_manager() as session:
+            return self._get(session, resource)
+
+    def list(self, capability: str) -> list[models.ResourceMixin]:
+        """Lists all resources by capability."""
+        if self._session:
+            return self._list(self._session, capability)
+
+        with contexts.Context().session_manager() as session:
+            return self._list(session, capability)
+
+    def create(self, resource: models.Resource) -> models.ResourceMixin:
+        """Creates a resource."""
+        if self._session:
+            return self._create(self._session, resource)
+
+        with contexts.Context().session_manager() as session:
+            return self._create(session, resource)
+
+    def update(self, resource: models.Resource) -> models.ResourceMixin:
+        """Update the resource."""
+        if self._session:
+            return self._update(self._session, resource)
+
+        with contexts.Context().session_manager() as session:
+            return self._update(session, resource)
+
+    def delete(self, resource: models.Resource) -> None:
+        """Delete the resource."""
+        if self._session:
+            return self._delete(self._session, resource)
+
+        with contexts.Context().session_manager() as session:
+            return self._delete(session, resource)

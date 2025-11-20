@@ -18,6 +18,8 @@ import uuid as sys_uuid
 from unittest.mock import MagicMock
 
 import pytest
+from restalchemy.dm import filters as dm_filters
+from restalchemy.storage import exceptions as ra_exc
 
 from gcl_sdk.agents.universal.clients.backend.db import (
     DatabaseBackendClient,
@@ -25,9 +27,6 @@ from gcl_sdk.agents.universal.clients.backend.db import (
 )
 from gcl_sdk.agents.universal.clients.backend import exceptions as client_exc
 from gcl_sdk.agents.universal.dm import models
-from gcl_sdk.agents.universal.storage import base as storage_base
-from restalchemy.dm import filters as dm_filters
-from restalchemy.storage import exceptions as ra_exc
 
 
 def _make_resource(
@@ -59,6 +58,7 @@ class TestDatabaseBackendClient:
 
         storage = MagicMock()
         client = DatabaseBackendClient(model_specs=[ms], tf_storage=storage)
+        client.set_session(object())
 
         # Act
         actual = client.get(resource)
@@ -91,6 +91,7 @@ class TestDatabaseBackendClient:
         client = DatabaseBackendClient(
             model_specs=[ms], tf_storage=MagicMock()
         )
+        client.set_session(object())
 
         with pytest.raises(client_exc.ResourceNotFound):
             client.get(resource)
@@ -104,6 +105,7 @@ class TestDatabaseBackendClient:
         storage.storage.return_value = {kind: {}}  # empty for this kind
 
         client = DatabaseBackendClient(model_specs=[ms], tf_storage=storage)
+        client.set_session(object())
 
         res = client.list(kind)
 
@@ -132,6 +134,7 @@ class TestDatabaseBackendClient:
         }
 
         client = DatabaseBackendClient(model_specs=[ms], tf_storage=storage)
+        client.set_session(object())
 
         res = client.list(kind)
 
@@ -166,6 +169,7 @@ class TestDatabaseBackendClient:
 
         storage = MagicMock()
         client = DatabaseBackendClient(model_specs=[ms], tf_storage=storage)
+        client.set_session(object())
 
         actual = client.create(resource)
 
@@ -194,6 +198,7 @@ class TestDatabaseBackendClient:
         client = DatabaseBackendClient(
             model_specs=[ms], tf_storage=MagicMock()
         )
+        client.set_session(object())
 
         with pytest.raises(client_exc.ResourceAlreadyExists):
             client.create(resource)
@@ -212,6 +217,7 @@ class TestDatabaseBackendClient:
         client = DatabaseBackendClient(
             model_specs=[ms], tf_storage=MagicMock()
         )
+        client.set_session(object())
 
         with pytest.raises(client_exc.ResourceNotFound):
             client.update(resource)
@@ -249,6 +255,7 @@ class TestDatabaseBackendClient:
         client = DatabaseBackendClient(
             model_specs=[ms], tf_storage=MagicMock()
         )
+        client.set_session(object())
 
         actual = client.update(resource)
 
@@ -275,6 +282,7 @@ class TestDatabaseBackendClient:
         client = DatabaseBackendClient(
             model_specs=[ms], tf_storage=MagicMock()
         )
+        client.set_session(object())
         client.delete(resource)
         obj.delete.assert_called_once()
 

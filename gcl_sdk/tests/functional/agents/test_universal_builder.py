@@ -45,7 +45,7 @@ class DummyBuilder(builder_svc.UniversalBuilderService):
         self.post_create_called = True
         instance.status = ua_c.InstanceStatus.IN_PROGRESS.value
 
-    def pre_update_instance_resource(self, instance):
+    def pre_update_instance_resource(self, instance, resource):
         self.pre_update_called = True
         instance.status = ua_c.InstanceStatus.IN_PROGRESS.value
 

@@ -39,10 +39,10 @@ class MigrationStep(migrations.AbstractMigrationStep):
                 "target" UUID references ua_target_resources(res_uuid) ON DELETE CASCADE,
                 "watcher_kind" varchar(64) NOT NULL,
                 "target_kind" varchar(64) NOT NULL,
-                "hash" varchar(256) NOT NULL DEFAULT '',
-                "full_hash" varchar(256) NOT NULL DEFAULT '',
+                "tracked_at" timestamp NOT NULL DEFAULT current_timestamp,
                 "created_at" timestamp NOT NULL DEFAULT current_timestamp,
-                "updated_at" timestamp NOT NULL DEFAULT current_timestamp
+                "updated_at" timestamp NOT NULL DEFAULT current_timestamp,
+                UNIQUE (watcher, target)
             );
             """,
             # INDEXES
@@ -54,36 +54,50 @@ class MigrationStep(migrations.AbstractMigrationStep):
             CREATE INDEX IF NOT EXISTS ua_tracked_resources_target_idx
                 ON ua_tracked_resources (target, target_kind);
             """,
-            # VIEWS
-            # """
-            # CREATE OR REPLACE VIEW ua_outdated_tracked_hash_instances_view AS
-            #     SELECT
-            #         tracked.uuid as uuid,
-            #         tracked.watcher as watcher,
-            #         tracked.target as target,
-            #         tracked.target_kind as target_kind,
-            #         tracked.watcher_kind as watcher_kind,
-            #         tracked.hash as hash
-            #     FROM ua_tracked_resources tracked
-            #     JOIN ua_target_resources utr ON
-            #         tracked.target = utr.res_uuid AND tracked.target_kind = utr.kind
-            #     WHERE tracked.hash != utr.hash;
-            # """,
             """
-            CREATE OR REPLACE VIEW ua_outdated_tracked_full_hash_instances_view AS
+            CREATE INDEX IF NOT EXISTS idx_ua_tracked_target_tracked_at
+                ON ua_tracked_resources(target, tracked_at);
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_ua_target_res_uuid_updated_at
+                ON ua_target_resources(res_uuid, updated_at);
+            """,
+            # VIEWS
+            """
+            CREATE OR REPLACE VIEW ua_outdated_tracked_resources_view AS
                 SELECT
                     tracked.uuid as uuid,
                     tracked.uuid as tracked_resource,
                     tracked.watcher_kind as watcher_kind,
-                    tracked.full_hash as full_hash,
-                    utr.full_hash as actual_full_hash,
-                    uar.uuid as actual_resource
+                    tracked.tracked_at as tracked_at,
+                    utr.updated_at as target_updated_at
                 FROM ua_tracked_resources tracked
                 JOIN ua_target_resources utr ON
                     tracked.target = utr.res_uuid
+                WHERE tracked.tracked_at != utr.updated_at;
+            """,
+            """
+            CREATE OR REPLACE VIEW ua_resource_pair_view AS
+                SELECT
+                    utr.uuid as uuid,
+                    utr.kind as kind,
+                    utr.res_uuid as res_uuid,
+                    utr.res_uuid as target_resource,
+                    uar.res_uuid as actual_resource
+                FROM ua_target_resources utr
                 LEFT JOIN ua_actual_resources uar ON
-                    tracked.target = uar.res_uuid
-                WHERE tracked.full_hash != utr.full_hash;
+                    utr.res_uuid = uar.res_uuid;
+            """,
+            """
+            CREATE OR REPLACE VIEW ua_outdated_resources_view AS
+                SELECT
+                    ua_target_resources.uuid as uuid,
+                    ua_target_resources.kind as kind,
+                    ua_target_resources.res_uuid as target_resource,
+                    ua_actual_resources.res_uuid as actual_resource
+                FROM ua_target_resources INNER JOIN ua_actual_resources ON 
+                    ua_target_resources.res_uuid = ua_actual_resources.res_uuid
+                WHERE ua_target_resources.full_hash != ua_actual_resources.full_hash;
             """,
         ]
 
@@ -91,10 +105,28 @@ class MigrationStep(migrations.AbstractMigrationStep):
             session.execute(expr, None)
 
     def downgrade(self, session):
-        views = [
-            # "ua_outdated_tracked_hash_instances_view",
-            "ua_outdated_tracked_full_hash_instances_view",
+        sql_expressions = [
+            """
+            CREATE OR REPLACE VIEW ua_outdated_resources_view AS
+                SELECT
+                    ua_target_resources.uuid as uuid,
+                    ua_target_resources.kind as kind,
+                    ua_target_resources.res_uuid as target_resource,
+                    ua_actual_resources.res_uuid as actual_resource
+                FROM ua_target_resources INNER JOIN ua_actual_resources ON 
+                    ua_target_resources.uuid = ua_actual_resources.uuid
+                WHERE ua_target_resources.full_hash != ua_actual_resources.full_hash;
+            """,
         ]
+
+        views = [
+            "ua_outdated_tracked_resources_view",
+            "ua_resource_pair_view",
+        ]
+
+        for expr in sql_expressions:
+            session.execute(expr, None)
+
         for view_name in views:
             self._delete_view_if_exists(session, view_name)
 
