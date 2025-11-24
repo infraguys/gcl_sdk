@@ -48,6 +48,10 @@ class ResourceIdentifier(tp.NamedTuple):
     kind: str
     uuid: sys_uuid.UUID
 
+    @property
+    def res_internal_uuid(self):
+        return Resource.gen_res_uuid(self.uuid, self.kind)
+
 
 # short alias
 RI = ResourceIdentifier
@@ -542,6 +546,10 @@ class Resource(
             node=self.node,
         )
 
+    @property
+    def ri(self) -> RI:
+        return RI(uuid=self.uuid, kind=self.kind)
+
     @classmethod
     def gen_res_uuid(cls, uuid: sys_uuid.UUID, kind: str) -> sys_uuid.UUID:
         return sys_uuid.uuid5(uuid, kind)
@@ -570,6 +578,19 @@ class Resource(
             full_hash=utils.calculate_hash(value),
             status=status,
         )
+
+    @classmethod
+    def fetch_by_uuids(
+        cls,
+        uuids: tp.Collection[sys_uuid.UUID],
+        kinds: tp.Collection[str] = tuple(),
+    ) -> dict[RI, Resource]:
+        filters = {"uuid": dm_filters.In(u for u in uuids)}
+
+        if kinds:
+            filters["kind"] = dm_filters.In(kinds)
+
+        return {r.ri: r for r in cls.objects.get_all(filters=filters)}
 
 
 class TargetResource(Resource):
@@ -839,6 +860,160 @@ class OutdatedMasterFullHashResource(
     )
 
 
+class TrackedResource(
+    models.ModelWithUUID, models.ModelWithTimestamp, orm.SQLStorableMixin
+):
+    __tablename__ = "ua_tracked_resources"
+
+    watcher = relationships.relationship(
+        TargetResource,
+        prefetch=True,
+        required=True,
+    )
+    target = relationships.relationship(
+        TargetResource,
+        prefetch=True,
+        required=True,
+    )
+    watcher_kind = properties.property(
+        types.String(max_length=64), required=True
+    )
+    target_kind = properties.property(
+        types.String(max_length=64), required=True
+    )
+    hash = properties.property(types.String(max_length=256), default="")
+    full_hash = properties.property(types.String(max_length=256), default="")
+
+    @property
+    def target_ri(self) -> RI:
+        return RI(
+            kind=self.target_kind,
+            uuid=self.target.uuid,
+        )
+
+    @property
+    def watcher_ri(self) -> RI:
+        return RI(
+            kind=self.watcher_kind,
+            uuid=self.watcher.uuid,
+        )
+
+    @classmethod
+    def fetch_by_watchers(
+        cls,
+        watchers: tp.Collection[TargetResource],
+    ) -> dict[RI, list[TrackedResource]]:
+        """
+        Fetch tracked resources by watcher instances.
+
+        Args:
+            watchers: Collection of watcher TargetResource instances
+
+        Returns:
+            Dictionary mapping watcher RI to list of TrackedResources
+
+        Note:
+            This method fetches all tracked resources for the given watcher
+            instances and groups them by watcher RI.
+        """
+        result = {}
+
+        if not watchers:
+            return result
+
+        filters = {"watcher": dm_filters.In(watchers)}
+        tracked = cls.objects.get_all(filters=filters)
+
+        for tr in tracked:
+            result.setdefault(tr.watcher.ri, []).append(tr)
+        return result
+
+
+class OutdatedTrackedHashResource(models.ModelWithUUID, orm.SQLStorableMixin):
+    __tablename__ = "ua_outdated_tracked_hash_instances_view"
+
+    watcher_kind = properties.property(
+        types.String(max_length=64), required=True
+    )
+    target_kind = properties.property(
+        types.String(max_length=64), required=True
+    )
+    watcher = relationships.relationship(
+        TargetResource,
+        prefetch=True,
+        required=True,
+    )
+    target = relationships.relationship(
+        TargetResource,
+        prefetch=True,
+        required=True,
+    )
+    hash = properties.property(types.String(max_length=256), default="")
+
+
+class OutdatedTrackedFullHashResource(
+    models.ModelWithUUID, orm.SQLStorableMixin
+):
+    __tablename__ = "ua_outdated_tracked_full_hash_instances_view"
+
+    watcher_kind = properties.property(
+        types.String(max_length=64), required=True
+    )
+    # target_kind = properties.property(
+    #     types.String(max_length=64), required=True
+    # )
+    # watcher = relationships.relationship(
+    #     TargetResource,
+    #     prefetch=True,
+    #     required=True,
+    # )
+    # target_target = relationships.relationship(
+    #     TargetResource,
+    #     prefetch=True,
+    #     required=True,
+    # )
+    actual_resource = relationships.relationship(
+        Resource,
+        prefetch=True,
+        required=True,
+    )
+    tracked_resource = relationships.relationship(
+        TrackedResource,
+        prefetch=True,
+        required=True,
+    )
+    full_hash = properties.property(types.String(max_length=256), default="")
+    actual_full_hash = properties.property(
+        types.String(max_length=256), default=""
+    )
+
+    @classmethod
+    def fetch_by_watcher_kind(
+        cls,
+        watcher_kind: str,
+    ) -> dict[RI, list[OutdatedTrackedFullHashResource]]:
+        """Fetch outdated tracked full hash resources by watcher kind.
+
+        Args:
+            watcher_kind: watcher kind
+
+        Returns:
+            Dictionary mapping watcher RI to list of
+            OutdatedTrackedFullHashResources
+        """
+
+        result = {}
+
+        outdated = cls.objects.get_all(
+            filters={"watcher_kind": dm_filters.EQ(watcher_kind)},
+            limit=c.DEF_SQL_LIMIT,
+        )
+
+        for o in outdated:
+            result.setdefault(o.tracked_resource.watcher.ri, []).append(o)
+        return result
+
+
 class SchedulableToAgentMixin:
     """A helpful mixin to schedule resources to the UA agent for simple cases.
 
@@ -989,6 +1164,10 @@ class ResourceKindAwareMixin(KindAwareMixin, ResourceMixin):
     def to_ua_resource(self) -> Resource:
         return super().to_ua_resource(kind=self.get_resource_kind())
 
+    @property
+    def ua_ri(self) -> ResourceIdentifier:
+        return ResourceIdentifier(self.get_resource_kind(), self.uuid)
+
 
 class TargetResourceKindAwareMixin(KindAwareMixin, TargetResourceMixin):
     """A helpful mixin to convert models to the target resource model.
@@ -1065,6 +1244,33 @@ class InstanceMixin(
     The default behavior for the `InstanceMixin` is to not have derivatives.
     """
 
+    # A map of tracked instances kinds to tracked instances models.
+    # Example:
+    # __tracked_instances_model_map__ = {
+    #     "node": Node,
+    # }
+    __tracked_instances_model_map__: dict | None = None
+
+    @classmethod
+    def _has_model_tracked_instances(cls) -> bool:
+        """Return `True` if the class has tracked instances objects."""
+        return cls.__tracked_instances_model_map__ is not None
+
+    @classmethod
+    def tracked_instance_model(cls, kind: str) -> tp.Type["InstanceMixin"]:
+        """Return the tracked instance model by kind."""
+        if not cls._has_model_tracked_instances():
+            raise ValueError(
+                "The tracked instance model map is not initialized."
+            )
+
+        if kind not in cls.__tracked_instances_model_map__:
+            raise ValueError(
+                f"The tracked instance model for kind {kind} is not found."
+            )
+
+        return cls.__tracked_instances_model_map__[kind]
+
     @classmethod
     def _has_model_derivatives(cls) -> bool:
         """Return `True` if the class has derivatives objects.
@@ -1097,6 +1303,48 @@ class InstanceMixin(
     ) -> list[TargetResource]:
         kind = cls.get_resource_kind()
         return cls.get_deleted_target_resources(cls.__tablename__, kind, limit)
+
+    def get_normalized_tracked_resources(
+        self,
+    ) -> frozenset[ResourceIdentifier]:
+        """Return the normalized tracked resources.
+
+        See `get_tracked_resources` for more details. The method returns
+        frozenset of ResourceIdentifier objects and does basic validation.
+        """
+        # Get the tracked instances
+        to_track = self.get_tracked_resources()
+
+        if not to_track:
+            return frozenset()
+
+        # Normalize the tracked instances to ResourceIdentifier
+        instances = frozenset(
+            (
+                RI(i.kind, i.uuid)
+                if isinstance(i, RI)
+                else RI(i.get_resource_kind(), i.uuid)
+            )
+            for i in to_track
+        )
+
+        # Ensure all tracked instances are valid
+        for i in instances:
+            if i.kind not in self.__tracked_instances_model_map__:
+                raise ValueError(f"Unknown tracked instance kind: {i.kind}")
+
+        return instances
+
+    def get_tracked_resources(
+        self,
+    ) -> tp.Collection["ResourceKindAwareMixin" | ResourceIdentifier]:
+        """Return the tracked resources.
+
+        Method returns either collection of ResourceKindAwareMixin or
+        ResourceIdentifier. If any of resources are changed, a special hooks
+        in the UB will be called to actualize the instance.
+        """
+        return tuple()
 
 
 class InstanceWithDerivativesMixin(InstanceMixin):
