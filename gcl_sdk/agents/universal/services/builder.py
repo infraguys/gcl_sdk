@@ -26,7 +26,6 @@ from gcl_looper.services import basic as looper_basic
 
 from gcl_sdk.common import constants as c
 
-# from gcl_sdk.infra import constants as pc
 from gcl_sdk.agents.universal.dm import models
 from gcl_sdk.agents.universal import constants as ua_c
 
@@ -87,6 +86,15 @@ class UniversalBuilderService(looper_basic.BasicService):
         The hook is called only for new instances.
         """
         return tuple()
+
+    def get_tracked_instances_on_create(
+        self, instance: models.InstanceMixin
+    ) -> tp.Collection[models.ResourceIdentifier]:
+        """Return a collection of tracked instances on create.
+
+        The hook is called only for new instances.
+        """
+        return instance.get_normalized_tracked_resources()
 
     def post_create_instance_resource(
         self,
@@ -229,6 +237,23 @@ class UniversalBuilderService(looper_basic.BasicService):
         """
         return tuple(p[0] for p in derivative_pairs)
 
+    def actualize_instance_with_outdated_tracked(
+        self,
+        instance: models.InstanceMixin,
+        tracked_instances: tp.Collection[models.InstanceMixin],
+    ) -> None:
+        """Actualize instance with outdated tracked instances.
+
+        This method is used to actualize a particular instance with outdated
+        tracked instances. See `_actualize_instances_with_outdated_tracked`
+        for more details.
+
+        Args:
+            instance: The instance to actualize.
+            tracked_instances: The tracked instances that are changed.
+        """
+        pass
+
     def can_delete_instance_resource(
         self, resource: models.TargetResource
     ) -> bool:
@@ -350,6 +375,82 @@ class UniversalBuilderService(looper_basic.BasicService):
         """
         agent_uuid = schedulable.schedule_to_ua_agent()
         resource.agent = agent_uuid
+
+    def _save_tracked_instances(
+        self,
+        instance: models.InstanceMixin,
+        target_tracked: tp.Collection[models.RI],
+    ) -> None:
+        """Save tracked instances."""
+        if not target_tracked:
+            return
+
+        target_tracked = set(target_tracked)
+
+        # Fetch existing tracked resources for the instance
+        current_tracked = {
+            (t.target_kind, t.target.uuid): t
+            for t in models.TrackedInstance.objects.get_all(
+                filters={
+                    "watcher": dm_filters.EQ(instance.ua_ri.res_internal_uuid),
+                },
+            )
+        }
+
+        # Add new tracked resources
+        for kind, uuid in target_tracked - current_tracked.keys():
+            tracked_instance = models.TrackedInstance(
+                watcher=instance.ua_ri.res_internal_uuid,
+                target=RI(kind=kind, uuid=uuid).res_internal_uuid,
+                watcher_kind=instance.kind,
+                target_kind=kind,
+            )
+            tracked_instance.save()
+            LOG.debug("Tracked instance %s added", tracked_instance.uuid)
+
+        # Remove outdated tracked resources
+        for t in current_tracked.keys() - target_tracked:
+            tracked_instance = current_tracked[t]
+            tracked_instance.delete()
+            LOG.debug("Tracked instance %s removed", tracked_instance.uuid)
+
+        # Update tracked resources
+        # FIXME(akremenetsky): Both collections are expected to be small.
+        # So we can use nested loop here.
+
+    def _actualize_tracked_resources(
+        self,
+        instance: models.InstanceMixin,
+        current_tracked: tp.Collection[models.OutdatedMasterFullHashResource],
+        target_tracked: frozenset[models.RI],
+    ) -> None:
+        """Save tracked instances."""
+        current_tracked = {t.target_ri: t for t in current_tracked}
+
+        # Add new tracked resources
+        for target in target_tracked - current_tracked.keys():
+            tracked_instance = models.TrackedResource(
+                watcher=instance.ua_ri.res_internal_uuid,
+                target=target.res_internal_uuid,
+                watcher_kind=instance.kind,
+                target_kind=target.kind,
+            )
+            tracked_instance.save()
+            LOG.debug("Tracked resource %s added", tracked_instance.uuid)
+
+        # Remove outdated tracked resources
+        for tracked in current_tracked.keys() - target_tracked:
+            tracked.tracked_resource.delete()
+            LOG.debug("Tracked resource %s removed", tracked.uuid)
+
+        # Update tracked resources
+        # FIXME(akremenetsky): Both collections are expected to be small.
+        # So we can use nested loop here.
+        for ri in current_tracked.keys() & target_tracked:
+            t = current_tracked[ri]
+            t.tracked_resource.full_hash = t.actual_full_hash
+            t.tracked_resource.update()
+            LOG.debug("Tracked resource %s updated", t.tracked_resource.uuid)
 
     def _actualize_resource_hash_status(
         self,
@@ -704,6 +805,14 @@ class UniversalBuilderService(looper_basic.BasicService):
                     derivative_object, derivative_resource
                 )
             derivative_resource.save()
+
+        # Actualize tracked instances
+        if tracked := self.get_tracked_instances_on_create(instance):
+            self._actualize_tracked_resources(
+                instance,
+                frozenset(),
+                frozenset(tracked),
+            )
 
         self.post_create_instance_resource(
             instance, instance_resource, derivative_resources
@@ -1292,6 +1401,195 @@ class UniversalBuilderService(looper_basic.BasicService):
             resources, tracked_field="full_hash"
         )
 
+    def _actualize_instance_with_outdated_tracked_full_hash(
+        self,
+        instance: models.InstanceMixin,
+        target_resource: models.TargetResource,
+        tracked_instances: tp.Collection[models.InstanceMixin],
+    ) -> frozenset[models.RI]:
+        """Actualize instance with outdated tracked instances.
+
+        This method is used to actualize a particular instance with outdated
+        tracked instances. See `_actualize_instances_with_outdated_tracked`
+        for more details.
+        """
+        # NOTE(akremenetsky): Start with lightweight implementation first.
+        # No derivatives for now, just update the instance with
+        # the tracked instances.
+
+        # Hook to actualize instance.
+        self.actualize_instance_with_outdated_tracked(
+            instance, tracked_instances
+        )
+
+        # Refresh tracked instances
+        new_tracked_instances = (
+            self._instance_model.get_normalized_tracked_resources()
+        )
+
+        # Save the instance if some changes occurred.
+        instance.save()
+
+        # FIXME(akremenetsky): Should we update status of the target resource?
+
+        # Commit the tracked_at timestamp
+        target_resource.tracked_at = instance.updated_at
+        target_resource.update()
+
+        LOG.info(
+            "Instance(%s) resource %s actualized",
+            instance.get_resource_kind(),
+            target_resource.uuid,
+        )
+
+        return new_tracked_instances
+
+    def _actualize_instances_with_outdated_tracked(self) -> None:
+        """Actualize instances that have outdated tracked instances.
+
+        This method is used to actualize instances that have outdated
+        tracked instances. For example, there is an instance `Node`.
+        At the creation time it subscribes to the `Machine` instance.
+        If the `Machine` instance is changed, the `Node` instance should
+        be actualized as well. This method is used to actualize such
+        instances.
+        """
+
+        # TODO(akremenetsky): Add support for hash as well
+
+        # Fetch all instances with outdated tracked instances
+        kind = self._instance_model.get_resource_kind()
+        outdated = (
+            models.OutdatedTrackedFullHashResource.fetch_by_watcher_kind(kind)
+        )
+        # outdated = models.OutdatedTrackedFullHashResource.objects.get_all(
+        #     filters={"watcher_kind": dm_filters.EQ(kind)},
+        #     limit=c.DEF_SQL_LIMIT,
+        # )
+
+        if len(outdated) == 0:
+            return
+
+        # Fetch all instances
+        instances = {
+            (kind, i.uuid): i
+            for i in self._instance_model.objects.get_all(
+                filters={
+                    "uuid": dm_filters.In({ri.uuid for ri in outdated.keys()}),
+                },
+            )
+        }
+        # instances = {
+        #     (kind, i.uuid): i
+        #     for i in self._instance_model.objects.get_all(
+        #         filters={
+        #             "uuid": dm_filters.In(
+        #                 {o.tracked_resource.watcher.uuid for o in outdated}
+        #             ),
+        #         },
+        #     )
+        # }
+
+        # Fetch existing tracked resources for the instance
+        # tracked_resources_map = models.TrackedResource.fetch_by_watchers(
+        #     {o.watcher for o in outdated}
+        # )
+
+        # Merge outdated and tracked resources
+        # Result:
+        # {
+        #     <RI>: (
+        #         (<tracked_resource_foo>, <outdated_resource_foo>),
+        #         (<tracked_resource_bar>, <outdated_resource_bar>),
+        #         ...
+        #     ),
+        #     ...
+        # }
+        # outdated_tracked_map = {}
+        # for ri, tracked_resources in tracked_resources_map.items():
+        #     outdated_resources = outdated.get(ri, [])
+        #     tracked_resources.sort(
+        #         key=lambda r: (r.target.kind, r.target.uuid)
+        #     )
+        #     outdated_resources.sort(
+        #         key=lambda r: (r.target_kind, r.target_target.uuid)
+        #     )
+
+        #     if len(tracked_resources) != len(outdated_resources):
+        #         LOG.error(
+        #             "Tracked resources %s and outdated resources %s do not match",
+        #             tracked_resources,
+        #             outdated_resources,
+        #         )
+        #         continue
+
+        #     outdated_tracked_map[ri] = tuple(
+        #         zip(tracked_resources, outdated_resources)
+        #     )
+
+        # Group tracked instances by watcher instance
+        # Result:
+        # {
+        #     <watcher_instance>: [
+        #         <tracked_instance_foo>,
+        #         <tracked_instance_bar>,
+        #         ...
+        #     ],
+        #     ...
+        # }
+        outdated_map = {}
+        # for o in outdated:
+        for o in itertools.chain.from_iterable(outdated.values()):
+            # Not clear how it can be None
+            instance = instances.get(o.tracked_resource.watcher_ri)
+            if instance is None:
+                LOG.error(
+                    "Instance(%s) %s not found for outdated tracked resource",
+                    kind,
+                    o.tracked_resource.watcher_ri,
+                )
+                continue
+
+            container = outdated_map.setdefault(
+                (instance, o.tracked_resource.watcher), []
+            )
+
+            # The tracked instances that have been changed
+            tracked_instance_class = instance.tracked_instance_model(
+                o.tracked_resource.target_kind
+            )
+            container.append(
+                tracked_instance_class.from_ua_resource(o.actual_resource)
+            )
+
+        # Actualize instances with outdated tracked instances
+        for (
+            instance,
+            target_resource,
+        ), tracked_instances in outdated_map.items():
+            current_outdated_tracked = outdated.get(target_resource.ri, [])
+            try:
+                new_tracked = (
+                    self._actualize_instance_with_outdated_tracked_full_hash(
+                        instance,
+                        target_resource,
+                        tracked_instances,
+                    )
+                )
+
+                # Actualize tracked resources
+                self._actualize_tracked_resources(
+                    instance,
+                    current_outdated_tracked,
+                    new_tracked,
+                )
+            except Exception:
+                LOG.exception(
+                    "Error actualizing outdated tracked instance(%s) %s",
+                    kind,
+                    instance.uuid,
+                )
+
     # Misc methods
 
     def _iteration(self) -> None:
@@ -1330,4 +1628,13 @@ class UniversalBuilderService(looper_basic.BasicService):
                 except Exception:
                     LOG.exception(
                         "Error actualizing outdated master full hash instances"
+                    )
+
+            if self._instance_model._has_model_tracked_instances():
+                try:
+                    self._actualize_instances_with_outdated_tracked()
+                except Exception:
+                    LOG.exception(
+                        "Error actualizing instances with outdated "
+                        "tracked instances"
                     )
