@@ -22,29 +22,50 @@ import uuid as sys_uuid
 
 from restalchemy.common import contexts
 from restalchemy.dm import filters as dm_filters
+from restalchemy.storage.sql import utils as sql_utils
 from gcl_looper.services import basic as looper_basic
 
 from gcl_sdk.common import constants as c
 
-# from gcl_sdk.infra import constants as pc
+from gcl_sdk.agents.universal.services import common as svc_common
 from gcl_sdk.agents.universal.dm import models
 from gcl_sdk.agents.universal import constants as ua_c
+
 
 LOG = logging.getLogger(__name__)
 
 
-class UniversalBuilderService(looper_basic.BasicService):
+class UniversalBuilderService(
+    svc_common.RegistrableUAServiceMixin, looper_basic.BasicService
+):
+    """The universal builder service."""
 
     def __init__(
         self,
         instance_model: type[models.InstanceMixin],
+        service_spec: svc_common.UAServiceSpec | None = None,
         iter_min_period: float = 3,
         iter_pause: float = 0.1,
     ):
         super().__init__(iter_min_period, iter_pause)
         self._instance_model = instance_model
+        self._service_spec = service_spec
+        self._iteration_context: dict[str, tp.Any] = {}
+
+    # RegistrableUAServiceMixin interface
+
+    @property
+    def ua_service_spec(self) -> svc_common.UAServiceSpec | None:
+        return self._service_spec
 
     # Builder interface
+
+    def prepare_iteration(self) -> dict[str, tp.Any]:
+        """Perform actions before iteration and return the iteration context.
+
+        The result is a dictionary that is passed to the iteration context.
+        """
+        return {}
 
     def can_create_instance_resource(
         self, instance: models.InstanceMixin
@@ -87,6 +108,17 @@ class UniversalBuilderService(looper_basic.BasicService):
         The hook is called only for new instances.
         """
         return tuple()
+
+    def get_tracked_instances_on_create(
+        self, instance: models.InstanceMixin
+    ) -> tp.Collection[models.ResourceIdentifier]:
+        """Return a collection of tracked instances on create.
+
+        The hook is called only for new instances.
+        """
+        if not instance._has_model_tracked_instances():
+            return tuple()
+        return instance.get_normalized_tracked_resources()
 
     def post_create_instance_resource(
         self,
@@ -142,6 +174,17 @@ class UniversalBuilderService(looper_basic.BasicService):
         The default behavior is to send the same list as on instance creation.
         """
         return self.create_instance_derivatives(instance)
+
+    def get_tracked_instances_on_update(
+        self, instance: models.InstanceMixin
+    ) -> tp.Collection[models.ResourceIdentifier]:
+        """Return a collection of tracked instances on update.
+
+        The hook is called only for updated instances.
+        """
+        if not instance._has_model_tracked_instances():
+            return tuple()
+        return instance.get_normalized_tracked_resources()
 
     def post_update_instance_resource(
         self,
@@ -228,6 +271,23 @@ class UniversalBuilderService(looper_basic.BasicService):
             derivative_pairs: Changed or all derivatives of the instance.
         """
         return tuple(p[0] for p in derivative_pairs)
+
+    def actualize_instance_with_outdated_tracked(
+        self,
+        instance: models.InstanceMixin,
+        tracked_instances: tp.Collection[models.InstanceMixin],
+    ) -> None:
+        """Actualize instance with outdated tracked instances.
+
+        This method is used to actualize a particular instance with outdated
+        tracked instances. See `_actualize_instances_with_outdated_tracked`
+        for more details.
+
+        Args:
+            instance: The instance to actualize.
+            tracked_instances: The tracked instances that are changed.
+        """
+        pass
 
     def can_delete_instance_resource(
         self, resource: models.TargetResource
@@ -326,6 +386,58 @@ class UniversalBuilderService(looper_basic.BasicService):
 
     # Internal methods
 
+    def _get_new_instances(self) -> tp.Collection[models.InstanceMixin]:
+        """Fetch new instances."""
+        # Fetch all new instances if the service is nameless
+        if self.is_nameless_ua_service:
+            return self._instance_model.get_new_instances()
+
+        # TODO(akremenetsky): Perhaps we need to more specific type for
+        # the iteration context than an original dict. Let's do it later.
+        clause_filters = self._iteration_context.get("clause_filters", {})
+
+        clause = self._instance_model.get_filter_clause(**clause_filters)
+
+        # Fetch new instances only for this service
+        return self._instance_model.get_new_instances(
+            clause=clause,
+        )
+
+    def _get_deleted_instances(self) -> tp.Collection[models.TargetResource]:
+        """Fetch resources of deleted instances."""
+        return self._instance_model.get_deleted_instances()
+
+    def _get_updated_instances(self) -> tp.Collection[models.InstanceMixin]:
+        """Fetch updated instances."""
+        # Fetch all updated instances if the service is nameless
+        if self.is_nameless_ua_service:
+            return self._instance_model.get_updated_instances()
+
+        # TODO(akremenetsky): Perhaps we need to more specific type for
+        # the iteration context than an original dict. Let's do it later.
+        clause_filters = self._iteration_context.get("clause_filters", {})
+
+        clause = self._instance_model.get_filter_clause(**clause_filters)
+
+        # Fetch updated instances only for this service
+        return self._instance_model.get_updated_instances(
+            clause=clause,
+        )
+
+    def _get_outdated_resources(
+        self,
+        filters: dict[str, dm_filters.AbstractClause],
+        limit: int = c.DEF_SQL_LIMIT,
+    ) -> tuple[models.ResourcePair, ...]:
+        """Fetch outdated resources."""
+        return tuple(
+            r.to_pair()
+            for r in models.OutdatedResource.objects.get_all(
+                filters=filters,
+                limit=limit,
+            )
+        )
+
     def _are_target_resources_equal(
         self,
         resources_left: tp.Collection[models.TargetResource],
@@ -348,8 +460,34 @@ class UniversalBuilderService(looper_basic.BasicService):
         the resource is created. For this case the method schedules the
         resource to the UA agent.
         """
-        agent_uuid = schedulable.schedule_to_ua_agent()
+        agent_uuid = schedulable.schedule_to_ua_agent(builder=self)
         resource.agent = agent_uuid
+
+    def _actualize_tracked_resources(
+        self,
+        instance: models.InstanceMixin,
+        current_tracked: tp.Collection[models.TrackedResource],
+        target_tracked: frozenset[models.RI],
+    ) -> None:
+        """Save tracked instances."""
+        ri = models.RI(kind=instance.get_resource_kind(), uuid=instance.uuid)
+        current_tracked = {t.target_ri: t for t in current_tracked}
+
+        # Add new tracked resources
+        for target in target_tracked - current_tracked.keys():
+            tracked_instance = models.PlainTrackedResource(
+                watcher=ri.res_internal_uuid,
+                watcher_kind=ri.kind,
+                target=target.res_internal_uuid,
+                target_kind=target.kind,
+            )
+            tracked_instance.save()
+            LOG.debug("Tracked resource %s added", tracked_instance.uuid)
+
+        # Remove outdated tracked resources
+        for tracked in current_tracked.keys() - target_tracked:
+            tracked.tracked_resource.delete()
+            LOG.debug("Tracked resource %s removed", tracked.uuid)
 
     def _actualize_resource_hash_status(
         self,
@@ -372,13 +510,15 @@ class UniversalBuilderService(looper_basic.BasicService):
         ):
             target_resource.status = actual_resource.status
         target_resource.update()
-        LOG.debug("Outdated resource %s actualized", target_resource.uuid)
+        LOG.debug(
+            "Outdated resource(%s) %s actualized",
+            target_resource.kind,
+            target_resource.uuid,
+        )
 
     def _actualize_derivative_resources_hash_status(
         self,
-        derivatives: tp.Collection[
-            tuple[models.TargetResource, models.Resource]
-        ],
+        derivatives: tp.Collection[models.ResourcePair],
         active_status: str = ua_c.InstanceStatus.ACTIVE.value,
     ) -> None:
         """Actualize derivative resources hash and status."""
@@ -505,9 +645,7 @@ class UniversalBuilderService(looper_basic.BasicService):
         instance: models.InstanceWithDerivativesMixin,
         target_resource: models.TargetResource,
         actual_resource: models.Resource | None = None,
-        changed_derivatives: tp.Collection[
-            tuple[models.TargetResource, models.Resource]
-        ] = tuple(),
+        changed_derivatives: tp.Collection[models.ResourcePair] = tuple(),
         active_status: str | None = ua_c.InstanceStatus.ACTIVE.value,
     ) -> None:
         """Actualize outdated instance.
@@ -587,12 +725,8 @@ class UniversalBuilderService(looper_basic.BasicService):
         instance: models.InstanceWithDerivativesMixin,
         target_resource: models.TargetResource,
         actual_resource: models.Resource | None = None,
-        changed_derivatives: tp.Collection[
-            tuple[models.TargetResource, models.Resource]
-        ] = tuple(),
-        all_derivatives: tp.Collection[
-            tuple[models.TargetResource, models.Resource | None]
-        ] = tuple(),
+        changed_derivatives: tp.Collection[models.ResourcePair] = tuple(),
+        all_derivatives: tp.Collection[models.ResourcePair] = tuple(),
         active_status: str | None = ua_c.InstanceStatus.ACTIVE.value,
     ) -> None:
         """Actualize outdated instance.
@@ -671,8 +805,11 @@ class UniversalBuilderService(looper_basic.BasicService):
             target_resource.full_hash = actual_resource.full_hash
         target_resource.update()
 
+    @sql_utils.rollback_to_savepoint_on_error()
     def _actualize_new_instance(self, instance: models.InstanceMixin) -> None:
-        """Actualize the new PaaS instance."""
+        """Actualize resources of the new instance."""
+        instance_resource = None
+
         # Perform some additional actions before creating
         # resource and derivatives
         self.pre_create_instance_resource(instance)
@@ -705,6 +842,14 @@ class UniversalBuilderService(looper_basic.BasicService):
                 )
             derivative_resource.save()
 
+        # Actualize tracked instances
+        if tracked := self.get_tracked_instances_on_create(instance):
+            self._actualize_tracked_resources(
+                instance,
+                frozenset(),
+                frozenset(tracked),
+            )
+
         self.post_create_instance_resource(
             instance, instance_resource, derivative_resources
         )
@@ -719,13 +864,17 @@ class UniversalBuilderService(looper_basic.BasicService):
 
         instance_resource.update()
 
-        LOG.info("Instance resource %s created", instance_resource.uuid)
+        LOG.info(
+            "Instance resource(%s) %s created",
+            instance_resource.kind,
+            instance_resource.uuid,
+        )
 
     def _actualize_new_instances(
         self, instances: tp.Collection[models.InstanceMixin] = tuple()
     ) -> None:
         """Actualize new PaaS instances."""
-        instances = instances or self._instance_model.get_new_instances()
+        instances = instances or self._get_new_instances()
 
         if len(instances) == 0:
             return
@@ -748,9 +897,8 @@ class UniversalBuilderService(looper_basic.BasicService):
         self,
         instance: models.InstanceMixin,
         resource: models.TargetResource,
-        derivatives: tp.Collection[
-            tuple[models.TargetResource, models.Resource | None]
-        ] = tuple(),
+        derivatives: tp.Collection[models.ResourcePair] = tuple(),
+        tracked_resources: tp.Collection[models.TrackedResource] = tuple(),
     ) -> None:
         """Actualize updated instance by user."""
         # Perform some additional actions before updating
@@ -807,6 +955,14 @@ class UniversalBuilderService(looper_basic.BasicService):
         else:
             target_resources = tuple()
 
+        # Actualize tracked instances
+        if tracked := self.get_tracked_instances_on_update(instance):
+            self._actualize_tracked_resources(
+                instance,
+                tracked_resources,
+                frozenset(tracked),
+            )
+
         self.post_update_instance_resource(
             instance, resource, target_resources
         )
@@ -826,19 +982,30 @@ class UniversalBuilderService(looper_basic.BasicService):
 
     def _actualize_updated_instances(self) -> None:
         """Actualize updated instances changed by user."""
-        updated_instances = self._instance_model.get_updated_instances()
+        updated_instances = self._get_updated_instances()
 
         if len(updated_instances) == 0:
             return
 
         instance_resources = models.TargetResource.objects.get_all(
             filters={
-                "uuid": dm_filters.In(str(i.uuid) for i in updated_instances),
+                "uuid": dm_filters.In(i.uuid for i in updated_instances),
                 "kind": dm_filters.EQ(
                     self._instance_model.get_resource_kind()
                 ),
             }
         )
+
+        # Collect tracked instances to actualize them later
+        if self._instance_model._has_model_tracked_instances():
+            tracked_resource_map = (
+                models.TrackedResource.fetch_by_watcher_kind(
+                    self._instance_model.get_resource_kind(),
+                    uuids={i.uuid for i in updated_instances},
+                )
+            )
+        else:
+            tracked_resource_map = {}
 
         # Derivatives resources if the model class has derivatives
         if self._instance_model._has_model_derivatives():
@@ -854,12 +1021,13 @@ class UniversalBuilderService(looper_basic.BasicService):
         for instance in updated_instances:
             resource = resource_map[instance.uuid]
             derivatives = resource_derivative_map.get(resource.uuid, tuple())
+            tracked_resources = tracked_resource_map.get(resource.ri, [])
 
             try:
                 # Check we can update the instance resource
                 if self.can_update_instance_resource(instance):
                     self._actualize_updated_instance(
-                        instance, resource, derivatives
+                        instance, resource, derivatives, tracked_resources
                     )
             except Exception:
                 LOG.exception(
@@ -873,19 +1041,28 @@ class UniversalBuilderService(looper_basic.BasicService):
         limit: int = c.DEF_SQL_LIMIT,
     ) -> dict[
         sys_uuid.UUID,  # Resource UUID
-        tuple[models.TargetResource, models.Resource],
+        models.ResourcePair,
     ]:
-        kind = self._instance_model.get_resource_kind()
-        outdated = models.OutdatedResource.objects.get_all(
-            filters={"kind": dm_filters.EQ(kind)},
-            limit=limit,
-        )
-        return {
-            pair.target_resource.uuid: (
-                pair.target_resource,
-                pair.actual_resource,
+        if self.is_nameless_ua_service:
+            kind = self._instance_model.get_resource_kind()
+            outdated = self._get_outdated_resources(
+                filters={"kind": dm_filters.EQ(kind)},
+                limit=limit,
             )
-            for pair in outdated
+            return {pair.target_resource.uuid: pair for pair in outdated}
+
+        # TODO(akremenetsky): Perhaps we need to more specific type for
+        # the iteration context than an original dict. Let's do it later.
+        clause_filters = self._iteration_context.get("clause_filters", {})
+
+        clause = self._instance_model.get_filter_clause(**clause_filters)
+
+        return {
+            pair.target_resource.uuid: pair
+            for pair in self._instance_model.get_outdated_resources(
+                clause=clause,
+                limit=limit,
+            )
         }
 
     def _actualize_outdated_instances_no_derivatives(self) -> None:
@@ -915,6 +1092,15 @@ class UniversalBuilderService(looper_basic.BasicService):
         # the status and full_hash
         for instance in instances:
             target, actual = resource_map[instance.uuid]
+            # It's not supposed the actual resource is None for this case
+            if actual is None:
+                LOG.error(
+                    "Actual resource is not found for instance(%s) %s",
+                    kind,
+                    instance.uuid,
+                )
+                continue
+
             try:
                 # Check if the instance can be actualized
                 if not self.can_actualize_outdated_instance_resource(instance):
@@ -932,19 +1118,18 @@ class UniversalBuilderService(looper_basic.BasicService):
         limit: int = c.DEF_SQL_LIMIT,
     ) -> dict[
         sys_uuid.UUID,  # Master UUID
-        list[tuple[models.TargetResource, models.Resource]],
+        list[models.ResourcePair],
     ]:
-        outdated = models.OutdatedResource.objects.get_all(
+        outdated = self._get_outdated_resources(
             filters={
                 "kind": dm_filters.In(self._instance_model.derivative_kinds())
             },
             limit=limit,
         )
+
         key_map = {}
         for pair in outdated:
-            key_map.setdefault(pair.target_resource.master, []).append(
-                (pair.target_resource, pair.actual_resource)
-            )
+            key_map.setdefault(pair.target_resource.master, []).append(pair)
 
         return key_map
 
@@ -978,7 +1163,7 @@ class UniversalBuilderService(looper_basic.BasicService):
         masters: tp.Collection[sys_uuid.UUID],
     ) -> dict[
         sys_uuid.UUID,  # Master UUID
-        list[tuple[models.TargetResource, models.Resource | None]],
+        list[models.ResourcePair],
     ]:
         kinds = self._instance_model.derivative_kinds()
         target_resources = models.TargetResource.objects.get_all(
@@ -1008,7 +1193,7 @@ class UniversalBuilderService(looper_basic.BasicService):
                 (target_resource.uuid, target_resource.kind)
             )
             resource_map.setdefault(target_resource.master, []).append(
-                (target_resource, actual_resource)
+                models.ResourcePair(target_resource, actual_resource)
             )
 
         return resource_map
@@ -1035,7 +1220,8 @@ class UniversalBuilderService(looper_basic.BasicService):
             tuple(changed_resource_map.keys())
         )
 
-        # Also fetch all derivatives if needed
+        # Also fetch all derivatives related to all instances and
+        # not only changed derivatives
         if need_all:
             all_resource_map = self._get_resources_by_masters(
                 tuple(changed_resource_map.keys())
@@ -1067,7 +1253,9 @@ class UniversalBuilderService(looper_basic.BasicService):
                     )
             except Exception:
                 LOG.exception(
-                    "Error actualizing outdated instance %s", instance.uuid
+                    "Error actualizing outdated instance(%s) %s",
+                    self._instance_model.get_resource_kind(),
+                    instance.uuid,
                 )
 
     def _actualize_outdated_instances(self) -> None:
@@ -1292,42 +1480,302 @@ class UniversalBuilderService(looper_basic.BasicService):
             resources, tracked_field="full_hash"
         )
 
+    def _actualize_instance_with_outdated_tracked(
+        self,
+        instance: models.InstanceMixin,
+        target_resource: models.TargetResource,
+        tracked_instances: tp.Collection[models.InstanceMixin],
+    ) -> frozenset[models.RI]:
+        """Actualize instance with outdated tracked instances.
+
+        This method is used to actualize a particular instance with outdated
+        tracked instances. See `_actualize_instances_with_outdated_tracked`
+        for more details.
+        """
+        # NOTE(akremenetsky): Start with lightweight implementation first.
+        # No derivatives for now, just update the instance with
+        # the tracked instances.
+
+        # Hook to actualize instance.
+        self.actualize_instance_with_outdated_tracked(
+            instance, tracked_instances
+        )
+
+        # Refresh tracked instances
+        new_tracked_instances = instance.get_normalized_tracked_resources()
+
+        # Save the instance if some changes occurred.
+        instance.save()
+
+        # FIXME(akremenetsky): Should we update status of the target resource?
+
+        # Commit the tracked_at timestamp
+        target_resource.tracked_at = instance.updated_at
+        target_resource.update()
+
+        LOG.info(
+            "Instance(%s) resource %s actualized",
+            instance.get_resource_kind(),
+            target_resource.uuid,
+        )
+
+        return new_tracked_instances
+
+    def _actualize_instances_with_outdated_tracked(self) -> None:
+        """Actualize instances that have outdated tracked instances.
+
+        This method is used to actualize instances that have outdated
+        tracked instances. For example, there is an instance `Node`.
+        At the creation time it subscribes to the `Machine` instance.
+        If the `Machine` instance is changed, the `Node` instance should
+        be actualized as well. This method is used to actualize such
+        instances.
+        """
+        # FIXME(akremenetsky): Perhaps we need to lightweight requirements
+        # and implementation here. For example, no need to actualize
+        # tracked resource every time.
+
+        # Fetch all instances with outdated tracked instances
+        kind = self._instance_model.get_resource_kind()
+        outdated = models.OutdatedTrackedResource.fetch_by_watcher_kind(kind)
+
+        if len(outdated) == 0:
+            return
+
+        # Fetch tracked resources of instances to actualize them later
+        tracked_resource_map = models.TrackedResource.fetch_by_watcher_kind(
+            kind,
+            uuids={ri.uuid for ri in outdated.keys()},
+        )
+
+        # Fetch all instances
+        instances = {
+            (kind, i.uuid): i
+            for i in self._instance_model.objects.get_all(
+                filters={
+                    "uuid": dm_filters.In({ri.uuid for ri in outdated.keys()}),
+                },
+            )
+        }
+
+        # Group tracked instances by watcher instance
+        # {
+        #     (watcher_instance, watcher_target_resource): [
+        #         (foo_class, tracked_foo_instance_uuid, foo_outdated),
+        #         (bar_class, tracked_bar_instance_uuid, bar_outdated),
+        #         ...
+        #     ],
+        #     ...
+        # }
+        pre_outdated_map = {}
+        tracked_instance_classes_map = {}
+        # for o in outdated:
+        for o in itertools.chain.from_iterable(outdated.values()):
+            # Not clear how it can be None
+            instance = instances.get(o.tracked_resource.watcher_ri)
+            if instance is None:
+                LOG.error(
+                    "Instance(%s) %s not found for outdated tracked resource",
+                    kind,
+                    o.tracked_resource.watcher_ri,
+                )
+                continue
+
+            container = pre_outdated_map.setdefault(
+                (instance, o.tracked_resource.watcher), []
+            )
+
+            # The tracked instances that have been changed
+            tracked_instance_class = instance.tracked_instance_model(
+                o.tracked_resource.target_kind
+            )
+
+            # Save all instances (UUIDs) related to this class
+            # This is used to fetch all instances of this class.
+            # {<tracked_instance_class>: [uuid1, uuid2, ...]}
+            target_uuid = o.tracked_resource.target.uuid
+            tracked_instance_classes_map.setdefault(
+                tracked_instance_class, []
+            ).append(target_uuid)
+
+            container.append((tracked_instance_class, target_uuid, o))
+
+        # Fetch all instances of the tracked instance classes
+        instances_by_class = {}
+        for _class, uuids in tracked_instance_classes_map.items():
+            _instances = _class.objects.get_all(
+                filters={"uuid": dm_filters.In(uuids)}
+            )
+            instances_by_class[_class] = {i.uuid: i for i in _instances}
+
+        # Prepare final structure for actualization
+        # {
+        #     (watcher_instance, watcher_target_resource):
+        #         (
+        #           [foo_tracked_instance, bar_tracked_instance, ...],
+        #           [foo_outdated, bar_outdated, ...]
+        #         ),
+        #         ...
+        #  }
+        outdated_map = {}
+        for outdated_key, tracked_helpers in pre_outdated_map.items():
+            outdated_map[outdated_key] = ([], [])
+            for _class, uuid, o in tracked_helpers:
+                instance = instances_by_class[_class].get(uuid)
+                if instance is None:
+                    LOG.error(
+                        "Instance(%s) %s not found for outdated tracked resource",
+                        _class.__name__,
+                        uuid,
+                    )
+                    continue
+                outdated_map[outdated_key][0].append(instance)
+                outdated_map[outdated_key][1].append(o)
+
+        # Actualize instances with outdated tracked instances
+        for (instance, tgt_resource), tracked in outdated_map.items():
+            tracked_instances, tracked_outdated = tracked
+            try:
+                new_tracked_ris = (
+                    self._actualize_instance_with_outdated_tracked(
+                        instance,
+                        tgt_resource,
+                        tracked_instances,
+                    )
+                )
+
+                # Actualize tracked resources
+                self._actualize_tracked_resources(
+                    instance,
+                    tracked_resource_map.get(tgt_resource.ri, []),
+                    new_tracked_ris,
+                )
+
+                # Mark outdated resources as actualized
+                for t in tracked_outdated:
+                    t.mark_as_actualized()
+            except Exception:
+                LOG.exception(
+                    "Error actualizing outdated tracked instance(%s) %s",
+                    kind,
+                    instance.uuid,
+                )
+
     # Misc methods
 
+    def _model_iteration(self) -> None:
+        """Perfrom iteration for the particular instance model."""
+        try:
+            self._actualize_new_instances()
+        except Exception:
+            LOG.exception(
+                "Error actualizing new instances(%s)",
+                self._instance_model.__name__,
+            )
+
+        try:
+            self._actualize_deleted_instances()
+        except Exception:
+            LOG.exception(
+                "Error actualizing deleted instances(%s)",
+                self._instance_model.__name__,
+            )
+
+        try:
+            self._actualize_updated_instances()
+        except Exception:
+            LOG.exception(
+                "Error actualizing updated instances(%s)",
+                self._instance_model.__name__,
+            )
+
+        try:
+            self._actualize_outdated_instances()
+        except Exception:
+            LOG.exception(
+                "Error actualizing outdated instances(%s)",
+                self._instance_model.__name__,
+            )
+
+        if self.track_outdated_master_hash_instances():
+            try:
+                self._actualize_outdated_master_hash_instances()
+            except Exception:
+                LOG.exception(
+                    "Error actualizing outdated master hash instances(%s)",
+                    self._instance_model.__name__,
+                )
+
+        if self.track_outdated_master_full_hash_instances():
+            try:
+                self._actualize_outdated_master_full_hash_instances()
+            except Exception:
+                LOG.exception(
+                    "Error actualizing outdated master full "
+                    "hash instances(%s)",
+                    self._instance_model.__name__,
+                )
+
+        if self._instance_model._has_model_tracked_instances():
+            try:
+                self._actualize_instances_with_outdated_tracked()
+            except Exception:
+                LOG.exception(
+                    "Error actualizing instances with outdated "
+                    "tracked instances"
+                )
+
+    # BasicService interface
+
+    def _setup(self):
+        """Setup the service."""
+        self.register_ua_service()
+
     def _iteration(self) -> None:
+        """Service iteration."""
         with contexts.Context().session_manager():
-            try:
-                self._actualize_new_instances()
-            except Exception:
-                LOG.exception("Error actualizing new instances")
+            self._iteration_context = self.prepare_iteration()
+            self._model_iteration()
 
-            try:
-                self._actualize_deleted_instances()
-            except Exception:
-                LOG.exception("Error actualizing deleted instances")
 
-            try:
-                self._actualize_updated_instances()
-            except Exception:
-                LOG.exception("Error actualizing updated instances")
+class CollectionUniversalBuilderService(UniversalBuilderService):
+    """The universal builder service for collections."""
 
-            try:
-                self._actualize_outdated_instances()
-            except Exception:
-                LOG.exception("Error actualizing outdated instances")
+    def __init__(
+        self,
+        instance_models: tp.Collection[type[models.InstanceMixin]],
+        service_spec: svc_common.UAServiceSpec | None = None,
+        iter_min_period: float = 3,
+        iter_pause: float = 0.1,
+    ):
+        if len(instance_models) == 0:
+            raise ValueError("The instance models collection is empty.")
 
-            if self.track_outdated_master_hash_instances():
-                try:
-                    self._actualize_outdated_master_hash_instances()
-                except Exception:
-                    LOG.exception(
-                        "Error actualizing outdated master hash instances"
-                    )
+        super().__init__(
+            # Just use the first instance model for the service.
+            instance_model=instance_models[0],
+            service_spec=service_spec,
+            iter_min_period=iter_min_period,
+            iter_pause=iter_pause,
+        )
 
-            if self.track_outdated_master_full_hash_instances():
-                try:
-                    self._actualize_outdated_master_full_hash_instances()
-                except Exception:
-                    LOG.exception(
-                        "Error actualizing outdated master full hash instances"
-                    )
+        self._instance_models = instance_models
+
+    def _iteration(self) -> None:
+        """Service iteration."""
+        context_ready = False
+
+        for instance_model in self._instance_models:
+            # Focus on the particular instance model.
+            self._instance_model = instance_model
+
+            with contexts.Context().session_manager():
+                # Prepare iteration context only once.
+                if not context_ready:
+                    self._iteration_context = self.prepare_iteration()
+                    context_ready = True
+
+                self._model_iteration()
+
+        # Reset the instance model.
+        self._instance_model = None

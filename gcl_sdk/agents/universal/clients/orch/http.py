@@ -74,6 +74,7 @@ class HttpOrchClient(base.AbstractOrchClient):
             data = {
                 "capabilities": agent.capabilities,
                 "facts": agent.facts,
+                "name": agent.name,
             }
 
             agent = self._status_api.agents.update(agent.uuid, **data)
