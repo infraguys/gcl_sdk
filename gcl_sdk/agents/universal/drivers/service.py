@@ -19,11 +19,6 @@ import os
 import logging
 import subprocess
 
-
-from restalchemy.dm import properties
-from restalchemy.dm import types as ra_types
-from restalchemy.dm import types_dynamic as ra_types_dyn
-
 from gcl_sdk.agents.universal.drivers import exceptions as driver_exc
 from gcl_sdk.agents.universal.drivers import meta
 from gcl_sdk.agents.universal import constants as c
