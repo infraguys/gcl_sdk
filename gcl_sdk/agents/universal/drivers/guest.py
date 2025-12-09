@@ -73,7 +73,8 @@ class GuestMachineMetaModel(meta.MetaDataPlaneModel):
 
     def dump_to_dp(self) -> None:
         """Apply the guest settings to the data plane."""
-        self._set_hostname(self.hostname)
+        if self.hostname:
+            self._set_hostname(self.hostname)
 
     def restore_from_dp(self) -> None:
         """Load the guest settings from the data plane."""
