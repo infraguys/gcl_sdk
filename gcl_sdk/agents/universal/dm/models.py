@@ -785,7 +785,10 @@ class TargetResourceSQLStorableMixin:
             return []
 
         return TargetResource.objects.get_all(
-            filters={"uuid": dm_filters.In(str(r["uuid"]) for r in response)},
+            filters={
+                "uuid": dm_filters.In(str(r["uuid"]) for r in response),
+                "kind": dm_filters.EQ(kind),
+            },
         )
 
 
