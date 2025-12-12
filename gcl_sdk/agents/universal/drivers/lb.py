@@ -34,7 +34,8 @@ BALANCE_MAPPING = {
     "roundrobin": "",
     "leastconn": "least_conn;",
 }
-NGINX_CONFIG_FILE = "/etc/nginx/conf.d/genesis_lb.conf"
+NGINX_L7_CONFIG_FILE = "/etc/nginx/conf.d/genesis_lb.conf"
+NGINX_L4_CONFIG_FILE = "/etc/nginx/genesis/l4.conf"
 NGINX_SSL_DIR = "/etc/nginx/ssl/"
 NGINX_USER = NGINX_GROUP = "www-data"
 # Drop all if not set by user, convenient default
@@ -90,14 +91,16 @@ class LB(lb_models.LB, meta.MetaDataPlaneModel):
             "backend_pools",
         }
 
-    def _gen_backends(self):
+    def _gen_backends(self, proto_lvl):
         upstreams = []
         for pid, pool in self.backend_pools.items():
             upstreams.append(
                 f"""\
 upstream {pid} {{
     {BALANCE_MAPPING[pool.get('balance', 'roundrobin')]}
+    zone {pid}_{proto_lvl} 64K;
     {'\n    '.join(f"    server {e['host']}:{e['port']} weight={e['weight']};" for e in pool['endpoints'] if e['kind'] == 'host')}
+    {'keepalive 2;' if proto_lvl == 'l7' else ''}
 }}
 """
             )
@@ -121,82 +124,124 @@ upstream {pid} {{
         return res
 
     def _gen_vhosts(self):
-        vhosts = []
+        vhosts_l4 = []
+        vhosts_l7 = []
         for v in self.vhosts:
             if len(v["routes"]) == 0:
                 continue
-            locations = [ROOT_LOCATION]
-            for rid, r in v["routes"].items():
-                c = r["cond"]
-
-                actions = []
-                for a in c["actions"]:
-                    if a["kind"] == "backend":
-                        actions.append(
-                            f"""\
-proxy_pass {a["protocol"]["kind"]}://{a["pool"]};"""
-                        )
-                        if (
-                            a["protocol"]["kind"] == "https"
-                            and a["protocol"]["verify"] is not True
-                        ):
-                            actions.append("proxy_ssl_verify off;")
-                        break
-                    elif a["kind"] == "redirect":
-                        actions.append(
-                            f"""\
-return {a["code"]} {a["url"]}$request_uri;"""
-                        )
-                        break
-                    elif a["kind"] == "local_dir":
-                        actions.append(
-                            f"""\
-alias {os.path.join(a['path'], '')};"""
-                        )
-                        break
-
-                loc = f"""
-    location {LOCATION_TYPE_MAPPING[c['kind']]} {c['value']} {{
-        {"\n        ".join(a for a in actions)}
-        {"\n        ".join(m for m in self._gen_modifiers(v, c, c['modifiers']))}
-    }}"""
-                if c["value"] == "/":
-                    # Replace default root location
-                    locations[0] = loc
-                else:
-                    locations.append(loc)
-
-            if v["proto"] == "https":
-                ssl_info = f"""
-    ssl_certificate      {NGINX_SSL_DIR}{v['uuid']}.crt;
-    ssl_certificate_key  {NGINX_SSL_DIR}{v['uuid']}.key;
-    ssl_protocols TLSv1 TLSv1.1 TLSv1.2;
-"""
+            if v["proto"].startswith("http"):
+                vhosts_l7.append(self._gen_vhost_l7(v))
             else:
-                ssl_info = ""
-            vhosts.append(
-                f"""\
+                vhosts_l4.append(self._gen_vhost_l4(v))
+        return vhosts_l4, vhosts_l7
+
+    def _gen_vhost_l4(self, v):
+        for r in v["routes"].values():
+            c = r["cond"]
+            return f"""\
 server {{
-    listen 0.0.0.0:{v['port']}{' ssl http2' if v['proto'] == 'https' else ''};
-    server_name {' '.join(v['domains'])};{ssl_info}
-    client_max_body_size 0;
-    proxy_http_version 1.1;
-    proxy_set_header Upgrade $http_upgrade;
-    proxy_set_header Connection "upgrade";
-    server_tokens off;
-    {('    \n').join(f"allow {ip};" for ip in c['allowed_ips'])}
-    deny all;
-    {"\n    ".join(locations)}
+listen 0.0.0.0:{v['port']} {v['proto']};
+{('    \n').join(f"allow {ip};" for ip in c['allowed_ips'])}
+deny all;
+proxy_pass {c["actions"][0]["pool"]};
 }}
 """
-            )
-        return vhosts
+        return ""
 
-    def _gen_file_content(self) -> str:
+    def _gen_file_content_l4(self, vhosts) -> str:
         return f"""\
-{"\n".join(b for b in self._gen_backends())}
+stream {{
+{"\n".join(b for b in self._gen_backends(proto_lvl="l4"))}
 
-{"\n".join(v for v in self._gen_vhosts())}
+{"\n".join(v for v in vhosts)}
+}}
+"""
+
+    def _gen_vhost_l7(self, v):
+        locations = [ROOT_LOCATION]
+        for r in v["routes"].values():
+            c = r["cond"]
+
+            actions = []
+            for a in c["actions"]:
+                if a["kind"] == "backend":
+                    actions.append(
+                        f"""\
+proxy_pass {a["protocol"]["kind"]}://{a["pool"]};"""
+                    )
+                    if (
+                        a["protocol"]["kind"] == "https"
+                        and a["protocol"]["verify"] is not True
+                    ):
+                        actions.append("proxy_ssl_verify off;")
+                    break
+                elif a["kind"] == "redirect":
+                    actions.append(
+                        f"""\
+return {a["code"]} {a["url"]}$request_uri;"""
+                    )
+                    break
+                elif a["kind"] == "local_dir":
+                    actions.append(
+                        f"""\
+alias {os.path.join(a['path'], '')};"""
+                    )
+                    break
+            # Upgrade + Connection headers must be inside location
+            loc = f"""
+location {LOCATION_TYPE_MAPPING[c['kind']]} {c['value']} {{
+    {"\n    ".join(a for a in actions)}
+    {"\n    ".join(m for m in self._gen_modifiers(v, c, c['modifiers']))}
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection $connection_upgrade;
+}}"""
+            if c["value"] == "/":
+                # Replace default root location
+                locations[0] = loc
+            else:
+                locations.append(loc)
+
+        if v["proto"] == "https":
+            ssl_info = f"""
+ssl_certificate      {NGINX_SSL_DIR}{v['uuid']}.crt;
+ssl_certificate_key  {NGINX_SSL_DIR}{v['uuid']}.key;
+ssl_protocols TLSv1 TLSv1.1 TLSv1.2;
+"""
+        else:
+            ssl_info = ""
+        return f"""\
+server {{
+listen 0.0.0.0:{v['port']}{' ssl http2' if v['proto'] == 'https' else ''};
+server_name {' '.join(v['domains'])};{ssl_info}
+{('    \n').join(f"allow {ip};" for ip in c['allowed_ips'])}
+deny all;
+{"\n    ".join(locations)}
+}}
+"""
+
+    def _gen_http_defaults(self) -> str:
+        return """\
+ssl_session_timeout 10m;
+ssl_session_cache shared:SSL:10m;
+gzip_proxied any;
+client_max_body_size 0;
+server_tokens off;
+
+map $http_upgrade $connection_upgrade {
+    default upgrade;
+    ''      close;
+}
+
+"""
+
+    def _gen_file_content_l7(self, vhosts) -> str:
+        return f"""\
+{self._gen_http_defaults()}
+
+{"\n".join(b for b in self._gen_backends(proto_lvl="l7"))}
+
+{"\n".join(v for v in vhosts)}
 """
 
     def _reload_or_restart_nginx(self):
@@ -206,8 +251,12 @@ server {{
             subprocess.check_call(["systemctl", "restart", "nginx"])
 
     def dump_to_dp(self) -> None:
-        with open(NGINX_CONFIG_FILE, "w") as f:
-            f.write(self._gen_file_content())
+        vhosts_l4, vhosts_l7 = self._gen_vhosts()
+        with open(NGINX_L4_CONFIG_FILE, "w") as f:
+            f.write(self._gen_file_content_l4(vhosts_l4))
+
+        with open(NGINX_L7_CONFIG_FILE, "w") as f:
+            f.write(self._gen_file_content_l7(vhosts_l7))
 
         for v in self.vhosts:
             if v["proto"] != "https":
@@ -245,8 +294,14 @@ server {{
                 obj={"uuid": str(self.uuid)}
             )
 
+        vhosts_l4, vhosts_l7 = self._gen_vhosts()
         # Force file validation
-        self._validate_file(NGINX_CONFIG_FILE, self._gen_file_content())
+        self._validate_file(
+            NGINX_L4_CONFIG_FILE, self._gen_file_content_l4(vhosts_l4)
+        )
+        self._validate_file(
+            NGINX_L7_CONFIG_FILE, self._gen_file_content_l7(vhosts_l7)
+        )
         for v in self.vhosts:
             if v["proto"] == "https":
                 self._validate_file(
@@ -263,7 +318,8 @@ server {{
             pass
 
     def delete_from_dp(self) -> None:
-        self._remove_file(NGINX_CONFIG_FILE)
+        self._remove_file(NGINX_L4_CONFIG_FILE)
+        self._remove_file(NGINX_L7_CONFIG_FILE)
 
         for v in self.vhosts:
             if v["proto"] == "https":
