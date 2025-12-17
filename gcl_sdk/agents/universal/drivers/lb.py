@@ -140,7 +140,7 @@ upstream {pid} {{
             c = r["cond"]
             return f"""\
 server {{
-listen 0.0.0.0:{v['port']} {v['proto']};
+listen 0.0.0.0:{v['port']}{f" {v['proto']}" if v['proto'] != 'tcp' else ""};
 {('    \n').join(f"allow {ip};" for ip in c['allowed_ips'])}
 deny all;
 proxy_pass {c["actions"][0]["pool"]};
