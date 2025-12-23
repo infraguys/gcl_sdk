@@ -15,17 +15,22 @@
 #    under the License.
 from __future__ import annotations
 
-import os
+import concurrent
 import logging
+import os
+import pathlib
 import shutil
 import subprocess
+import uuid
 
+import renameat2
+
+from gcl_sdk.agents.universal import constants
 from gcl_sdk.agents.universal.drivers import exceptions as driver_exc
 from gcl_sdk.agents.universal.drivers import meta
-from gcl_sdk.agents.universal import constants
+from gcl_sdk.agents.universal.storage import common as storage_common
 from gcl_sdk.infra import constants as ic
 from gcl_sdk.paas.dm import lb as lb_models
-
 
 LOG = logging.getLogger(__name__)
 
@@ -66,13 +71,33 @@ ADD_HEADERS_MAPPING = {
         )
     ),
 }
+DOWNLOAD_DIR = "/var/www/gc_downloaded/"
+DOWNLOAD_DIR_TMP = "/var/www/gc_downloaded_tmp/"
 
 
 def secure_opener(path, flags):
     return os.open(path, flags, 0o700)
 
 
+TPOOL = concurrent.futures.ThreadPoolExecutor(max_workers=10)
+
+
 class LB(lb_models.LB, meta.MetaDataPlaneModel):
+    META_PATH = os.path.join(constants.WORK_DIR, "lb_meta.json")
+
+    _download_dirs_futures = {}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._meta_file = self.META_PATH
+        self._common_storage = storage_common.JsonFileStorageSingleton(
+            self._meta_file
+        )
+        if "lb_driver_info" not in self._common_storage:
+            self._common_storage["lb_driver_info"] = {"download_dirs": {}}
+        self._download_dirs = self._common_storage["lb_driver_info"][
+            "download_dirs"
+        ]
 
     def get_meta_model_fields(self) -> set[str] | None:
         """Return a list of meta fields or None.
@@ -186,6 +211,11 @@ return {a["code"]} {a["url"]}$request_uri;"""
                         f"""\
 alias {os.path.join(a['path'], '')};"""
                     )
+                elif a["kind"] == "local_dir_download":
+                    actions.append(
+                        f"""\
+alias {os.path.join(DOWNLOAD_DIR, str(uuid.uuid5(uuid.NAMESPACE_URL, f"{v['uuid']}{c['kind']}{c['value']}")), '')};"""
+                    )
                     break
             # Upgrade + Connection headers must be inside location
             loc = f"""
@@ -246,6 +276,159 @@ map $http_upgrade $connection_upgrade {
 {"\n".join(v for v in vhosts)}
 """
 
+    # We use tmp dir existence as a fact to unfinished download, so clean insides only
+    def _clean_dir_insides(self, path):
+        tmpdir = os.path.join(DOWNLOAD_DIR_TMP, path)
+        for filename in os.listdir(tmpdir):
+            file_path = os.path.join(tmpdir, filename)
+            if os.path.isdir(file_path) and not os.path.islink(file_path):
+                shutil.rmtree(file_path)
+            else:
+                os.unlink(file_path)
+
+    def _clean_path(self, path):
+        self._purge_path_only(path)
+        self._download_dirs.pop(path, None)
+        return True
+
+    def _purge_path_only(self, dir_name):
+        LOG.info("_purge_dir: %s", dir_name)
+        tmpdir = os.path.join(DOWNLOAD_DIR_TMP, dir_name)
+        tgtdir = os.path.join(DOWNLOAD_DIR, dir_name)
+        if os.path.exists(tmpdir):
+            shutil.rmtree(tmpdir)
+        if os.path.exists(tgtdir):
+            shutil.rmtree(tgtdir)
+
+    def _clean_external_symlinks(self, root_dir):
+        # Basic safety from path traversal via symlinks
+        root = pathlib.Path(root_dir).resolve()
+        for path in root.rglob("*"):
+            if path.is_symlink():
+                try:
+                    target_path = path.resolve()
+                    if not target_path.is_relative_to(root):
+                        path.unlink()
+                except (OSError, RuntimeError):
+                    # Handles broken links or infinite loops
+                    path.unlink()
+
+    def _download_url(self, path, url):
+        LOG.info("_download_url: %s %s", path, url)
+        key = "--zstd"
+        if url.endswith(".gz"):
+            key = "-z"
+        tmpdir = os.path.join(DOWNLOAD_DIR_TMP, path)
+        if os.path.exists(tmpdir):
+            self._clean_dir_insides(tmpdir)
+        else:
+            os.makedirs(tmpdir, mode=0o775, exist_ok=True)
+        shutil.chown(tmpdir, user="www-data", group="www-data")
+        tgtdir = os.path.join(DOWNLOAD_DIR, path)
+        wgetps = subprocess.Popen(
+            ("wget", "-O", "-", "--timeout=60", url),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        tarps = subprocess.Popen(
+            (
+                "sudo",
+                "-u",
+                "www-data",
+                "tar",
+                key,
+                "--no-same-owner",
+                "-xvf",
+                "-",
+                "-C",
+                tmpdir,
+            ),
+            stdin=wgetps.stdout,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
+        )
+        tar_rc = tarps.wait()
+        wget_rc = wgetps.wait()
+        if tar_rc != 0 or wget_rc != 0:
+            wgetps.kill()
+            tarps.kill()
+            return f"wget({wget_rc}):{wgetps.stderr.read()}\ntar({tar_rc}):{tarps.stderr.read()}"
+        self._clean_external_symlinks(tmpdir)
+        if os.path.exists(tgtdir):
+            renameat2.exchange(tmpdir, tgtdir)
+            shutil.rmtree(tmpdir)
+        else:
+            os.rename(tmpdir, tgtdir)
+        # Update url in persistent storage
+        self._download_dirs[path] = url
+        return True
+
+    def _get_target_paths(self):
+        target_paths = {}
+        for v in self.vhosts:
+            if len(v["routes"]) == 0:
+                continue
+            if not v["proto"].startswith("http"):
+                continue
+            for r in v["routes"].values():
+                c = r["cond"]
+                for a in c["actions"]:
+                    if a["kind"] != "local_dir_download":
+                        continue
+                    target_paths[
+                        str(
+                            uuid.uuid5(
+                                uuid.NAMESPACE_URL,
+                                f"{v['uuid']}{c['kind']}{c['value']}",
+                            )
+                        )
+                    ] = a["url"]
+        return target_paths
+
+    def _actualize_downloaded_dirs(self):
+        target_paths = self._get_target_paths()
+        target_paths_set = set(target_paths.keys())
+        # Download new dirs/Update already existing with new link
+        for p, u in target_paths.items():
+            # Already in progress, skip
+            if p in self._download_dirs_futures:
+                continue
+            if self._download_dirs.get(p) != u:
+                # Url changed, get new one
+                self._download_dirs_futures[p] = TPOOL.submit(
+                    self._download_url, p, u
+                )
+            elif (
+                os.path.isdir(os.path.join(DOWNLOAD_DIR, p))
+                and not os.path.isdir(os.path.join(DOWNLOAD_DIR_TMP, p))
+                and p not in self._download_dirs
+            ):
+                # already exists and ok, just track it
+                self._download_dirs[p] = u
+            else:
+                self._download_dirs_futures[p] = TPOOL.submit(
+                    self._download_url, p, u
+                )
+        # Clean orphan dirs
+        actual_ondisk_dirs = set(
+            entry.name for entry in os.scandir(DOWNLOAD_DIR) if entry.is_dir()
+        )
+        for d in actual_ondisk_dirs - target_paths_set:
+            self._download_dirs_futures[d] = TPOOL.submit(self._clean_path, d)
+
+    def _validate_downloaded_dirs(self):
+        for p, u in self._get_target_paths().items():
+            # If TMP dir exists - it's a signal that we didn't finish our job
+            #  before (for ex. when url was updated)
+            if (
+                not os.path.isdir(os.path.join(DOWNLOAD_DIR, p))
+                or os.path.isdir(os.path.join(DOWNLOAD_DIR_TMP, p))
+                or self._download_dirs.get(p, None) != u
+            ):
+                self._download_dirs.pop(p, None)
+                return False
+        return True
+
     def _reload_or_restart_nginx(self):
         try:
             subprocess.check_call(["systemctl", "reload", "nginx"])
@@ -272,8 +455,9 @@ map $http_upgrade $connection_upgrade {
                 f.write(v["cert"]["key"])
             shutil.chown(key_name, user=NGINX_USER, group=NGINX_GROUP)
 
+        self._actualize_downloaded_dirs()
+
         self._reload_or_restart_nginx()
-        self.status = ic.InstanceStatus.ACTIVE.value
 
     def _validate_file(self, path, expected_content):
         try:
@@ -288,9 +472,9 @@ map $http_upgrade $connection_upgrade {
             )
 
     def restore_from_dp(self) -> None:
+        self.status = ic.InstanceStatus.IN_PROGRESS.value
         try:
             subprocess.check_output(["systemctl", "is-active", "nginx"])
-            self.status = ic.InstanceStatus.ACTIVE.value
         except subprocess.CalledProcessError:
             raise driver_exc.InvalidDataPlaneObjectError(
                 obj={"uuid": str(self.uuid)}
@@ -312,6 +496,41 @@ map $http_upgrade $connection_upgrade {
                 self._validate_file(
                     f"{NGINX_SSL_DIR}{v['uuid']}.key", v["cert"]["key"]
                 )
+        for path, future in self._download_dirs_futures.copy().items():
+            try:
+                if (ret := future.result(timeout=0)) is not True:
+                    LOG.error(
+                        "Future for %s failed with errors:\n%s\n",
+                        self._download_dirs[path],
+                        ret,
+                    )
+                    self.status = ic.InstanceStatus.ERROR.value
+                    self._download_dirs_futures.pop(path, None)
+                    raise driver_exc.InvalidDataPlaneObjectError(
+                        obj={"uuid": str(self.uuid)}
+                    )
+            except TimeoutError:
+                # Future is not finished yet
+                continue
+            except Exception as e:
+                # Future got exception
+                LOG.error(
+                    "Future for %s failed with exception:\n%s",
+                    self._download_dirs[path],
+                    e,
+                )
+                self.status = ic.InstanceStatus.ERROR.value
+                self._download_dirs_futures.pop(path, None)
+                raise driver_exc.InvalidDataPlaneObjectError(
+                    obj={"uuid": str(self.uuid)}
+                )
+            self._download_dirs_futures.pop(path, None)
+        if not self._validate_downloaded_dirs():
+            raise driver_exc.InvalidDataPlaneObjectError(
+                obj={"uuid": str(self.uuid)}
+            )
+
+        self.status = ic.InstanceStatus.ACTIVE.value
 
     def _remove_file(self, path):
         try:
@@ -340,4 +559,6 @@ class LBCapabilityDriver(meta.MetaFileStorageAgentDriver):
     __model_map__ = {LB_TARGET_KIND: LB}
 
     def __init__(self, *args, **kwargs) -> None:
+        os.makedirs(DOWNLOAD_DIR, exist_ok=True)
+        os.makedirs(DOWNLOAD_DIR_TMP, exist_ok=True)
         super().__init__(*args, meta_file=self.META_PATH, **kwargs)
