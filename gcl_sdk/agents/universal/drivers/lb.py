@@ -213,11 +213,16 @@ return {a["code"]} {a["url"]}$request_uri;"""
                         f"""\
 alias {os.path.join(a['path'], '')};"""
                     )
+                    if a.get("is_spa"):
+                        actions.append("try_files $uri $uri/ /index.html;")
+                    break
                 elif a["kind"] == "local_dir_download":
                     actions.append(
                         f"""\
 alias {os.path.join(DOWNLOAD_DIR, str(uuid.uuid5(uuid.NAMESPACE_URL, f"{v['uuid']}{c['kind']}{c['value']}")), '')};"""
                     )
+                    if a.get("is_spa"):
+                        actions.append("try_files $uri $uri/ /index.html;")
                     break
             # Upgrade + Connection headers must be inside location
             loc = f"""
