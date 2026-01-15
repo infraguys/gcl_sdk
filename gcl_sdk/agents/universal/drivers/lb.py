@@ -90,8 +90,10 @@ class LB(lb_models.LB, meta.MetaDataPlaneModel):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._meta_file = self.META_PATH
-        self._common_storage = storage_common.JsonFileStorageSingleton(
-            self._meta_file
+        self._common_storage = (
+            storage_common.JsonFileStorageSingleton.get_instance(
+                self._meta_file
+            )
         )
         if "lb_driver_info" not in self._common_storage:
             self._common_storage["lb_driver_info"] = {"download_dirs": {}}

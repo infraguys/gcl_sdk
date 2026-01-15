@@ -31,7 +31,9 @@ class TargetFieldsFileStorage(base.AbstractTargetFieldsStorage):
     """
 
     def __init__(self, storage_path: str) -> None:
-        self._storage = common.JsonFileStorageSingleton(storage_path)
+        self._storage = common.JsonFileStorageSingleton.get_instance(
+            storage_path
+        )
 
     def get(self, kind: str, uuid: sys_uuid.UUID) -> base.TargetFieldItem:
         """Get the target fields item from the storage."""
