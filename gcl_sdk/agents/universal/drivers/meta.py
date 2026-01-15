@@ -159,12 +159,19 @@ class MetaFileStorageAgentDriver(base.AbstractCapabilityDriver):
             self._meta_file
         )
 
-        # Check the model map is in the correct format
-        for cap_models in self.__model_map__.values():
-            if not issubclass(cap_models, MetaDataPlaneModel):
+        for cap_name, cap_model in self.__model_map__.items():
+            # Check the model map is in the correct format
+            if not issubclass(cap_model, MetaDataPlaneModel):
                 raise TypeError(
-                    f"Model {cap_models} is not a MetaDataPlaneModel"
+                    f"Model {cap_model} is not a MetaDataPlaneModel"
                 )
+
+            if (
+                cap_name not in self._storage
+                # Reset storage with new format
+                or "resources" not in self._storage.get(cap_name, {})
+            ):
+                self._storage[cap_name] = {"resources": {}}
 
     def _load_from_meta(self, capability: str) -> list[MetaDataPlaneModel]:
         """Load the resources from the meta file.
@@ -172,13 +179,6 @@ class MetaFileStorageAgentDriver(base.AbstractCapabilityDriver):
         It loads only the `meta` part that cannot be fetched from the data plane
         or lightweight models.
         """
-
-        if (
-            capability not in self._storage
-            # Reset storage with new format
-            or "resources" not in self._storage.get(capability, {})
-        ):
-            self._storage[capability] = {"resources": {}}
         capstor = self._storage[capability]["resources"]
 
         cap_model = self.__model_map__[capability]

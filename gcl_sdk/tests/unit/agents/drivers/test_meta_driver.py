@@ -91,7 +91,7 @@ class TestMetaDriver:
         drv = _Driver(meta_file=str(meta_file))
 
         # Initially empty storage
-        assert drv._storage == {}
+        assert drv._storage == {"dummy": {"resources": {}}}
 
         # Create one resource to populate meta storage
         res = _make_resource("dummy")
