@@ -321,7 +321,7 @@ map $http_upgrade $connection_upgrade {
                     path.unlink()
 
     def _download_url(self, path, url):
-        LOG.info("_download_url: %s %s", path, url)
+        LOG.info("_download_url start: %s %s", path, url)
         key = "--zstd"
         if url.endswith(".gz"):
             key = "-z"
@@ -368,6 +368,7 @@ map $http_upgrade $connection_upgrade {
             os.rename(tmpdir, tgtdir)
         # Update url in persistent storage
         self._download_dirs[path] = url
+        LOG.info("_download_url finish: %s %s", path, url)
         return True
 
     def _get_target_paths(self):
@@ -405,12 +406,10 @@ map $http_upgrade $connection_upgrade {
                 self._download_dirs_futures[p] = TPOOL.submit(
                     self._download_url, p, u
                 )
-            elif (
-                os.path.isdir(os.path.join(DOWNLOAD_DIR, p))
-                and not os.path.isdir(os.path.join(DOWNLOAD_DIR_TMP, p))
-                and p not in self._download_dirs
-            ):
-                # already exists and ok, just track it
+            elif os.path.isdir(
+                os.path.join(DOWNLOAD_DIR, p)
+            ) and not os.path.isdir(os.path.join(DOWNLOAD_DIR_TMP, p)):
+                # already exists and "ok", just track it
                 self._download_dirs[p] = u
             else:
                 self._download_dirs_futures[p] = TPOOL.submit(
