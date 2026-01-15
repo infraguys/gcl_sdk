@@ -25,18 +25,8 @@ class JsonFileStorageSingleton(dict):
     _instances = {}
     _lock = threading.Lock()
 
-    def __new__(cls, storage_path: str):
-        if storage_path not in cls._instances:
-            with cls._lock:
-                if storage_path not in cls._instances:
-                    cls._instances[storage_path] = super(
-                        JsonFileStorageSingleton, cls
-                    ).__new__(cls)
-        return cls._instances[storage_path]
-
     def __init__(self, storage_path: str):
         self._storage_path = Path(storage_path)
-
         super().__init__()
         self.load()
 
@@ -63,3 +53,13 @@ class JsonFileStorageSingleton(dict):
         with open(tmp_file, "w") as f:
             json.dump(self, f, indent=2)
         os.replace(tmp_file, self._storage_path)
+
+    @classmethod
+    def get_instance(cls, storage_path: str) -> "JsonFileStorageSingleton":
+        """Get or create a singleton instance for the given storage path."""
+        if storage_path in cls._instances:
+            return cls._instances[storage_path]
+        with cls._lock:
+            if storage_path not in cls._instances:
+                cls._instances[storage_path] = cls(storage_path)
+            return cls._instances[storage_path]

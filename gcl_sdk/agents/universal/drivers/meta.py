@@ -155,7 +155,7 @@ class MetaFileStorageAgentDriver(base.AbstractCapabilityDriver):
     def __init__(self, *args, meta_file: str, **kwargs):
         super().__init__()
         self._meta_file = meta_file
-        self._storage = storage_common.JsonFileStorageSingleton(
+        self._storage = storage_common.JsonFileStorageSingleton.get_instance(
             self._meta_file
         )
 
