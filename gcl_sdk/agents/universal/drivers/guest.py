@@ -26,7 +26,6 @@ from restalchemy.dm import types_network
 from gcl_sdk.agents.universal.drivers import meta
 from gcl_sdk.agents.universal import constants as c
 
-
 LOG = logging.getLogger(__name__)
 GUEST_MACHINE_KIND = "guest_machine"
 

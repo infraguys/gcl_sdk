@@ -26,7 +26,6 @@ from gcl_sdk.agents.universal.dm import models
 from gcl_sdk.tests.functional import utils as test_utils
 from gcl_sdk.tests.functional import conftest
 
-
 CONF = cfg.CONF
 
 

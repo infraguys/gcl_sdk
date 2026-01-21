@@ -16,7 +16,6 @@
 import os
 import enum
 
-
 GENESIS_WORK_DIR = "/var/lib/genesis"
 WORK_DIR = "/var/lib/genesis/universal_agent/"
 PAYLOAD_PATH = os.path.join(WORK_DIR, "payload.json")

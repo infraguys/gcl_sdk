@@ -36,7 +36,6 @@ from restalchemy.storage.sql import filters as sql_filters
 from gcl_sdk.agents.universal import utils
 from gcl_sdk.agents.universal import constants as c
 
-
 LOG = logging.getLogger(__name__)
 
 

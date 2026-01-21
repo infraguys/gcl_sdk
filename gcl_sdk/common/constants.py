@@ -16,7 +16,6 @@
 
 import enum
 
-
 GLOBAL_SERVICE_NAME = "gcl_sdk"
 DEF_SQL_LIMIT = 100
 
