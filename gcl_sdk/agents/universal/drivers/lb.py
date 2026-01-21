@@ -121,16 +121,14 @@ class LB(lb_models.LB, meta.MetaDataPlaneModel):
     def _gen_backends(self, proto_lvl):
         upstreams = []
         for pid, pool in self.backend_pools.items():
-            upstreams.append(
-                f"""\
+            upstreams.append(f"""\
 upstream {pid} {{
     {BALANCE_MAPPING[pool.get('balance', 'roundrobin')]}
     zone {pid}_{proto_lvl} 64K;
     {'\n    '.join(f"    server {e['host']}:{e['port']} weight={e['weight']};" for e in pool['endpoints'] if e['kind'] == 'host')}
     {'keepalive 2;' if proto_lvl == 'l7' else ''}
 }}
-"""
-            )
+""")
         return upstreams
 
     def _gen_modifiers(self, vhost, route, modifiers):
@@ -192,10 +190,8 @@ stream {{
             actions = []
             for a in c["actions"]:
                 if a["kind"] == "backend":
-                    actions.append(
-                        f"""\
-proxy_pass {a["protocol"]["kind"]}://{a["pool"]};"""
-                    )
+                    actions.append(f"""\
+proxy_pass {a["protocol"]["kind"]}://{a["pool"]};""")
                     if (
                         a["protocol"]["kind"] == "https"
                         and a["protocol"]["verify"] is not True
@@ -203,16 +199,12 @@ proxy_pass {a["protocol"]["kind"]}://{a["pool"]};"""
                         actions.append("proxy_ssl_verify off;")
                     break
                 elif a["kind"] == "redirect":
-                    actions.append(
-                        f"""\
-return {a["code"]} {a["url"]}$request_uri;"""
-                    )
+                    actions.append(f"""\
+return {a["code"]} {a["url"]}$request_uri;""")
                     break
                 elif a["kind"] == "local_dir":
-                    actions.append(
-                        f"""\
-alias {os.path.join(a['path'], '')};"""
-                    )
+                    actions.append(f"""\
+alias {os.path.join(a['path'], '')};""")
                     if a.get("is_spa"):
                         actions.append("try_files $uri $uri/ /index.html;")
                     break

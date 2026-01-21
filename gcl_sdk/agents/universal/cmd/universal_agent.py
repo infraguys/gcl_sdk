@@ -34,7 +34,6 @@ from gcl_sdk.agents.universal import constants as c
 from gcl_sdk.agents.universal import utils as ua_utils
 from gcl_sdk.agents.universal.clients.orch import http as orch
 
-
 DOMAIN = "universal_agent"
 
 

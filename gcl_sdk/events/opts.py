@@ -19,7 +19,6 @@ from oslo_config import cfg
 from gcl_sdk.events import clients
 from gcl_sdk.events import constants as event_c
 
-
 CONF = cfg.CONF
 
 

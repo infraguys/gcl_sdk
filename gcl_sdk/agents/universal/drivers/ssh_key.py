@@ -28,7 +28,6 @@ from gcl_sdk.agents.universal.drivers import meta
 from gcl_sdk.agents.universal.drivers import exceptions
 from gcl_sdk.agents.universal import constants as c
 
-
 LOG = logging.getLogger(__name__)
 AUTHORIZED_KEYS_PATH = ".ssh/authorized_keys"
 SSH_KEY_TARGET_KIND = "ssh_key_target"

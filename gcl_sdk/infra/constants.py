@@ -16,7 +16,6 @@
 
 import enum
 
-
 DEF_ROOT_DISK_SIZE = 10
 
 
