@@ -21,7 +21,6 @@ import typing as tp
 from gcl_sdk.agents.universal.dm import models as ua_models
 from gcl_sdk.agents.universal.services import builder
 
-
 LOG = logging.getLogger(__name__)
 
 

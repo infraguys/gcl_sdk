@@ -25,7 +25,6 @@ from restalchemy.storage.sql import engines
 from restalchemy.common import config_opts as ra_config_opts
 from gcl_sdk.agents.universal.services import scheduler
 
-
 DOMAIN = "universal_agent_scheduler"
 
 svc_opts = [

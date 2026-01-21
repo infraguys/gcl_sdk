@@ -25,7 +25,6 @@ from gcl_looper.services import basic as looper_basic
 from gcl_sdk.agents.universal.dm import models
 from gcl_sdk.agents.universal import constants as c
 
-
 LOG = logging.getLogger(__name__)
 
 

@@ -29,7 +29,6 @@ import yaml
 from gcl_sdk.events import constants as event_c
 from gcl_sdk.events.dm import models
 
-
 CONF = cfg.CONF
 
 

@@ -25,7 +25,6 @@ from gcl_sdk.agents.universal import constants as c
 from gcl_sdk.infra import constants as ic
 from gcl_sdk.paas.dm import services as s_models
 
-
 LOG = logging.getLogger(__name__)
 SERVICE_TARGET_KIND = "service_agent_node"
 SERVICES_DIR = "/etc/systemd/system/"

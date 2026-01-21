@@ -33,7 +33,6 @@ from gcl_sdk.agents.universal.services import common as svc_common
 from gcl_sdk.agents.universal.dm import models
 from gcl_sdk.agents.universal import constants as ua_c
 
-
 LOG = logging.getLogger(__name__)
 
 
