@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import concurrent
+import glob
 import logging
 import os
 import pathlib
@@ -74,9 +75,50 @@ ADD_HEADERS_MAPPING = {
 DOWNLOAD_DIR = "/var/www/gc_downloaded/"
 DOWNLOAD_DIR_TMP = "/var/www/gc_downloaded_tmp/"
 
+SYSTEMD_TEMPLATE = """\
+[Unit]
+Description=Genesis Tunnel service for %i
+After=network.target
+
+[Service]
+ExecStart=/var/lib/genesis/tunnels/%i.sh
+RestartSec=5
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+"""
+SYSTEMD_TMPL_PATH = "/etc/systemd/system/genesis-tunnel@.service"
+
+TUNNEL_SCRIPT_PATH = "/var/lib/genesis/tunnels/"
+
+TUNNEL_SCRIPT_TEMPLATE = """\
+#!/bin/bash
+set -e
+
+MODE={mode}
+
+
+COMMAND="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ServerAliveInterval=20 -o ServerAliveCountMax=3 -o IdentitiesOnly=yes -F /dev/null {ssh_user}@{ssh_host} -p {ssh_port} -i /var/lib/genesis/tunnels/{name}.key"
+
+if [[ "$MODE" == "tcp" ]]; then
+    $COMMAND -N -T -R 0.0.0.0:{port}:0.0.0.0:{port}
+fi;
+
+if [[ "$MODE" == "udp" ]]; then
+    $COMMAND -R 0.0.0.0:{port}:0.0.0.0:{port} socat udp-listen\\:{port},fork,reuseaddr tcp\\:0.0.0.0:{port} &
+    socat tcp-listen:{port},fork,reuseaddr udp:0.0.0.0:{port} &
+    wait -n
+fi;
+"""
+
 
 def secure_opener(path, flags):
     return os.open(path, flags, 0o700)
+
+
+def executable_opener(path, flags):
+    return os.open(path, flags, 0o755)
 
 
 TPOOL = concurrent.futures.ThreadPoolExecutor(max_workers=10)
@@ -151,14 +193,23 @@ upstream {pid} {{
     def _gen_vhosts(self):
         vhosts_l4 = []
         vhosts_l7 = []
+        ext_sources = {}
         for v in self.vhosts:
             if len(v["routes"]) == 0:
                 continue
             if v["proto"].startswith("http"):
                 vhosts_l7.append(self._gen_vhost_l7(v))
+                proto = "tcp"
             else:
                 vhosts_l4.append(self._gen_vhost_l4(v))
-        return vhosts_l4, vhosts_l7
+                proto = "udp"
+            for ext_source in v.get("ext_sources", []):
+                e = ext_source.copy()
+                e["lport"] = v["port"]
+                e["lproto"] = proto
+                ext_sources[f"{e['host']}_{e['lport']}_{e['lproto']}"] = e
+
+        return vhosts_l4, vhosts_l7, ext_sources
 
     def _gen_vhost_l4(self, v):
         for r in v["routes"].values():
@@ -434,7 +485,7 @@ map $http_upgrade $connection_upgrade {
             subprocess.check_call(["systemctl", "restart", "nginx"])
 
     def dump_to_dp(self) -> None:
-        vhosts_l4, vhosts_l7 = self._gen_vhosts()
+        vhosts_l4, vhosts_l7, ext_sources = self._gen_vhosts()
         with open(NGINX_L4_CONFIG_FILE, "w") as f:
             f.write(self._gen_file_content_l4(vhosts_l4))
 
@@ -468,6 +519,34 @@ map $http_upgrade $connection_upgrade {
 
         self._reload_or_restart_nginx()
 
+        # external sources
+        for n, e in ext_sources.items():
+            with open(
+                os.path.join(TUNNEL_SCRIPT_PATH, f"{n}.sh"),
+                "w",
+                opener=executable_opener,
+            ) as f:
+                f.write(
+                    TUNNEL_SCRIPT_TEMPLATE.format(
+                        name=n,
+                        mode=e["lproto"],
+                        ssh_user=e["user"],
+                        ssh_port=e["port"],
+                        ssh_host=e["host"],
+                        port=e["lport"],
+                    )
+                )
+            with open(
+                os.path.join(TUNNEL_SCRIPT_PATH, f"{n}.key"),
+                "w",
+                opener=secure_opener,
+            ) as f:
+                f.write(e["private_key"])
+            subprocess.check_call(
+                ["systemctl", "enable", "--now", f"genesis-tunnel@{n}"]
+            )
+        self._remove_external_sources(ext_sources)
+
     def _validate_file(self, path, expected_content):
         try:
             with open(path, "r") as f:
@@ -489,7 +568,7 @@ map $http_upgrade $connection_upgrade {
                 obj={"uuid": str(self.uuid)}
             )
 
-        vhosts_l4, vhosts_l7 = self._gen_vhosts()
+        vhosts_l4, vhosts_l7, ext_sources = self._gen_vhosts()
         # Force file validation
         self._validate_file(
             NGINX_L4_CONFIG_FILE, self._gen_file_content_l4(vhosts_l4)
@@ -539,6 +618,30 @@ map $http_upgrade $connection_upgrade {
                 obj={"uuid": str(self.uuid)}
             )
 
+        for n, e in ext_sources.items():
+            self._validate_file(
+                os.path.join(TUNNEL_SCRIPT_PATH, f"{n}.sh"),
+                TUNNEL_SCRIPT_TEMPLATE.format(
+                    name=n,
+                    mode=e["lproto"],
+                    ssh_user=e["user"],
+                    ssh_port=e["port"],
+                    ssh_host=e["host"],
+                    port=e["lport"],
+                ),
+            )
+            self._validate_file(
+                os.path.join(TUNNEL_SCRIPT_PATH, f"{n}.key"), e["private_key"]
+            )
+            try:
+                subprocess.check_output(
+                    ["systemctl", "is-active", f"genesis-tunnel@{n}"]
+                )
+            except subprocess.CalledProcessError:
+                raise driver_exc.InvalidDataPlaneObjectError(
+                    obj={"uuid": str(self.uuid)}
+                )
+
         self.status = ic.InstanceStatus.ACTIVE.value
 
     def _remove_file(self, path):
@@ -546,6 +649,34 @@ map $http_upgrade $connection_upgrade {
             os.remove(path)
         except FileNotFoundError:
             pass
+
+    def _remove_external_sources(self, existing_sources=None):
+        existing_sources = existing_sources or {}
+        snames_on_disk = {
+            os.path.splitext(f)[0] for f in os.listdir(TUNNEL_SCRIPT_PATH)
+        }
+        snames_to_remove = snames_on_disk - set(existing_sources.keys())
+
+        for sname in snames_to_remove:
+            try:
+                subprocess.check_call(
+                    [
+                        "systemctl",
+                        "disable",
+                        "--now",
+                        f"genesis-tunnel@{sname}",
+                    ]
+                )
+            except subprocess.CalledProcessError:
+                pass
+
+            for ext in (".sh", ".key"):
+                try:
+                    os.remove(
+                        os.path.join(TUNNEL_SCRIPT_PATH, f"{sname}{ext}")
+                    )
+                except OSError:
+                    pass
 
     def delete_from_dp(self) -> None:
         self._remove_file(NGINX_L4_CONFIG_FILE)
@@ -559,6 +690,9 @@ map $http_upgrade $connection_upgrade {
         self._actualize_downloaded_dirs()
         self._reload_or_restart_nginx()
 
+        # external sources
+        self._remove_external_sources()
+
     def update_on_dp(self) -> None:
         self.dump_to_dp()
 
@@ -571,4 +705,8 @@ class LBCapabilityDriver(meta.MetaFileStorageAgentDriver):
     def __init__(self, *args, **kwargs) -> None:
         os.makedirs(DOWNLOAD_DIR, exist_ok=True)
         os.makedirs(DOWNLOAD_DIR_TMP, exist_ok=True)
+        os.makedirs(TUNNEL_SCRIPT_PATH, exist_ok=True)
+        with open(SYSTEMD_TMPL_PATH, mode="w") as f:
+            f.write(SYSTEMD_TEMPLATE)
+        subprocess.check_call(["systemctl", "daemon-reload"])
         super().__init__(*args, meta_file=self.META_PATH, **kwargs)
