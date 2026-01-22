@@ -233,8 +233,8 @@ location {LOCATION_TYPE_MAPPING[c['kind']]} {c['value']} {{
 
         if v["proto"] == "https":
             ssl_info = f"""
-ssl_certificate      {NGINX_SSL_DIR}{v['uuid']}.crt;
-ssl_certificate_key  {NGINX_SSL_DIR}{v['uuid']}.key;
+ssl_certificate      {NGINX_SSL_DIR}{v['uuid']}_genesis.crt;
+ssl_certificate_key  {NGINX_SSL_DIR}{v['uuid']}_genesis.key;
 ssl_protocols TLSv1.2 TLSv1.3;
 ssl_ecdh_curve X25519:prime256v1:secp384r1;
 ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384:DHE-RSA-CHACHA20-POLY1305;
@@ -441,17 +441,28 @@ map $http_upgrade $connection_upgrade {
         with open(NGINX_L7_CONFIG_FILE, "w") as f:
             f.write(self._gen_file_content_l7(vhosts_l7))
 
+        actual_keys = set()
         for v in self.vhosts:
             if v["proto"] != "https":
                 continue
-            crt_name = f"{NGINX_SSL_DIR}{v['uuid']}.crt"
+            crt_name = f"{NGINX_SSL_DIR}{v['uuid']}_genesis.crt"
             with open(crt_name, "w", opener=secure_opener) as f:
                 f.write(v["cert"]["crt"])
             shutil.chown(crt_name, user=NGINX_USER, group=NGINX_GROUP)
-            key_name = f"{NGINX_SSL_DIR}{v['uuid']}.key"
+            key_name = f"{NGINX_SSL_DIR}{v['uuid']}_genesis.key"
+            actual_keys.add(key_name)
             with open(key_name, "w", opener=secure_opener) as f:
                 f.write(v["cert"]["key"])
             shutil.chown(key_name, user=NGINX_USER, group=NGINX_GROUP)
+
+        # Clean up SSL certificate files that are not in use
+        for filepath in glob.glob(f"{NGINX_SSL_DIR}*_genesis.key"):
+            if filepath not in actual_keys:
+                try:
+                    os.remove(f"{os.path.splitext(filepath)[0]}.crt")
+                    os.remove(filepath)
+                except OSError:
+                    pass
 
         self._actualize_downloaded_dirs()
 
@@ -489,10 +500,10 @@ map $http_upgrade $connection_upgrade {
         for v in self.vhosts:
             if v["proto"] == "https":
                 self._validate_file(
-                    f"{NGINX_SSL_DIR}{v['uuid']}.crt", v["cert"]["crt"]
+                    f"{NGINX_SSL_DIR}{v['uuid']}_genesis.crt", v["cert"]["crt"]
                 )
                 self._validate_file(
-                    f"{NGINX_SSL_DIR}{v['uuid']}.key", v["cert"]["key"]
+                    f"{NGINX_SSL_DIR}{v['uuid']}_genesis.key", v["cert"]["key"]
                 )
         for path, future in self._download_dirs_futures.copy().items():
             try:
@@ -542,9 +553,10 @@ map $http_upgrade $connection_upgrade {
 
         for v in self.vhosts:
             if v["proto"] == "https":
-                self._remove_file(f"{NGINX_SSL_DIR}{v['uuid']}.crt")
-                self._remove_file(f"{NGINX_SSL_DIR}{v['uuid']}.key")
+                self._remove_file(f"{NGINX_SSL_DIR}{v['uuid']}_genesis.crt")
+                self._remove_file(f"{NGINX_SSL_DIR}{v['uuid']}_genesis.key")
 
+        self._actualize_downloaded_dirs()
         self._reload_or_restart_nginx()
 
     def update_on_dp(self) -> None:
