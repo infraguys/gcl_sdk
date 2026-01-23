@@ -19,6 +19,7 @@ import typing as tp
 import uuid as sys_uuid
 
 from restalchemy.dm import properties
+from restalchemy.dm import relationships
 from restalchemy.dm import types as ra_types
 from restalchemy.dm import types_network as ra_nettypes
 from restalchemy.dm import types_dynamic
@@ -26,6 +27,7 @@ from restalchemy.dm import models as ra_models
 
 from gcl_sdk.agents.universal.dm import models as ua_models
 from gcl_sdk.infra import constants as pc
+from gcl_sdk.infra import exceptions as infra_exc
 from gcl_sdk.common import types as common_types
 
 
@@ -694,6 +696,278 @@ class Config(
                 "mode",
                 "owner",
                 "group",
+                "project_id",
+            )
+        )
+
+
+class Profile(
+    ua_models.TargetResourceKindAwareMixin,
+    ra_models.ModelWithRequiredUUID,
+    ra_models.ModelWithProject,
+    ra_models.ModelWithNameDesc,
+    ra_models.ModelWithTimestamp,
+):
+    """The model represents a profile in scope of ValuesStore.
+
+    Profiles allow to adapt installation for various environments
+    such as local development, stage, production.
+
+    Example:
+      $core.vs.profiles:
+        custom:
+          name: "custom"
+          profile_type: "ELEMENT"
+          project_id: "12345678-c625-4fee-81d5-f691897b8142"
+          description: "The custom profile"
+    """
+
+    __init_resource_status__ = pc.AlwaysActiveStatus.ACTIVE.value
+
+    profile_type = properties.property(
+        ra_types.Enum(tuple(pt.value for pt in pc.ProfileType)),
+        default=pc.ProfileType.ELEMENT.value,
+    )
+    active = properties.property(
+        ra_types.Boolean(),
+        default=False,
+    )
+    status = properties.property(
+        ra_types.Enum(tuple(s.value for s in pc.AlwaysActiveStatus)),
+        default=pc.AlwaysActiveStatus.ACTIVE.value,
+    )
+
+    @classmethod
+    def get_resource_kind(cls) -> str:
+        """Return the resource kind."""
+        return "vs_profile"
+
+    def get_resource_target_fields(self) -> tp.Collection[str]:
+        """Return the collection of target fields.
+
+        Refer to the Resource model for more details about target fields.
+        """
+        return frozenset(
+            (
+                "uuid",
+                "name",
+                "profile_type",
+                "active",
+                "project_id",
+            )
+        )
+
+
+class AbstractVariableSetter(
+    ra_models.SimpleViewMixin,
+    types_dynamic.AbstractKindModel,
+):
+    """The abstract model for variable setter."""
+
+    def set_value(self, variable: "Variable") -> None:
+        """Determine a value for the variable and set it.
+
+        If the value cannot be determined, the method raises an exception.
+        """
+        raise infra_exc.VariableCannotFindValue(variable=variable.uuid)
+
+
+class ProfileVariableSetterItem(common_types.SchematicType):
+    __scheme__ = {
+        "profile": ra_types.UUID(),
+        "value": ra_types.AnySimpleType(),
+    }
+    __mandatory__ = {"profile", "value"}
+
+
+class ProfileVariableSetter(AbstractVariableSetter):
+    """The setter based on profiles.
+
+    Example:
+    $core.vs.variables:
+      var_profile:
+        name: "var_profile"
+        project_id: "12345678-c625-4fee-81d5-f691897b8142"
+        setter:
+          kind: profile
+          fallback_strategy: ignore
+          profiles:
+            - profile: "$core.vs.profiles.$default:uuid"
+              value: 1
+            - profile: "$core.vs.profiles.$develop:uuid"
+              value: 1
+            - profile: "$core.vs.profiles.$medium:uuid"
+              value: 2
+            - profile: "$core.vs.profiles.$custom:uuid"
+              value: 3
+    """
+
+    KIND = "profile"
+
+    fallback_strategy = properties.property(
+        ra_types.Enum(("ignore",)),
+        default="ignore",
+    )
+    profiles = properties.property(
+        ra_types.TypedList(ProfileVariableSetterItem()), default=list
+    )
+    element = properties.property(
+        ra_types.AllowNone(ra_types.UUID()),
+        default=None,
+    )
+
+
+class SelectorVariableSetter(AbstractVariableSetter):
+    """The selector setter allowing to select a value for the variable.
+
+    Example:
+    $core.vs.variables:
+      var_profile:
+        name: "var_profile"
+        project_id: "12345678-c625-4fee-81d5-f691897b8142"
+        setter:
+          kind: selector
+          selector_strategy: latest
+    """
+
+    KIND = "selector"
+
+    selector_strategy = properties.property(
+        ra_types.Enum(("latest",)),
+        default="latest",
+    )
+
+
+class Variable(
+    ua_models.TargetResourceKindAwareMixin,
+    ra_models.ModelWithRequiredUUID,
+    ra_models.ModelWithProject,
+    ra_models.ModelWithNameDesc,
+    ra_models.ModelWithTimestamp,
+):
+    """The model represents a variable in scope of ValuesStore.
+
+    Variables are the entities with internal logic to calculate
+    value based on profiles or values.
+
+    Examples:
+
+    $core.vs.variables:
+      var_profile:
+        name: "var_profile"
+        project_id: "12345678-c625-4fee-81d5-f691897b8142"
+        setter:
+          kind: profile
+          fallback_strategy: ignore
+          profiles:
+            - name: $core.vs.profiles.develop:uuid
+              value: 1
+            - name: $core.vs.profiles.medium:uuid
+              value: 2
+            - name: $core.vs.profiles.custom:uuid
+              value: 3
+      var_selector:
+        name: "var_selector"
+        project_id: "12345678-c625-4fee-81d5-f691897b8142"
+        setter:
+          kind: selector
+          selector_strategy: latest
+    """
+
+    __init_resource_status__ = pc.VariableStatus.NEW.value
+
+    setter = properties.property(
+        types_dynamic.KindModelSelectorType(
+            types_dynamic.KindModelType(ProfileVariableSetter),
+            types_dynamic.KindModelType(SelectorVariableSetter),
+        ),
+        required=True,
+    )
+    status = properties.property(
+        ra_types.Enum(tuple(s.value for s in pc.VariableStatus)),
+        default=pc.VariableStatus.NEW.value,
+    )
+    value = properties.property(
+        ra_types.AllowNone(ra_types.AnySimpleType()),
+        default=None,
+    )
+
+    @classmethod
+    def get_resource_kind(cls) -> str:
+        """Return the resource kind."""
+        return "vs_variable"
+
+    def get_resource_target_fields(self) -> tp.Collection[str]:
+        """Return the collection of target fields.
+
+        Refer to the Resource model for more details about target fields.
+        """
+        return frozenset(
+            (
+                "uuid",
+                "name",
+                "setter",
+                "project_id",
+            )
+        )
+
+
+class Value(
+    ua_models.TargetResourceKindAwareMixin,
+    ra_models.ModelWithRequiredUUID,
+    ra_models.ModelWithProject,
+    ra_models.ModelWithNameDesc,
+    ra_models.ModelWithTimestamp,
+):
+    """The model represents a value in scope of ValuesStore.
+
+    It's a value of a simple type: int, float, list, dict, bool, str.
+    Manifest example:
+
+    $core.vs.values:
+      int_value:
+        name: "int value"
+        project_id: "12345678-c625-4fee-81d5-f691897b8142"
+        value: 1
+    """
+
+    __init_resource_status__ = pc.AlwaysActiveStatus.ACTIVE.value
+
+    value = properties.property(
+        ra_types.AllowNone(ra_types.AnySimpleType()),
+        default=None,
+    )
+    read_only = properties.property(
+        ra_types.Boolean(),
+        default=False,
+    )
+    variable = relationships.relationship(Variable)
+    manual_selected = properties.property(
+        ra_types.Boolean(),
+        default=False,
+    )
+    status = properties.property(
+        ra_types.Enum(tuple(s.value for s in pc.AlwaysActiveStatus)),
+        default=pc.AlwaysActiveStatus.ACTIVE.value,
+    )
+
+    @classmethod
+    def get_resource_kind(cls) -> str:
+        """Return the resource kind."""
+        return "vs_value"
+
+    def get_resource_target_fields(self) -> tp.Collection[str]:
+        """Return the collection of target fields.
+
+        Refer to the Resource model for more details about target fields.
+        """
+        return frozenset(
+            (
+                "uuid",
+                "name",
+                "value",
+                "read_only",
+                "manual_selected",
                 "project_id",
             )
         )
