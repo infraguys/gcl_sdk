@@ -1,4 +1,4 @@
-#    Copyright 2025 Genesis Corporation.
+#    Copyright 2025-2026 Genesis Corporation.
 #
 #    All Rights Reserved.
 #
@@ -13,9 +13,21 @@
 #    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 #    License for the specific language governing permissions and limitations
 #    under the License.
-from izulu import root
+
+import uuid as sys_uuid
+
+from gcl_sdk.common import exceptions
 
 
-class UniversalAgentException(root.Error):
-    __toggles__ = root.Toggles.DEFAULT ^ root.Toggles.FORBID_UNANNOTATED_FIELDS
-    __template__ = "An unknown exception occurred."
+class InfraException(exceptions.UniversalAgentException):
+    __template__ = "An unknown infra exception occurred."
+
+
+class VariableCannotFindValue(InfraException):
+    __template__ = "The variable cannot find a value: {variable}"
+    variable: sys_uuid.UUID
+
+
+class ProfileInUse(InfraException):
+    __template__ = "The profile is in use: {profile}"
+    profile: sys_uuid.UUID

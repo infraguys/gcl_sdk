@@ -19,6 +19,10 @@ import enum
 DEF_ROOT_DISK_SIZE = 10
 
 
+class AlwaysActiveStatus(str, enum.Enum):
+    ACTIVE = "ACTIVE"
+
+
 class InstanceStatus(str, enum.Enum):
     NEW = "NEW"
     IN_PROGRESS = "IN_PROGRESS"
@@ -45,6 +49,18 @@ class NodeSetType(str, enum.Enum):
 
 
 class VolumeStatus(str, enum.Enum):
+    NEW = "NEW"
+    IN_PROGRESS = "IN_PROGRESS"
+    ACTIVE = "ACTIVE"
+    ERROR = "ERROR"
+
+
+class ProfileType(str, enum.Enum):
+    GLOBAL = "GLOBAL"
+    ELEMENT = "ELEMENT"
+
+
+class VariableStatus(str, enum.Enum):
     NEW = "NEW"
     IN_PROGRESS = "IN_PROGRESS"
     ACTIVE = "ACTIVE"
