@@ -36,6 +36,7 @@ from gcl_sdk.paas.dm import lb as lb_models
 LOG = logging.getLogger(__name__)
 
 LB_TARGET_KIND = "paas_lb_node"
+LB_AGENT_TARGET_KIND = "paas_lb_agent"
 BALANCE_MAPPING = {
     "roundrobin": "",
     "leastconn": "least_conn;",
@@ -710,3 +711,8 @@ class LBCapabilityDriver(meta.MetaFileStorageAgentDriver):
             f.write(SYSTEMD_TEMPLATE)
         subprocess.check_call(["systemctl", "daemon-reload"])
         super().__init__(*args, meta_file=self.META_PATH, **kwargs)
+
+
+class LBAgentCapabilityDriver(LBCapabilityDriver):
+
+    __model_map__ = {LB_AGENT_TARGET_KIND: LB}
