@@ -16,6 +16,8 @@
 from __future__ import annotations
 
 import logging
+import dataclasses
+import typing as tp
 import uuid as sys_uuid
 
 from gcl_sdk.agents.universal.drivers import base
@@ -27,6 +29,72 @@ from gcl_sdk.agents.universal.storage import base as storage_base
 from gcl_sdk.agents.universal.storage import exceptions as storage_exc
 
 LOG = logging.getLogger(__name__)
+
+
+@dataclasses.dataclass
+class ResourceTransformer:
+    """Process and perform some actions on the resource view.
+
+    The main idea is to perform some additional transformations
+    on the resource view. For instance, delete specific attributes
+    or ignore null attributes and so on. The first implementation
+    is pretty simple and it can ignore null attributes. The next
+    implementation can be more complex and the interface can be
+    changed.
+
+    Examples:
+    # Ignore null attributes
+    In:
+    {
+        "uuid": "0000000-0000-0000-0000-000000000000",
+        "name": "foo",
+        "value": null,
+        "created_at": "2026-01-01T00:00:00.000000",
+        "updated_at": "2026-01-01T00:00:00.000000"
+    }
+    Out:
+    {
+        "uuid": "0000000-0000-0000-0000-000000000000",
+        "name": "foo",
+        "created_at": "2026-01-01T00:00:00.000000",
+        "updated_at": "2026-01-01T00:00:00.000000"
+    }
+    """
+
+    ignore_null_attributes: bool = False
+    attributes: tp.Collection[str] | None = None
+
+    def transform(self, view: dict) -> dict:
+        if not self.ignore_null_attributes:
+            return view
+
+        # If attributes are not specified, ignore all null attributes
+        if self.attributes is None:
+            return {k: v for k, v in view.items() if v is not None}
+
+        # If attributes are specified, ignore only null attributes from the list
+        attributes = set(self.attributes)
+        return {
+            k: v
+            for k, v in view.items()
+            if not (v is None and k in attributes)
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> ResourceTransformer:
+        ignore_null_attributes = data.get("ignore_null_attributes", False)
+        attributes = data.get("attributes", None)
+
+        if isinstance(ignore_null_attributes, str):
+            ignore_null_attributes = ignore_null_attributes.lower() == "true"
+
+        if isinstance(attributes, str):
+            attributes = {attr.strip() for attr in attributes.split(",")}
+
+        return cls(
+            ignore_null_attributes=ignore_null_attributes,
+            attributes=attributes,
+        )
 
 
 class DirectAgentDriver(base.AbstractCapabilityDriver):
@@ -45,10 +113,12 @@ class DirectAgentDriver(base.AbstractCapabilityDriver):
         self,
         client: client_base.AbstractBackendClient,
         storage: storage_base.AbstractTargetFieldsStorage,
+        transformer_map: dict[str, ResourceTransformer] | None = None,
     ):
         super().__init__()
         self._client = client
         self._storage = storage
+        self._transformer_map = transformer_map or {}
 
     def _model_to_resource(
         self,
@@ -61,7 +131,34 @@ class DirectAgentDriver(base.AbstractCapabilityDriver):
         value = model.dump_to_simple_view(
             skip=model.get_resource_ignore_fields()
         )
+
+        # Apply additional transformations if needed
+        if kind in self._transformer_map:
+            value = self._transformer_map[kind].transform(value)
+
         return models.Resource.from_value(value, kind, target_fields)
+
+    def _prepare_res_response(
+        self,
+        origin_resource: models.Resource,
+        value: dict[str, tp.Any] | models.Resource | models.ResourceMixin,
+        target_fields: frozenset[str],
+    ) -> models.Resource:
+        """Prepare the response from the client."""
+        if isinstance(value, models.Resource):
+            return value
+        elif isinstance(value, dict):
+            # Apply additional transformations if needed
+            if origin_resource.kind in self._transformer_map:
+                value = self._transformer_map[origin_resource.kind].transform(
+                    value
+                )
+
+            return origin_resource.replace_value(value, target_fields)
+        else:
+            return self._model_to_resource(
+                origin_resource.kind, value, target_fields
+            )
 
     def _validate(self, resource: models.Resource) -> None:
         """Validate the resource."""
@@ -82,7 +179,9 @@ class DirectAgentDriver(base.AbstractCapabilityDriver):
             LOG.error("Unable to find resource on backend %s", resource.uuid)
             raise driver_exc.ResourceNotFound(resource=resource)
 
-        return resource.replace_value(value, target_fields.fields)
+        return self._prepare_res_response(
+            resource, value, target_fields.fields
+        )
 
     def list(self, capability: str) -> list[models.Resource]:
         """Lists all resources by capability."""
@@ -101,6 +200,9 @@ class DirectAgentDriver(base.AbstractCapabilityDriver):
             elif isinstance(i, dict):
                 uuid = sys_uuid.UUID(i["uuid"])
                 if storage_item := storage_items.get(uuid):
+                    # Apply additional transformations if needed
+                    if capability in self._transformer_map:
+                        i = self._transformer_map[capability].transform(i)
                     client_resources[uuid] = models.Resource.from_value(
                         i, capability, storage_item.fields
                     )
@@ -150,12 +252,7 @@ class DirectAgentDriver(base.AbstractCapabilityDriver):
             raise driver_exc.ResourceAlreadyExists(resource=resource)
 
         # Convert response to the resource
-        if isinstance(resp, models.Resource):
-            return resp
-        elif isinstance(resp, dict):
-            return resource.replace_value(resp, target_fields)
-        else:
-            return self._model_to_resource(resource.kind, resp, target_fields)
+        return self._prepare_res_response(resource, resp, target_fields)
 
     def update(self, resource: models.Resource) -> models.Resource:
         """Update the resource."""
@@ -176,12 +273,7 @@ class DirectAgentDriver(base.AbstractCapabilityDriver):
             raise driver_exc.ResourceNotFound(resource=resource)
 
         # Convert response to the resource
-        if isinstance(resp, models.Resource):
-            return resp
-        elif isinstance(resp, dict):
-            return resource.replace_value(resp, target_fields)
-        else:
-            return self._model_to_resource(resource.kind, resp, target_fields)
+        return self._prepare_res_response(resource, resp, target_fields)
 
     def delete(self, resource: models.Resource) -> None:
         """Delete the resource."""

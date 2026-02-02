@@ -13,12 +13,15 @@
 #    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 #    License for the specific language governing permissions and limitations
 #    under the License.
+from __future__ import annotations
+
 import uuid as sys_uuid
 from unittest.mock import MagicMock
 
 import pytest
 
 from gcl_sdk.agents.universal.drivers.direct import DirectAgentDriver
+from gcl_sdk.agents.universal.drivers.direct import ResourceTransformer
 from gcl_sdk.agents.universal.drivers import exceptions as driver_exc
 from gcl_sdk.agents.universal.clients.backend import exceptions as client_exc
 from gcl_sdk.agents.universal.storage import exceptions as storage_exc
@@ -37,13 +40,20 @@ def _make_resource(
 
 
 def _driver_with_caps(
-    client_mock: MagicMock, storage_mock: MagicMock, caps: list[str]
+    client_mock: MagicMock,
+    storage_mock: MagicMock,
+    caps: list[str],
+    transformer_map: dict[str, ResourceTransformer] | None = None,
 ):
     class _Drv(DirectAgentDriver):
         def get_capabilities(self) -> list[str]:
             return caps
 
-    return _Drv(client=client_mock, storage=storage_mock)
+    return _Drv(
+        client=client_mock,
+        storage=storage_mock,
+        transformer_map=transformer_map,
+    )
 
 
 class TestDirectDriver:
@@ -246,6 +256,40 @@ class TestDirectDriver:
 
         client.update.assert_called_once_with(res)
         assert actual.value == client_resp
+
+    def test_update_success_applies_transformer_map_on_model_response(self):
+        client = MagicMock()
+        storage = MagicMock()
+        transformer_map = {
+            "config": ResourceTransformer(ignore_null_attributes=True)
+        }
+        drv = _driver_with_caps(
+            client, storage, caps=["config"], transformer_map=transformer_map
+        )
+
+        res = _make_resource(
+            "config", value={"uuid": str(sys_uuid.uuid4()), "a": 1}
+        )
+
+        model_obj = MagicMock()
+        model_obj.get_resource_ignore_fields.return_value = set()
+        model_obj.dump_to_simple_view.return_value = {
+            "uuid": str(res.uuid),
+            "a": 11,
+            "b": None,
+            "status": "ACTIVE",
+        }
+        client.update.return_value = model_obj
+
+        actual = drv.update(res)
+
+        client.update.assert_called_once_with(res)
+        assert storage.update.call_count == 1
+        assert actual.value == {
+            "uuid": str(res.uuid),
+            "a": 11,
+            "status": "ACTIVE",
+        }
 
     def test_update_maps_not_found_exception(self):
         client = MagicMock()
