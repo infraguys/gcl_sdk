@@ -1,4 +1,4 @@
-#    Copyright 2025 Genesis Corporation.
+#    Copyright 2025-2026 Genesis Corporation.
 #
 #    All Rights Reserved.
 #
@@ -13,6 +13,7 @@
 #    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 #    License for the specific language governing permissions and limitations
 #    under the License.
+from __future__ import annotations
 
 import logging
 import sys
@@ -28,6 +29,7 @@ from gcl_sdk.common import config
 from gcl_sdk.common import log as infra_log
 from gcl_sdk.agents.universal.services import agent
 from gcl_sdk.agents.universal import utils as ua_utils
+from gcl_sdk.agents.universal.drivers import direct
 from gcl_sdk.agents.universal.clients.orch import db as orch_db
 from gcl_sdk.agents.universal.clients.orch import http as orch_http
 from gcl_sdk.agents.universal.clients.backend import db as db_back
@@ -104,6 +106,24 @@ def load_filters() -> dict[str, dict[str, dm_filters.AbstractClause]]:
     return filters
 
 
+def load_transformers(
+    kinds: tuple[str, ...],
+) -> dict[str, direct.ResourceTransformer]:
+    transformer_map = {}
+    for kind in kinds:
+        section = f"resource_transformer:{kind}"
+        transformer = ua_utils.cfg_load_section_map(CONF.config_file, section)
+        if not transformer:
+            continue
+
+        transformer_map[kind] = direct.ResourceTransformer.from_dict(
+            transformer
+        )
+
+    LOG.info("Loaded transformers: %s", transformer_map)
+    return transformer_map
+
+
 def main():
     # Parse config
     config.parse(sys.argv[1:])
@@ -148,9 +168,13 @@ def main():
         )
         specs.append(spec)
 
+    # Prepare resource transformers
+    transformer_map = load_transformers(tuple(models.keys()))
+
     db_core_driver = ua_core_drivers.DatabaseCapabilityDriver(
         model_specs=specs,
         target_fields_storage_path=CONF[DOMAIN].target_fields_path,
+        transformer_map=transformer_map,
     )
 
     caps_drivers = [
