@@ -130,6 +130,7 @@ class DatabaseCapabilityDriver(direct.DirectAgentDriver):
         self,
         model_specs: tp.Collection[db_back.ModelSpec],
         target_fields_storage_path: str,
+        transformer_map: dict[str, direct.ResourceTransformer] | None = None,
     ):
 
         storage = fs.TargetFieldsFileStorage(target_fields_storage_path)
@@ -137,7 +138,9 @@ class DatabaseCapabilityDriver(direct.DirectAgentDriver):
 
         self._kinds = {m.kind for m in model_specs}
 
-        super().__init__(storage=storage, client=client)
+        super().__init__(
+            storage=storage, client=client, transformer_map=transformer_map
+        )
 
     def get_capabilities(self) -> list[str]:
         """Returns a list of capabilities supported by the driver."""
