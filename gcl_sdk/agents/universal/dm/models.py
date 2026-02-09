@@ -1,4 +1,4 @@
-#    Copyright 2025 Genesis Corporation.
+#    Copyright 2025-2026 Genesis Corporation.
 #
 #    All Rights Reserved.
 #
@@ -417,6 +417,25 @@ class UniversalAgent(
                 cap_map[capability].append(agent)
 
         return cap_map
+
+
+class NodeEncryptionKey(
+    models.ModelWithUUID,
+    models.ModelWithTimestamp,
+    models.SimpleViewMixin,
+    orm.SQLStorableMixin,
+):
+    """API encryption key model for the universal agent APIs."""
+
+    __tablename__ = "ua_node_encryption_keys"
+
+    private_key = properties.property(
+        types.String(max_length=44), required=True
+    )
+    encryption_disabled_until = properties.property(
+        types.UTCDateTimeZ(),
+        default=lambda: datetime.datetime.now(datetime.timezone.utc),
+    )
 
 
 class Resource(

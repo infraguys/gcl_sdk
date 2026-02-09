@@ -19,10 +19,11 @@ from restalchemy.api import resources
 from restalchemy.api import controllers
 from restalchemy.dm import filters as dm_filters
 
+from gcl_sdk.agents.universal.api import controllers as sdk_controllers
 from gcl_sdk.agents.universal.status_api.dm import models
 
 
-class KindController(controllers.BaseResourceController):
+class KindController(sdk_controllers.BaseSdkResourceController):
     """Controller for /v1/kind/ endpoint"""
 
     __resource__ = resources.ResourceByRAModel(
@@ -62,7 +63,7 @@ class ResourcesController(controllers.BaseNestedResourceController):
         return resource
 
 
-class UniversalAgentsController(controllers.BaseResourceController):
+class UniversalAgentsController(sdk_controllers.BaseSdkResourceController):
     """Controller for /v1/agents/ endpoint"""
 
     __resource__ = resources.ResourceByRAModel(
