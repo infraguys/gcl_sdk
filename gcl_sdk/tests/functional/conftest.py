@@ -16,6 +16,7 @@
 
 from __future__ import annotations
 
+import functools
 import itertools
 import uuid as sys_uuid
 
@@ -34,6 +35,8 @@ from restalchemy.api.middlewares import errors as errors_mw
 from restalchemy.openapi import structures as openapi_structures
 from restalchemy.openapi import engines as openapi_engines
 
+from gcl_sdk.agents.universal.api import middlewares as sdk_middlewares
+from gcl_sdk.agents.universal.api import packers
 from gcl_sdk.agents.universal.dm import models
 from gcl_sdk.agents.universal import constants as c
 from gcl_sdk.agents.universal.orch_api import routes as orch_routes
@@ -225,7 +228,14 @@ def orch_api_wsgi_app():
             openapi_engine=get_openapi_engine(),
         ),
         [
-            context_mw.ContextMiddleware,
+            functools.partial(
+                sdk_middlewares.SdkContextMiddleware,
+                context_kwargs={
+                    "encryption_information_class": (
+                        packers.NoEncryptionInformation
+                    )
+                },
+            ),
             errors_mw.ErrorsHandlerMiddleware,
             logging_mw.LoggingMiddleware,
         ],
@@ -259,7 +269,14 @@ def status_api_wsgi_app():
             openapi_engine=get_openapi_engine(),
         ),
         [
-            context_mw.ContextMiddleware,
+            functools.partial(
+                sdk_middlewares.SdkContextMiddleware,
+                context_kwargs={
+                    "encryption_information_class": (
+                        packers.NoEncryptionInformation
+                    )
+                },
+            ),
             errors_mw.ErrorsHandlerMiddleware,
             logging_mw.LoggingMiddleware,
         ],
