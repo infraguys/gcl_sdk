@@ -24,8 +24,13 @@ import shutil
 import subprocess
 import uuid
 
-import renameat2
-
+# `renameat2` is only available for Linux, not for macOS. 
+# Code below uses a workaround for macOS.
+if sys.platform.startswith('linux'):
+    import renameat2
+else:
+    renameat2 = None
+    
 from gcl_sdk.agents.universal import constants
 from gcl_sdk.agents.universal.drivers import exceptions as driver_exc
 from gcl_sdk.agents.universal.drivers import meta
@@ -406,7 +411,7 @@ map $http_upgrade $connection_upgrade {
             return f"wget({wget_rc}):{wgetps.stderr.read()}\ntar({tar_rc}):{tarps.stderr.read()}"
         self._clean_external_symlinks(tmpdir)
         if os.path.exists(tgtdir):
-            renameat2.exchange(tmpdir, tgtdir)
+            exchange_dirs(tmpdir, tgtdir)
             shutil.rmtree(tmpdir)
         else:
             os.rename(tmpdir, tgtdir)
@@ -716,3 +721,16 @@ class LBCapabilityDriver(meta.MetaFileStorageAgentDriver):
 class LBAgentCapabilityDriver(LBCapabilityDriver):
 
     __model_map__ = {LB_AGENT_TARGET_KIND: LB}
+
+
+def exchange_dirs(tmpdir, tgtdir):
+    """
+    Platform-independent atomic dir replace.
+    Uses renameat2 on Linux, and os.rename which overwrites dst on macOS.
+    """
+    if renameat2:
+        # Linux way:
+        renameat2.exchange(tmpdir, tgtdir)
+    else:    
+        # Generic (macOS-friendly) way:
+        os.replace(tmpdir, tgtdir)
