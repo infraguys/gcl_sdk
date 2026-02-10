@@ -24,12 +24,12 @@ import shutil
 import subprocess
 import uuid
 
-import renameat2
-
+    
 from gcl_sdk.agents.universal import constants
 from gcl_sdk.agents.universal.drivers import exceptions as driver_exc
 from gcl_sdk.agents.universal.drivers import meta
 from gcl_sdk.agents.universal.storage import common as storage_common
+from gcl_sdk.common.utils import swap_dirs
 from gcl_sdk.infra import constants as ic
 from gcl_sdk.paas.dm import lb as lb_models
 
@@ -482,7 +482,7 @@ map $http_upgrade $connection_upgrade {
             return f"wget({wget_rc}):{wgetps.stderr.read()}\ntar({tar_rc}):{tarps.stderr.read()}"
         self._clean_external_symlinks(tmpdir)
         if os.path.exists(tgtdir):
-            renameat2.exchange(tmpdir, tgtdir)
+            swap_dirs(tmpdir, tgtdir)
             shutil.rmtree(tmpdir)
         else:
             os.rename(tmpdir, tgtdir)
