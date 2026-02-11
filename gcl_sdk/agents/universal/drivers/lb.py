@@ -93,22 +93,77 @@ SYSTEMD_TMPL_PATH = "/etc/systemd/system/genesis-tunnel@.service"
 
 TUNNEL_SCRIPT_PATH = "/var/lib/genesis/tunnels/"
 
+REMOTE_SCRIPT = """\
+set -eux
+
+cat > /tmp/genesis_nginx_{port}_{mode}.conf <<EOF
+load_module /usr/lib/nginx/modules/ngx_stream_module.so;
+pid /tmp/genesis_nginx_{port}_{mode}.pid;
+
+events {{
+    worker_connections  1024;
+}}
+
+stream {{
+    upstream backend {{
+       server unix:/tmp/genesis_nginx_{port}_{mode}.sock;
+    }}
+
+    server {{
+        listen {port} {proto};
+        proxy_pass backend;
+        proxy_protocol on;
+    }}
+}}
+EOF
+
+PID_FILE="/tmp/genesis_nginx_{port}_{mode}.pid"
+
+if [ -f "$PID_FILE" ]; then
+    pkill -F "$PID_FILE"
+fi;
+
+if [ -S "/tmp/genesis_nginx_{port}_{mode}.sock" ]; then
+    if socat -u OPEN:/dev/null UNIX-CONNECT:/tmp/genesis_nginx_{port}_{mode}.sock; then
+        echo "Socket is alive, continue"
+    else
+        rm /tmp/genesis_nginx_{port}_{mode}.sock || true
+        exit 1
+    fi
+fi;
+
+trap "pkill -F $PID_FILE && rm /tmp/genesis_nginx_{port}_{mode}.sock || true" EXIT
+
+/usr/sbin/nginx -g "daemon off; master_process off;" -e stderr -c /tmp/genesis_nginx_{port}_{mode}.conf
+
+"""
+
 TUNNEL_SCRIPT_TEMPLATE = """\
 #!/bin/bash
-set -e
+set -xe
 
 MODE={mode}
 
 
 COMMAND="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ServerAliveInterval=20 -o ServerAliveCountMax=3 -o IdentitiesOnly=yes -F /dev/null {ssh_user}@{ssh_host} -p {ssh_port} -i /var/lib/genesis/tunnels/{name}.key"
+REMOTE_COMMAND=$(cat <<'END'
+{remote_command}
+END
+)
 
 if [[ "$MODE" == "tcp" ]]; then
-    $COMMAND -N -T -R 0.0.0.0:{port}:0.0.0.0:{port}
+    if [[ "$REMOTE_COMMAND" = *[^[:space:]]* ]]; then
+        $COMMAND -R /tmp/genesis_nginx_{port}_{mode}.sock:0.0.0.0:{port} <<END
+$REMOTE_COMMAND
+END
+    else
+        $COMMAND -N -T -R 0.0.0.0:{port}:0.0.0.0:{port}
+    fi;
 fi;
 
 if [[ "$MODE" == "udp" ]]; then
-    $COMMAND -R 0.0.0.0:{port}:0.0.0.0:{port} socat udp-listen\\:{port},fork,reuseaddr tcp\\:0.0.0.0:{port} &
     socat tcp-listen:{port},fork,reuseaddr udp:0.0.0.0:{port} &
+    $COMMAND -R 0.0.0.0:{port}:0.0.0.0:{port} socat udp-listen\\:{port},fork,reuseaddr tcp\\:0.0.0.0:{port} &
     wait -n
 fi;
 """
@@ -208,6 +263,7 @@ upstream {pid} {{
                 e = ext_source.copy()
                 e["lport"] = v["port"]
                 e["lproto"] = proto
+                e["proxy_proto_from"] = v.get("proxy_proto_from")
                 ext_sources[f"{e['host']}_{e['lport']}_{e['lproto']}"] = e
 
         return vhosts_l4, vhosts_l7, ext_sources
@@ -295,7 +351,11 @@ ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDS
             ssl_info = ""
         return f"""\
 server {{
-listen 0.0.0.0:{v['port']}{' ssl http2' if v['proto'] == 'https' else ''};
+listen 0.0.0.0:{v['port']}{' ssl http2' if v['proto'] == 'https' else ''}{" proxy_protocol" if v.get('proxy_proto_from') else ""};
+{f"""\
+set_real_ip_from {v['proxy_proto_from']};
+real_ip_header proxy_protocol;"""
+if v.get('proxy_proto_from') else ""}
 server_name {' '.join(v['domains'])};{ssl_info}
 {('    \n').join(f"allow {ip};" for ip in c['allowed_ips'])}
 deny all;
@@ -535,6 +595,17 @@ map $http_upgrade $connection_upgrade {
                         ssh_port=e["port"],
                         ssh_host=e["host"],
                         port=e["lport"],
+                        remote_command=(
+                            REMOTE_SCRIPT.format(
+                                port=e["lport"],
+                                mode=e["lproto"],
+                                proto=(
+                                    e["lproto"] if e["lproto"] == "udp" else ""
+                                ),
+                            )
+                            if e["proxy_proto_from"]
+                            else ""
+                        ),
                     )
                 )
             with open(
@@ -629,6 +700,15 @@ map $http_upgrade $connection_upgrade {
                     ssh_port=e["port"],
                     ssh_host=e["host"],
                     port=e["lport"],
+                    remote_command=(
+                        REMOTE_SCRIPT.format(
+                            port=e["lport"],
+                            mode=e["lproto"],
+                            proto=e["lproto"] if e["lproto"] == "udp" else "",
+                        )
+                        if e["proxy_proto_from"]
+                        else ""
+                    ),
                 ),
             )
             self._validate_file(
