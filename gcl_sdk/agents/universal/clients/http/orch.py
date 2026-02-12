@@ -47,11 +47,14 @@ class OrchAPI:
         self,
         base_url: str,
         http_client: bazooka.Client | None = None,
+        encryptor: base.Encryptor | None = None,
     ) -> None:
         http_client = http_client or bazooka.Client()
 
         self._http_client = http_client
-        self._agents_client = UniversalAgentsClient(base_url, http_client)
+        self._agents_client = UniversalAgentsClient(
+            base_url, http_client=http_client, encryptor=encryptor
+        )
 
     @property
     def agents(self):

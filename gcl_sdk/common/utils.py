@@ -26,6 +26,14 @@ LOG = logging.getLogger(__name__)
 EVENT_PAYLOADS_GROUP = "gcl_sdk_event_payloads"
 
 
+def ro_owner_opener(path, flags):
+    return os.open(path, flags, 0o400)
+
+
+def rw_owner_opener(path, flags):
+    return os.open(path, flags, 0o600)
+
+
 def load_event_payload_map() -> dict:
     event_payload_map = {
         ep.name: ep.load()

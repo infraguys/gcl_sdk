@@ -51,7 +51,7 @@ class TestUAStatusApi:
 
         status_api_service.teardown_method()
 
-    def test_agent_no_agents(
+    def test_agent_list_not_allowed(
         self,
         status_api: test_utils.RestServiceTestCase,
     ):
@@ -59,31 +59,7 @@ class TestUAStatusApi:
 
         response = requests.get(url)
 
-        assert response.status_code == 200
-
-    def test_agent_list(
-        self,
-        status_api: test_utils.RestServiceTestCase,
-    ):
-        uuid_a = sys_uuid.uuid4()
-        agent_a = models.UniversalAgent(
-            name="Agent A", uuid=uuid_a, node=uuid_a
-        )
-        uuid_b = sys_uuid.uuid4()
-        agent_b = models.UniversalAgent(
-            name="Agent B", uuid=uuid_b, node=uuid_b
-        )
-        agent_a.insert()
-        agent_b.insert()
-
-        url = urljoin(status_api.base_url, "agents/")
-
-        response = requests.get(url)
-        output = response.json()
-
-        assert response.status_code == 200
-        assert len(output) == 2
-        assert {a["uuid"] for a in output} == {str(uuid_a), str(uuid_b)}
+        assert response.status_code == 405
 
     def test_agent_register(
         self,
@@ -120,17 +96,15 @@ class TestUAStatusApi:
         assert response.status_code == 200
         assert output == []
 
-    def test_resources_empty_kind(
+    def test_resources_kind_list_not_allowed(
         self,
         status_api: test_utils.RestServiceTestCase,
     ):
         url = urljoin(status_api.base_url, "kind/foo/resources/")
 
         response = requests.get(url)
-        output = response.json()
 
-        assert response.status_code == 200
-        assert output == []
+        assert response.status_code == 405
 
     def test_resources_add_resource(
         self,
@@ -236,27 +210,3 @@ class TestUAStatusApi:
 
         assert response.status_code == 200
         assert output == ["foo"]
-
-    def test_resources_list_kind(
-        self,
-        status_api: test_utils.RestServiceTestCase,
-    ):
-        uuid = sys_uuid.uuid4()
-        resource = conftest.FooResource(
-            uuid=uuid,
-            name="foo-name",
-            project_id=uuid,
-        ).to_ua_resource(kind="/v1/kind/foo")
-        view = resource.dump_to_simple_view()
-
-        url = urljoin(status_api.base_url, "kind/foo/resources/")
-
-        response = requests.post(url, json=view)
-        assert response.status_code == 201
-
-        response = requests.get(url)
-        output = response.json()
-
-        assert response.status_code == 200
-        assert len(output) == 1
-        assert output[0]["uuid"] == str(uuid)

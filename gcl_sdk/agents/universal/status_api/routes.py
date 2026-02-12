@@ -22,11 +22,25 @@ from gcl_sdk.agents.universal.status_api import controllers
 class UniversalAgentsRoute(routes.Route):
     """Handler for /v1/agents/ endpoint"""
 
+    __allow_methods__ = [
+        routes.GET,
+        routes.CREATE,
+        routes.UPDATE,
+        routes.DELETE,
+    ]
+
     __controller__ = controllers.UniversalAgentsController
 
 
 class ResourcesRoute(routes.Route):
     """Handler for /v1/kind/<name>/resources/ endpoint"""
+
+    __allow_methods__ = [
+        routes.GET,
+        routes.CREATE,
+        routes.UPDATE,
+        routes.DELETE,
+    ]
 
     __controller__ = controllers.ResourcesController
 
@@ -38,3 +52,18 @@ class KindRoute(routes.Route):
     __controller__ = controllers.KindController
 
     resources = routes.route(ResourcesRoute, resource_route=True)
+
+
+class RefreshSecretAction(routes.Action):
+    """Handler for /v1/nodes/<uuid>/actions/refresh_secret/invoke endpoint"""
+
+    __controller__ = controllers.NodesController
+
+
+class NodesRoute(routes.Route):
+    """Handler for /v1/nodes/ endpoint"""
+
+    __allow_methods__ = [routes.GET]
+    __controller__ = controllers.NodesController
+
+    refresh_secret = routes.action(RefreshSecretAction, invoke=True)

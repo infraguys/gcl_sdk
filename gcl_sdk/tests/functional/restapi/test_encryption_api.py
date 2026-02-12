@@ -162,9 +162,18 @@ class TestEncryptedOrchApi:
             datetime.timezone.utc
         ) + datetime.timedelta(hours=1)
         node_uuid = encryption_key_factory(disabled_until)
+
+        agent_uuid = sys_uuid.uuid4()
+        agent = models.UniversalAgent(
+            name="Test Agent",
+            uuid=agent_uuid,
+            node=node_uuid,
+        )
+        agent.insert()
+
         headers = build_encryption_headers(node_uuid, "application/json")
 
-        url = urllib_parse.urljoin(orch_api.base_url, "agents/")
+        url = urllib_parse.urljoin(orch_api.base_url, f"agents/{agent_uuid}")
 
         response = requests.get(url, headers=headers)
 
@@ -201,7 +210,15 @@ class TestEncryptedOrchApi:
             packers.ENCRYPTED_JSON_CONTENT_TYPE,
         )
 
-        url = urllib_parse.urljoin(orch_api.base_url, "agents/")
+        agent_uuid = sys_uuid.uuid4()
+        agent = models.UniversalAgent(
+            name="Test Agent",
+            uuid=agent_uuid,
+            node=node_uuid,
+        )
+        agent.insert()
+
+        url = urllib_parse.urljoin(orch_api.base_url, f"agents/{agent_uuid}")
 
         response = requests.get(url, headers=headers)
 
@@ -241,7 +258,15 @@ class TestEncryptedStatusApi:
         node_uuid = encryption_key_factory(disabled_until)
         headers = build_encryption_headers(node_uuid, "application/json")
 
-        url = urllib_parse.urljoin(status_api.base_url, "agents/")
+        agent_uuid = sys_uuid.uuid4()
+        agent = models.UniversalAgent(
+            name="Test Agent",
+            uuid=agent_uuid,
+            node=node_uuid,
+        )
+        agent.insert()
+
+        url = urllib_parse.urljoin(status_api.base_url, f"agents/{agent_uuid}")
 
         response = requests.get(url, headers=headers)
 
@@ -278,7 +303,15 @@ class TestEncryptedStatusApi:
             packers.ENCRYPTED_JSON_CONTENT_TYPE,
         )
 
-        url = urllib_parse.urljoin(status_api.base_url, "agents/")
+        agent_uuid = sys_uuid.uuid4()
+        agent = models.UniversalAgent(
+            name="Test Agent",
+            uuid=agent_uuid,
+            node=node_uuid,
+        )
+        agent.insert()
+
+        url = urllib_parse.urljoin(status_api.base_url, f"agents/{agent_uuid}")
 
         response = requests.get(url, headers=headers)
 

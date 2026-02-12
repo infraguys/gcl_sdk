@@ -14,6 +14,8 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+import os
+import base64
 import logging
 import sys
 import typing as tp
@@ -28,6 +30,7 @@ from restalchemy.storage.sql import engines
 from gcl_sdk.common import config
 from gcl_sdk.common import log as infra_log
 from gcl_sdk.common import utils
+from gcl_sdk.clients.http import base as http_base
 from gcl_sdk.agents.universal.services import agent
 from gcl_sdk.agents.universal.drivers import base as driver_base
 from gcl_sdk.agents.universal import constants as c
@@ -79,6 +82,16 @@ core_agent_opts = [
         default=c.PAYLOAD_PATH,
         help="Path to the payload file.",
     ),
+    cfg.BoolOpt(
+        "orch_secure_communication",
+        default=True,
+        help="Enable encrypted communication with the orchestrator APIs.",
+    ),
+    cfg.StrOpt(
+        "private_key_path",
+        default=c.PRIVATE_KEY_PATH,
+        help="Path to the private key file.",
+    ),
 ]
 
 CONF = cfg.CONF
@@ -119,6 +132,21 @@ def register_db_opts(config_file: str) -> bool:
     return False
 
 
+def get_encryptor() -> http_base.Encryptor:
+    if not os.path.exists(CONF[DOMAIN].private_key_path):
+        raise FileNotFoundError(
+            f"Private key file not found: {CONF[DOMAIN].private_key_path}"
+        )
+
+    with open(CONF[DOMAIN].private_key_path, "r") as f:
+        private_key_base64 = f.read()
+
+    private_key = base64.b64decode(private_key_base64)
+    node = ua_utils.system_uuid()
+
+    return http_base.Encryptor(private_key, node)
+
+
 def main():
     # Get the config file path
     for i, arg in enumerate(sys.argv):
@@ -136,12 +164,19 @@ def main():
     infra_log.configure()
     log = logging.getLogger(__name__)
 
+    # Enable encrypted communication with the orchestrator APIs.
+    if CONF[DOMAIN].orch_secure_communication:
+        encryptor = get_encryptor()
+    else:
+        encryptor = None
+
     # Prepare clients
     http_client = bazooka.Client(default_timeout=20)
     orch_client = orch.HttpOrchClient(
         orch_endpoint=CONF[DOMAIN].orch_endpoint,
         status_endpoint=CONF[DOMAIN].status_endpoint,
         http_client=http_client,
+        encryptor=encryptor,
     )
 
     # Detect the agent UUID.

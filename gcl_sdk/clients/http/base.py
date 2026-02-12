@@ -16,14 +16,20 @@
 from __future__ import annotations
 
 import abc
+import base64
 import typing as tp
 import uuid as sys_uuid
 import http as httplib
 from urllib.parse import urljoin
 
+import orjson
 import bazooka
+from requests import models as req_models
 from bazooka import exceptions as bazooka_exc
 from restalchemy.dm import models
+
+from gcl_sdk.agents.universal.api import crypto
+from gcl_sdk.agents.universal.api import packers
 
 
 class AbstractAuthenticator(abc.ABC):
@@ -96,6 +102,29 @@ class CoreIamAuthenticator(AbstractAuthenticator):
         return f"project:{project_id}"
 
 
+class Encryptor:
+    def __init__(self, key: bytes, node: sys_uuid.UUID) -> None:
+        self._key = key
+        self._node = str(node)
+
+    def encrypt(self, data: dict[str, tp.Any]) -> tuple[bytes, dict[str, str]]:
+        nonce, nonce_base64 = crypto.generate_nonce_base64()
+        encrypted_data = crypto.encrypt_chacha20_poly1305(
+            self._key, orjson.dumps(data), nonce
+        )
+
+        headers = {
+            "Content-Type": packers.ENCRYPTED_JSON_CONTENT_TYPE,
+            "X-Genesis-Node-UUID": self._node,
+            "X-Genesis-Nonce": nonce_base64,
+        }
+
+        return encrypted_data, headers
+
+    def decrypt(self, data: bytes, nonce: bytes) -> bytes:
+        return crypto.decrypt_chacha20_poly1305(self._key, nonce, data)
+
+
 class CollectionBaseClient:
     ACTIONS_KEY = "actions"
     INVOKE_KEY = "invoke"
@@ -105,25 +134,74 @@ class CollectionBaseClient:
         base_url: str,
         http_client: bazooka.Client | None = None,
         auth: AbstractAuthenticator | None = None,
+        encryptor: Encryptor | None = None,
     ) -> None:
         self._http_client = http_client or bazooka.Client()
         self._base_url = base_url
         self._auth = auth
+        self._encryptor = encryptor
 
     def _collection_url(self, collection: str):
         if not self._base_url.endswith("/") and not collection.startswith("/"):
             return self._base_url + "/" + collection
         return self._base_url + collection
 
+    def _do_request(
+        self,
+        requester: tp.Callable,
+        url: str,
+        data: dict[str, tp.Any] | None = None,
+        json: dict[str, tp.Any] | None = None,
+        params: dict[str, tp.Any] | None = None,
+        headers: dict[str, str] | None = None,
+    ) -> req_models.Response:
+        if self._encryptor is None:
+            return requester(
+                url, data=data, json=json, params=params, headers=headers
+            )
+
+        if data and json:
+            raise ValueError("data and json are mutually exclusive")
+
+        # Prepare encrypted request. Encrypt body and prepare headers
+        data = data or json
+        encrypted_data, encryption_headers = self._encryptor.encrypt(data)
+
+        headers = headers or {}
+        headers.update(encryption_headers)
+
+        resp = requester(
+            url,
+            data=encrypted_data,
+            params=params,
+            headers=headers,
+        )
+
+        # Decrypt response
+        content_type = resp.headers["Content-Type"]
+        if content_type != packers.ENCRYPTED_JSON_CONTENT_TYPE:
+            raise ValueError(
+                f"Not suitable content type {content_type} for "
+                "encrypted response"
+            )
+
+        nonce_base64 = resp.headers["X-Genesis-Nonce"]
+        resp._content = self._encryptor.decrypt(
+            resp.content, base64.b64decode(nonce_base64)
+        )
+        resp.headers["Content-Type"] = "application/json"
+
+        return resp
+
     def _request(
         self,
         method: httplib.HTTPMethod,
         url: str,
-        data: dict[str : tp.Any] | None = None,
-        json: dict[str : tp.Any] | None = None,
-        params: dict[str : tp.Any] | None = None,
-        headers: dict[str:str] | None = None,
-    ):
+        data: dict[str, tp.Any] | None = None,
+        json: dict[str, tp.Any] | None = None,
+        params: dict[str, tp.Any] | None = None,
+        headers: dict[str, str] | None = None,
+    ) -> req_models.Response:
         if method == httplib.HTTPMethod.POST:
             requester = self._http_client.post
         elif method == httplib.HTTPMethod.GET:
@@ -135,37 +213,43 @@ class CollectionBaseClient:
         else:
             raise ValueError(f"Method {method} is not supported")
 
-        if self._auth is None:
-            return requester(
-                url, data=data, json=json, params=params, headers=headers
-            )
-
-        headers = headers or {}
-        headers.update(self._auth.get_auth_header())
+        if self._auth is not None:
+            headers = headers or {}
+            headers.update(self._auth.get_auth_header())
 
         try:
-            return requester(
-                url, data=data, json=json, params=params, headers=headers
+            return self._do_request(
+                requester,
+                url,
+                data=data,
+                json=json,
+                params=params,
+                headers=headers,
             )
         except bazooka_exc.UnauthorizedError:
             # Perhaps we need to re-authenticate
             self._auth.authenticate()
             headers.update(self._auth.get_auth_header())
-            return requester(
-                url, data=data, json=json, params=params, headers=headers
+            return self._do_request(
+                requester,
+                url,
+                data=data,
+                json=json,
+                params=params,
+                headers=headers,
             )
 
     def resource_url(self, collection: str, uuid: sys_uuid.UUID):
         return urljoin(self._collection_url(collection), str(uuid))
 
-    def get(self, collection: str, uuid: sys_uuid.UUID) -> dict[str : tp.Any]:
+    def get(self, collection: str, uuid: sys_uuid.UUID) -> dict[str, tp.Any]:
         url = self.resource_url(collection, uuid)
         resp = self._request(httplib.HTTPMethod.GET, url)
         return resp.json()
 
     def filter(
-        self, collection: str, **filters: tp.Dict[str, tp.Any]
-    ) -> list[dict[str : tp.Any]]:
+        self, collection: str, **filters: dict[str, tp.Any]
+    ) -> list[dict[str, tp.Any]]:
         resp = self._request(
             httplib.HTTPMethod.GET,
             self._collection_url(collection),
@@ -174,8 +258,8 @@ class CollectionBaseClient:
         return resp.json()
 
     def create(
-        self, collection: str, data: dict[str : tp.Any]
-    ) -> dict[str : tp.Any]:
+        self, collection: str, data: dict[str, tp.Any]
+    ) -> dict[str, tp.Any]:
         resp = self._request(
             httplib.HTTPMethod.POST,
             self._collection_url(collection),
@@ -187,8 +271,8 @@ class CollectionBaseClient:
         self,
         collection: str,
         uuid: sys_uuid.UUID,
-        **params: tp.Dict[str, tp.Any],
-    ) -> dict[str : tp.Any]:
+        **params: dict[str, tp.Any],
+    ) -> dict[str, tp.Any]:
         url = self.resource_url(collection, uuid)
         resp = self._request(httplib.HTTPMethod.PUT, url, json=params)
         return resp.json()
@@ -204,7 +288,7 @@ class CollectionBaseClient:
         uuid: sys_uuid.UUID,
         invoke: bool = False,
         **kwargs,
-    ) -> dict[str : tp.Any] | None:
+    ) -> dict[str, tp.Any] | None:
         url = self.resource_url(collection, uuid) + "/"
         action_url = urljoin(urljoin(url, self.ACTIONS_KEY) + "/", name)
 
@@ -237,8 +321,9 @@ class CollectionBaseModelClient(CollectionBaseClient):
         collection_path: str,
         http_client: bazooka.Client | None = None,
         auth: AbstractAuthenticator | None = None,
+        encryptor: Encryptor | None = None,
     ) -> None:
-        super().__init__(base_url, http_client, auth)
+        super().__init__(base_url, http_client, auth, encryptor)
         self._collection_path = collection_path
 
     def get_collection(self) -> str:
@@ -257,7 +342,7 @@ class CollectionBaseModelClient(CollectionBaseClient):
         )
 
     def filter(
-        self, **filters: tp.Dict[str, tp.Any]
+        self, **filters: dict[str, tp.Any]
     ) -> list[models.SimpleViewMixin]:
         return [
             self.__model__.restore_from_simple_view(**o)
@@ -272,7 +357,7 @@ class CollectionBaseModelClient(CollectionBaseClient):
         )
 
     def update(
-        self, uuid: sys_uuid.UUID, **params: tp.Dict[str, tp.Any]
+        self, uuid: sys_uuid.UUID, **params: dict[str, tp.Any]
     ) -> models.SimpleViewMixin:
         return self.__model__.restore_from_simple_view(
             **super().update(self.get_collection(), uuid, **params)
@@ -297,8 +382,11 @@ class StaticCollectionBaseModelClient(CollectionBaseModelClient):
         base_url: str,
         http_client: bazooka.Client | None = None,
         auth: AbstractAuthenticator | None = None,
+        encryptor: Encryptor | None = None,
     ) -> None:
-        super().__init__(base_url, self.__collection_path__, http_client, auth)
+        super().__init__(
+            base_url, self.__collection_path__, http_client, auth, encryptor
+        )
 
 
 class ResourceBaseModelClient:
@@ -327,7 +415,7 @@ class ResourceBaseModelClient:
         resp = self._http_client.get(url)
         return self.__model__.restore_from_simple_view(**resp.json())
 
-    def update(self, **params: tp.Dict[str, tp.Any]) -> models.SimpleViewMixin:
+    def update(self, **params: dict[str, tp.Any]) -> models.SimpleViewMixin:
         url = self.resource_url()
         resp = self._http_client.put(url, json=params)
         return self.__model__.restore_from_simple_view(**resp.json())
@@ -338,7 +426,7 @@ class ResourceBaseModelClient:
 
     def do_action(
         self, name: str, invoke: bool = False, **kwargs
-    ) -> tp.Dict[str, tp.Any] | None:
+    ) -> dict[str, tp.Any] | None:
         url = self.resource_url() + "/"
         action_url = urljoin(urljoin(url, self.ACTIONS_KEY) + "/", name)
 

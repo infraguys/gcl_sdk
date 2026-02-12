@@ -94,3 +94,9 @@ class Resource(models.Resource):
 # launch functional tests
 class UniversalAgent(models.UniversalAgent):
     pass
+
+
+# NOTE(akremenetsky): Keep it as a separate class to be able to
+# launch functional tests
+class NodeEncryptionKey(models.NodeEncryptionKey):
+    pass

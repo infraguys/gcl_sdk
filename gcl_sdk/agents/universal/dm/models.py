@@ -35,6 +35,7 @@ from restalchemy.storage.sql import filters as sql_filters
 
 from gcl_sdk.agents.universal import utils
 from gcl_sdk.agents.universal import constants as c
+from gcl_sdk.common import utils as common_utils
 
 LOG = logging.getLogger(__name__)
 
@@ -184,7 +185,7 @@ class Payload(models.Model, models.SimpleViewMixin):
         payload_data = self.dump_to_simple_view()
 
         tmp_file = f"{payload_path}.tmp"
-        with open(tmp_file, "w") as f:
+        with open(tmp_file, "w", opener=common_utils.rw_owner_opener) as f:
             json.dump(payload_data, f, indent=2)
         os.replace(tmp_file, payload_path)
 
