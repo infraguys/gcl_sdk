@@ -51,7 +51,7 @@ class TestUAOrchApi:
 
         orch_api_service.teardown_method()
 
-    def test_agent_no_agents(
+    def test_agent_list_not_allowed(
         self,
         orch_api: test_utils.RestServiceTestCase,
     ):
@@ -59,33 +59,9 @@ class TestUAOrchApi:
 
         response = requests.get(url)
 
-        assert response.status_code == 200
+        assert response.status_code == 405
 
-    def test_agent_list(
-        self,
-        orch_api: test_utils.RestServiceTestCase,
-    ):
-        uuid_a = sys_uuid.uuid4()
-        agent_a = models.UniversalAgent(
-            name="Agent A", uuid=uuid_a, node=uuid_a
-        )
-        uuid_b = sys_uuid.uuid4()
-        agent_b = models.UniversalAgent(
-            name="Agent B", uuid=uuid_b, node=uuid_b
-        )
-        agent_a.insert()
-        agent_b.insert()
-
-        url = urljoin(orch_api.base_url, "agents/")
-
-        response = requests.get(url)
-        output = response.json()
-
-        assert response.status_code == 200
-        assert len(output) == 2
-        assert {a["uuid"] for a in output} == {str(uuid_a), str(uuid_b)}
-
-    def test_agent_register(
+    def test_agent_register_not_allowed(
         self,
         orch_api: test_utils.RestServiceTestCase,
     ):
@@ -105,8 +81,7 @@ class TestUAOrchApi:
         response = requests.post(url, json=view)
         output = response.json()
 
-        assert response.status_code == 201
-        assert output["uuid"] == str(uuid)
+        assert response.status_code == 405
 
     def test_agent_get_payload_no_payload(
         self,
@@ -120,13 +95,7 @@ class TestUAOrchApi:
             capabilities={"capabilities": ["foo"]},
             facts={"facts": ["bar"]},
         )
-
-        view = agent.dump_to_simple_view()
-
-        url = urljoin(orch_api.base_url, "agents/")
-
-        response = requests.post(url, json=view)
-        assert response.status_code == 201
+        agent.insert()
 
         url = urljoin(
             orch_api.base_url,
@@ -156,13 +125,7 @@ class TestUAOrchApi:
             capabilities={"capabilities": ["foo"]},
             facts={"facts": ["bar"]},
         )
-
-        view = agent.dump_to_simple_view()
-
-        url = urljoin(orch_api.base_url, "agents/")
-
-        response = requests.post(url, json=view)
-        assert response.status_code == 201
+        agent.insert()
 
         uuid_r = sys_uuid.uuid4()
         resource = conftest.FooTargetResource(
@@ -209,13 +172,7 @@ class TestUAOrchApi:
             capabilities={"capabilities": ["foo"]},
             facts={"facts": ["bar"]},
         )
-
-        view = agent.dump_to_simple_view()
-
-        url = urljoin(orch_api.base_url, "agents/")
-
-        response = requests.post(url, json=view)
-        assert response.status_code == 201
+        agent.insert()
 
         uuid_r = sys_uuid.uuid4()
         resource = conftest.FooTargetResource(

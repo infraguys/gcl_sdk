@@ -23,6 +23,7 @@ import bazooka
 from bazooka import exceptions as baz_exc
 
 from gcl_sdk.agents.universal.dm import models
+from gcl_sdk.clients.http import base as base_client
 from gcl_sdk.agents.universal.clients.orch import base
 from gcl_sdk.agents.universal.clients.orch import exceptions
 from gcl_sdk.agents.universal.clients.http import status as rest_status
@@ -42,16 +43,19 @@ class HttpOrchClient(base.AbstractOrchClient):
         orch_endpoint: str,
         status_endpoint: str,
         http_client: bazooka.Client | None = None,
+        encryptor: base_client.Encryptor | None = None,
     ):
         http_client = http_client or bazooka.Client(default_timeout=20)
 
         self._orch_api = rest_orch.OrchAPI(
             orch_endpoint,
             http_client=http_client,
+            encryptor=encryptor,
         )
         self._status_api = rest_status.StatusAPI(
             status_endpoint,
             http_client=http_client,
+            encryptor=encryptor,
         )
 
     def agents_create(

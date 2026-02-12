@@ -20,6 +20,8 @@ import json
 import threading
 from pathlib import Path
 
+from gcl_sdk.common import utils
+
 
 class JsonFileStorageSingleton(dict):
     _instances = {}
@@ -50,7 +52,7 @@ class JsonFileStorageSingleton(dict):
 
         # Save the new data
         tmp_file = self._storage_path.with_suffix(".tmp")
-        with open(tmp_file, "w") as f:
+        with open(tmp_file, "w", opener=utils.rw_owner_opener) as f:
             json.dump(self, f, indent=2)
         os.replace(tmp_file, self._storage_path)
 
