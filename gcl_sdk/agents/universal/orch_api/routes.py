@@ -28,6 +28,8 @@ class UniversalAgentsGetPayloadAction(routes.Action):
 class UniversalAgentsRoute(routes.Route):
     """Handler for /v1/agents/ endpoint"""
 
+    __allow_methods__ = [routes.GET]
+
     __controller__ = controllers.UniversalAgentsController
 
     get_payload = routes.action(UniversalAgentsGetPayloadAction)

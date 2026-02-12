@@ -15,10 +15,11 @@
 #    under the License.
 import uuid as sys_uuid
 
+from restalchemy.api import actions
 from restalchemy.api import resources
-from restalchemy.api import controllers
 from restalchemy.dm import filters as dm_filters
 
+from gcl_sdk.agents.universal.api import crypto
 from gcl_sdk.agents.universal.api import controllers as sdk_controllers
 from gcl_sdk.agents.universal.status_api.dm import models
 
@@ -33,7 +34,7 @@ class KindController(sdk_controllers.BaseSdkResourceController):
     )
 
 
-class ResourcesController(controllers.BaseNestedResourceController):
+class ResourcesController(sdk_controllers.BaseSdkNestedResourceController):
     """Controller for /v1/kind/<name>/resources/ endpoint"""
 
     __resource__ = resources.ResourceByRAModel(
@@ -71,3 +72,21 @@ class UniversalAgentsController(sdk_controllers.BaseSdkResourceController):
         process_filters=True,
         convert_underscore=False,
     )
+
+
+class NodesController(sdk_controllers.BaseSdkResourceController):
+    """Controller for /v1/nodes/ endpoint"""
+
+    __resource__ = resources.ResourceByRAModel(
+        model_class=models.NodeEncryptionKey,
+        process_filters=True,
+        convert_underscore=False,
+    )
+
+    @actions.post
+    def refresh_secret(self, resource: models.NodeEncryptionKey):
+        _, key_base64 = crypto.generate_key_base64()
+        resource.private_key = key_base64
+        resource.save()
+
+        return {"key": key_base64}

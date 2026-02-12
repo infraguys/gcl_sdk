@@ -15,12 +15,12 @@
 #    under the License.
 from restalchemy.api import actions
 from restalchemy.api import resources
-from restalchemy.api import controllers
+from gcl_sdk.agents.universal.api import controllers as sdk_controllers
 
 from gcl_sdk.agents.universal.dm import models
 
 
-class UniversalAgentsController(controllers.BaseResourceController):
+class UniversalAgentsController(sdk_controllers.BaseSdkResourceController):
     """Controller for /v1/agents/ endpoint"""
 
     __resource__ = resources.ResourceByRAModel(

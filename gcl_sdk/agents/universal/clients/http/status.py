@@ -39,9 +39,12 @@ class ResourcesClient(base.CollectionBaseModelClient):
         kind: str,
         http_client: bazooka.Client | None = None,
         auth: base.AbstractAuthenticator | None = None,
+        encryptor: base.Encryptor | None = None,
     ) -> None:
         collecton_path = f"/{self.API_VERSION}/kind/{kind}/resources/"
-        super().__init__(base_url, collecton_path, http_client, auth)
+        super().__init__(
+            base_url, collecton_path, http_client, auth, encryptor
+        )
         self._kind = kind
 
     def _set_kind_ref(self, resource: models.Resource | dict) -> None:
@@ -103,11 +106,15 @@ class StatusAPI:
         self,
         base_url: str,
         http_client: bazooka.Client | None = None,
+        encryptor: base.Encryptor | None = None,
     ) -> None:
         http_client = http_client or bazooka.Client()
         self._http_client = http_client
         self._base_url = base_url
-        self._agents_client = UniversalAgentsClient(base_url, http_client)
+        self._encryptor = encryptor
+        self._agents_client = UniversalAgentsClient(
+            base_url, http_client=http_client, encryptor=encryptor
+        )
 
     @property
     def agents(self) -> UniversalAgentsClient:
@@ -115,4 +122,6 @@ class StatusAPI:
 
     @functools.lru_cache
     def resources(self, kind: str) -> ResourcesClient:
-        return ResourcesClient(self._base_url, kind, self._http_client)
+        return ResourcesClient(
+            self._base_url, kind, self._http_client, encryptor=self._encryptor
+        )
