@@ -44,10 +44,7 @@ core_agent_opts = [
     cfg.StrOpt(
         "uuid",
         default=None,
-        help=(
-            "UUID of the agent, if not provided, "
-            "the system UUID will be used"
-        ),
+        help=("UUID of the agent, if not provided, the system UUID will be used"),
     ),
     cfg.StrOpt(
         "uuid5_name",
@@ -116,9 +113,7 @@ def load_transformers(
         if not transformer:
             continue
 
-        transformer_map[kind] = direct.ResourceTransformer.from_dict(
-            transformer
-        )
+        transformer_map[kind] = direct.ResourceTransformer.from_dict(transformer)
 
     LOG.info("Loaded transformers: %s", transformer_map)
     return transformer_map
@@ -138,9 +133,7 @@ def main():
     if CONF[DOMAIN].uuid:
         agent_uuid = sys_uuid.UUID(CONF[DOMAIN].uuid)
     elif CONF[DOMAIN].uuid5_name:
-        agent_uuid = sys_uuid.uuid5(
-            ua_utils.system_uuid(), CONF[DOMAIN].uuid5_name
-        )
+        agent_uuid = sys_uuid.uuid5(ua_utils.system_uuid(), CONF[DOMAIN].uuid5_name)
     else:
         agent_uuid = ua_utils.system_uuid()
 

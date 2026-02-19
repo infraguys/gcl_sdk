@@ -41,7 +41,6 @@ class PaaSCollection(tp.NamedTuple):
 
 
 class PaaSBuilder(builder.UniversalBuilderService):
-
     def create_paas_objects(
         self, instance: ua_models.InstanceWithDerivativesMixin
     ) -> tp.Collection[ua_models.TargetResourceKindAwareMixin]:
@@ -71,9 +70,7 @@ class PaaSBuilder(builder.UniversalBuilderService):
         self,
         instance: ua_models.InstanceWithDerivativesMixin,
         paas_objects: tp.Collection[ua_models.TargetResourceKindAwareMixin],
-    ) -> dict[
-        sys_uuid.UUID, tp.Collection[ua_models.TargetResourceKindAwareMixin]
-    ]:
+    ) -> dict[sys_uuid.UUID, tp.Collection[ua_models.TargetResourceKindAwareMixin]]:
         """Schedule the PaaS objects.
 
         The method schedules the PaaS objects. The result is a dictionary
@@ -144,8 +141,7 @@ class PaaSBuilder(builder.UniversalBuilderService):
         derivative_pairs: tp.Collection[
             tuple[
                 ua_models.TargetResourceKindAwareMixin,  # The target resource
-                ua_models.TargetResourceKindAwareMixin
-                | None,  # The actual resource
+                ua_models.TargetResourceKindAwareMixin | None,  # The actual resource
             ]
         ],
     ) -> tp.Collection[ua_models.TargetResourceKindAwareMixin]:
@@ -167,8 +163,7 @@ class PaaSBuilder(builder.UniversalBuilderService):
         derivative_pairs: tp.Collection[
             tuple[
                 ua_models.TargetResourceKindAwareMixin,  # The target resource
-                ua_models.TargetResourceKindAwareMixin
-                | None,  # The actual resource
+                ua_models.TargetResourceKindAwareMixin | None,  # The actual resource
             ]
         ],
     ) -> tp.Collection[ua_models.TargetResourceKindAwareMixin]:
@@ -204,9 +199,7 @@ class PaaSBuilder(builder.UniversalBuilderService):
             paas_objects=tuple(PaaSResourcePair(*p) for p in derivative_pairs),
         )
 
-        return self.actualize_paas_objects_source_data_plane(
-            instance, paas_collection
-        )
+        return self.actualize_paas_objects_source_data_plane(instance, paas_collection)
 
     def track_outdated_master_full_hash_instances(self) -> bool:
         """Track outdated master full hash instances."""
@@ -219,8 +212,7 @@ class PaaSBuilder(builder.UniversalBuilderService):
         derivatives: tp.Collection[
             tuple[
                 ua_models.TargetResourceKindAwareMixin,  # The target resource
-                ua_models.TargetResourceKindAwareMixin
-                | None,  # The actual resource
+                ua_models.TargetResourceKindAwareMixin | None,  # The actual resource
             ]
         ],
     ) -> tp.Collection[ua_models.TargetResourceKindAwareMixin]:
@@ -251,9 +243,7 @@ class PaaSBuilder(builder.UniversalBuilderService):
 
     def post_create_instance_resource(
         self,
-        instance: (
-            ua_models.InstanceMixin | ua_models.InstanceWithDerivativesMixin
-        ),
+        instance: (ua_models.InstanceMixin | ua_models.InstanceWithDerivativesMixin),
         resource: ua_models.TargetResource,
         derivatives: tp.Collection[ua_models.TargetResource] = tuple(),
     ) -> None:

@@ -1,0 +1,203 @@
+[project]
+name = "gcl_sdk"
+description = "The Genesis Core SDK"
+readme = "README.md"
+authors = [{name = "Genesis Corporation", email = "eugene@frolov.net.ru"}]
+dynamic = ["version"]
+license = {text = "Apache-2.0"}
+requires-python = ">=3.8"
+classifiers = [
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+]
+dependencies = [
+    "oslo.config>=3.22.2,<10.0.0",  # Apache-2.0
+    "importlib-metadata",  # Apache-2.0
+    "restalchemy>=15.0.1,<16.0.0",  # Apache-2.0
+    "gcl_iam>=1.0.0,<2.0.0",  # Apache-2.0
+    "gcl_looper>=1.0.1,<2.0.0",  # Apache-2.0
+    "bjoern>=3.2.2",  # BSD License (BSD-3-Clause)
+    "izulu>=0.50.0,<1.0.0",  # MIT License
+    "renameat2>=0.4.4,<1.0.0",  # MIT License
+    "xxhash>=3.5.0,<4.0.0",  # BSD 2-Clause License
+    "orjson>=3.10.0,<4.0.0",  # MIT
+]
+[project.urls]
+homepage = "https://github.com/infraguys/gcl_sdk/"
+
+[build-system]
+requires = [
+    "setuptools>=75.3.3",  # last version for python3.8
+    "setuptools_scm>=8"
+]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools_scm]
+
+[project.optional-dependencies]
+dev = [
+    "tox>=4.0.0",
+    "tox-uv",
+    "pytest>=7.0.0",
+]
+test = [
+    "coverage>=4.0",
+    "mock>=3.0.5,<4.0.0",
+    "pytest>=8.0.0,<9.0.0",
+    "pytest-timer>=1.0.0,<2.0.0",  # MIT License (MIT)
+]
+mypy = [
+    "mypy",
+]
+ruff = [
+    "ruff",
+]
+shellcheck = [
+    "shellcheck-py",
+]
+
+[tool.ruff]
+exclude = [
+    ".bzr",
+    ".direnv",
+    ".eggs",
+    ".git",
+    ".git-rewrite",
+    ".hg",
+    ".ipynb_checkpoints",
+    ".mypy_cache",
+    ".nox",
+    ".pants.d",
+    ".pyenv",
+    ".pytest_cache",
+    ".pytype",
+    ".ruff_cache",
+    ".svn",
+    ".tox",
+    ".venv",
+    ".vscode",
+    "__pypackages__",
+    "_build",
+    "buck-out",
+    "build",
+    "dist",
+    "node_modules",
+    "site-packages",
+    "venv",
+    "docs",
+]
+
+# Same as Black.
+line-length = 88
+indent-width = 4
+# Assume Python 3.8
+target-version = "py38"
+[lint]
+# Enable Pyflakes (`F`) and a subset of the pycodestyle (`E`)  codes by default.
+select = ["E4", "E7", "E9", "F"]
+ignore = []
+# Allow fix for all enabled rules (when `--fix`) is provided.
+fixable = ["ALL"]
+unfixable = []
+# Allow unused variables when underscore-prefixed.
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+[format]
+# Like Black, use double quotes for strings.
+quote-style = "double"
+# Like Black, indent with spaces, rather than tabs.
+indent-style = "space"
+# Like Black, respect magic trailing commas.
+skip-magic-trailing-comma = false
+# Like Black, automatically detect the appropriate line ending.
+line-ending = "auto"
+
+[tool.setuptools.packages.find]
+where = ["."]
+
+[project.scripts]
+genesis-universal-agent = "gcl_sdk.agents.universal.cmd.universal_agent:main"
+genesis-universal-agent-db-back = "gcl_sdk.agents.universal.cmd.universal_agent_db_back:main"
+genesis-universal-scheduler = "gcl_sdk.agents.universal.cmd.scheduler:main"
+
+[project.entry-points."gcl_sdk_event_payloads"]
+DummyEventPayload = "gcl_sdk.events.dm.models:DummyEventPayload"
+
+[project.entry-points."gcl_sdk_universal_agent"]
+LBCapabilityDriver = "gcl_sdk.agents.universal.drivers.lb:LBCapabilityDriver"
+LBAgentCapabilityDriver = "gcl_sdk.agents.universal.drivers.lb:LBAgentCapabilityDriver"
+RenderAgentDriver = "gcl_sdk.agents.universal.drivers.render:RenderAgentDriver"
+SSHKeyCapabilityDriver = "gcl_sdk.agents.universal.drivers.ssh_key:SSHKeyCapabilityDriver"
+ServiceCapabilityDriver = "gcl_sdk.agents.universal.drivers.service:ServiceCapabilityDriver"
+GuestMachineCapabilityDriver = "gcl_sdk.agents.universal.drivers.guest:GuestMachineCapabilityDriver"
+CoreCapabilityDriver = "gcl_sdk.agents.universal.drivers.core:CoreCapabilityDriver"
+RestCoreCapabilityDriver = "gcl_sdk.agents.universal.drivers.core:RestCoreCapabilityDriver"
+
+[tool.uv]
+package = true
+
+[tool.mypy]
+exclude = [
+    '.venv',
+    'gcl_sdk/tests',
+]
+python_version = "3.12"
+disallow_untyped_defs = true
+show_error_codes = true
+no_implicit_optional = true
+warn_return_any = false
+warn_unused_ignores = true
+ignore_missing_imports = true
+
+[tool.setuptools.package-data]
+gcl_sdk = ["*.yaml", "*.md"]
+
+[tool.coverage.run]
+branch = true
+source = [
+    "gcl_sdk"
+]
+command_line = "-m pytest -s gcl_sdk/tests/unit"
+omit = [
+    "gcl_sdk/tests/*",
+    ".venv",
+    "memory:0x"
+]
+
+[tool.coverage.report]
+# Regexes for lines to exclude from consideration
+exclude_also = [
+    # Don't complain about missing debug-only code:
+    "def __repr__",
+    "if self\\.debug",
+    "if settings\\.DEBUG",
+
+    # Don't complain if tests don't hit defensive assertion code:
+    "raise AssertionError",
+    "raise NotImplementedError",
+
+    # Don't complain if non-runnable code isn't run:
+    "if 0:",
+    "if __name__ == .__main__.:",
+
+    "if TYPE_CHECKING:",
+
+    # Don't complain about abstract methods, they aren't run:
+    "@(abc\\.)?abstractmethod",
+    ]
+
+ignore_errors = true
+
+[tool.coverage.html]
+directory = "cover"
+
+[tool.coverage.xml]
+output = "cover/coverage.xml"

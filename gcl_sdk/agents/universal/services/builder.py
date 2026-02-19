@@ -68,9 +68,7 @@ class UniversalBuilderService(
         """
         return {}
 
-    def can_create_instance_resource(
-        self, instance: models.InstanceMixin
-    ) -> bool:
+    def can_create_instance_resource(self, instance: models.InstanceMixin) -> bool:
         """The hook to check if the instance can be created.
 
         If the hook returns `False`, the code related to the instance:
@@ -86,9 +84,7 @@ class UniversalBuilderService(
 
         return True
 
-    def pre_create_instance_resource(
-        self, instance: models.InstanceMixin
-    ) -> None:
+    def pre_create_instance_resource(self, instance: models.InstanceMixin) -> None:
         """The hook is performed before creating instance resource.
 
         The hook is called only for new instances.
@@ -163,8 +159,7 @@ class UniversalBuilderService(
         derivative_pairs: tp.Collection[
             tuple[
                 models.TargetResourceKindAwareMixin,  # The target resource
-                models.TargetResourceKindAwareMixin
-                | None,  # The actual resource
+                models.TargetResourceKindAwareMixin | None,  # The actual resource
             ]
         ],
     ) -> tp.Collection[models.TargetResourceKindAwareMixin]:
@@ -238,8 +233,7 @@ class UniversalBuilderService(
         derivative_pairs: tp.Collection[
             tuple[
                 models.TargetResourceKindAwareMixin,  # The target resource
-                models.TargetResourceKindAwareMixin
-                | None,  # The actual resource
+                models.TargetResourceKindAwareMixin | None,  # The actual resource
             ]
         ],
     ) -> tp.Collection[models.TargetResourceKindAwareMixin]:
@@ -290,9 +284,7 @@ class UniversalBuilderService(
         """
         pass
 
-    def can_delete_instance_resource(
-        self, resource: models.TargetResource
-    ) -> bool:
+    def can_delete_instance_resource(self, resource: models.TargetResource) -> bool:
         """The hook to check if the instance can be deleted.
 
         If the hook returns `False`, the code related to the instance:
@@ -321,17 +313,13 @@ class UniversalBuilderService(
                     ):
                         value[field] = None
 
-                instance = self._instance_model.restore_from_simple_view(
-                    **value
-                )
+                instance = self._instance_model.restore_from_simple_view(**value)
 
             return instance.is_ready_to_delete()
 
         return True
 
-    def pre_delete_instance_resource(
-        self, resource: models.TargetResource
-    ) -> None:
+    def pre_delete_instance_resource(self, resource: models.TargetResource) -> None:
         """The hook is performed before deleting instance resource."""
         pass
 
@@ -350,8 +338,7 @@ class UniversalBuilderService(
         derivatives: tp.Collection[
             tuple[
                 models.TargetResourceKindAwareMixin,  # The target resource
-                models.TargetResourceKindAwareMixin
-                | None,  # The actual resource
+                models.TargetResourceKindAwareMixin | None,  # The actual resource
             ]
         ],
     ) -> tp.Collection[models.TargetResourceKindAwareMixin]:
@@ -381,8 +368,7 @@ class UniversalBuilderService(
         derivatives: tp.Collection[
             tuple[
                 models.TargetResourceKindAwareMixin,  # The target resource
-                models.TargetResourceKindAwareMixin
-                | None,  # The actual resource
+                models.TargetResourceKindAwareMixin | None,  # The actual resource
             ]
         ],
     ) -> tp.Collection[models.TargetResourceKindAwareMixin]:
@@ -634,9 +620,7 @@ class UniversalBuilderService(
             target_resource: The target resource of the instance.
             actual_resource: The actual resource of the instance.
         """
-        actual_instance = self._instance_model.from_ua_resource(
-            actual_resource
-        )
+        actual_instance = self._instance_model.from_ua_resource(actual_resource)
 
         # Hook to actualize instance. For example, for `Password` instance
         # we need to update its value, saved into the secret storage.
@@ -692,12 +676,8 @@ class UniversalBuilderService(
         # Convert derivatives to actual models
         derivatives = [
             (
-                self._instance_model.derivative_model(t.kind).from_ua_resource(
-                    t
-                ),
-                self._instance_model.derivative_model(a.kind).from_ua_resource(
-                    a
-                ),
+                self._instance_model.derivative_model(t.kind).from_ua_resource(t),
+                self._instance_model.derivative_model(a.kind).from_ua_resource(a),
             )
             for t, a in changed_derivatives
         ]
@@ -775,13 +755,9 @@ class UniversalBuilderService(
         # Convert derivatives to actual models
         derivatives = [
             (
-                self._instance_model.derivative_model(t.kind).from_ua_resource(
-                    t
-                ),
+                self._instance_model.derivative_model(t.kind).from_ua_resource(t),
                 (
-                    self._instance_model.derivative_model(
-                        a.kind
-                    ).from_ua_resource(a)
+                    self._instance_model.derivative_model(a.kind).from_ua_resource(a)
                     if a is not None
                     else None
                 ),
@@ -861,9 +837,7 @@ class UniversalBuilderService(
             derivative_resources.append(derivative_resource)
             # Schedule derivatives to the UA agent for simple cases
             if isinstance(derivative_object, models.SchedulableToAgentMixin):
-                self._schedule_to_ua_agent(
-                    derivative_object, derivative_resource
-                )
+                self._schedule_to_ua_agent(derivative_object, derivative_resource)
             derivative_resource.save()
 
         # Actualize tracked instances
@@ -946,13 +920,11 @@ class UniversalBuilderService(
             # Convert derivative resources to actual models
             current_derivatives = tuple(
                 (
-                    self._instance_model.derivative_model(
-                        t.kind
-                    ).from_ua_resource(t),
+                    self._instance_model.derivative_model(t.kind).from_ua_resource(t),
                     (
-                        self._instance_model.derivative_model(
-                            a.kind
-                        ).from_ua_resource(a)
+                        self._instance_model.derivative_model(a.kind).from_ua_resource(
+                            a
+                        )
                         if a is not None
                         else None
                     ),
@@ -990,9 +962,7 @@ class UniversalBuilderService(
                 frozenset(tracked),
             )
 
-        self.post_update_instance_resource(
-            instance, resource, target_resources
-        )
+        self.post_update_instance_resource(instance, resource, target_resources)
 
         instance.save()
 
@@ -1017,19 +987,15 @@ class UniversalBuilderService(
         instance_resources = models.TargetResource.objects.get_all(
             filters={
                 "uuid": dm_filters.In(i.uuid for i in updated_instances),
-                "kind": dm_filters.EQ(
-                    self._instance_model.get_resource_kind()
-                ),
+                "kind": dm_filters.EQ(self._instance_model.get_resource_kind()),
             }
         )
 
         # Collect tracked instances to actualize them later
         if self._instance_model._has_model_tracked_instances():
-            tracked_resource_map = (
-                models.TrackedResource.fetch_by_watcher_kind(
-                    self._instance_model.get_resource_kind(),
-                    uuids={i.uuid for i in updated_instances},
-                )
+            tracked_resource_map = models.TrackedResource.fetch_by_watcher_kind(
+                self._instance_model.get_resource_kind(),
+                uuids={i.uuid for i in updated_instances},
             )
         else:
             tracked_resource_map = {}
@@ -1136,9 +1102,7 @@ class UniversalBuilderService(
                 self._actualize_outdated_instance(instance, target, actual)
                 LOG.debug("Instance(%s) %s actualized", kind, instance.uuid)
             except Exception:
-                LOG.exception(
-                    "Error actualizing instance(%s) %s", kind, instance.uuid
-                )
+                LOG.exception("Error actualizing instance(%s) %s", kind, instance.uuid)
 
     def _get_outdated_derivative_resources(
         self,
@@ -1148,9 +1112,7 @@ class UniversalBuilderService(
         list[models.ResourcePair],
     ]:
         outdated = self._get_outdated_resources(
-            filters={
-                "kind": dm_filters.In(self._instance_model.derivative_kinds())
-            },
+            filters={"kind": dm_filters.In(self._instance_model.derivative_kinds())},
             limit=limit,
         )
 
@@ -1300,9 +1262,7 @@ class UniversalBuilderService(
 
     def _actualize_deleted_instances(self) -> None:
         """Actualize deleted instances."""
-        deleted_instance_resources = (
-            self._instance_model.get_deleted_instances()
-        )
+        deleted_instance_resources = self._instance_model.get_deleted_instances()
 
         if len(deleted_instance_resources) == 0:
             return
@@ -1326,9 +1286,7 @@ class UniversalBuilderService(
 
                 self.pre_delete_instance_resource(instance_res)
 
-                resources_to_delete = tuple(t for t, _ in derivatives) + (
-                    instance_res,
-                )
+                resources_to_delete = tuple(t for t, _ in derivatives) + (instance_res,)
                 for resource in resources_to_delete:
                     resource.delete()
                     LOG.info(
@@ -1396,19 +1354,13 @@ class UniversalBuilderService(
         if self._instance_model.__master_model__ is None:
             raise ValueError("The master model is not initialized.")
 
-        master_instance = (
-            self._instance_model.__master_model__.from_ua_resource(master)
-        )
+        master_instance = self._instance_model.__master_model__.from_ua_resource(master)
 
         converted_derivatives = [
             (
-                self._instance_model.derivative_model(t.kind).from_ua_resource(
-                    t
-                ),
+                self._instance_model.derivative_model(t.kind).from_ua_resource(t),
                 (
-                    self._instance_model.derivative_model(
-                        a.kind
-                    ).from_ua_resource(a)
+                    self._instance_model.derivative_model(a.kind).from_ua_resource(a)
                     if a is not None
                     else None
                 ),
@@ -1423,10 +1375,8 @@ class UniversalBuilderService(
                 instance, master_instance, converted_derivatives
             )
         else:
-            new_derivatives = (
-                self.actualize_outdated_master_full_hash_instance(
-                    instance, master_instance, converted_derivatives
-                )
+            new_derivatives = self.actualize_outdated_master_full_hash_instance(
+                instance, master_instance, converted_derivatives
             )
 
         # Convert derivatives to new target resources
@@ -1453,9 +1403,7 @@ class UniversalBuilderService(
 
     def _actualize_outdated_master_instances(
         self,
-        resources: tuple[
-            tuple[models.TargetResource, models.TargetResource], ...
-        ],
+        resources: tuple[tuple[models.TargetResource, models.TargetResource], ...],
         tracked_field: tp.Literal["hash", "full_hash"] = "hash",
     ) -> None:
         """Actualize outdated master hash instances.
@@ -1496,17 +1444,13 @@ class UniversalBuilderService(
         """Actualize outdated master hash instances."""
 
         resources = self._get_outdated_master_hash_resources()
-        self._actualize_outdated_master_instances(
-            resources, tracked_field="hash"
-        )
+        self._actualize_outdated_master_instances(resources, tracked_field="hash")
 
     def _actualize_outdated_master_full_hash_instances(self) -> None:
         """Actualize outdated master full hash instances."""
 
         resources = self._get_outdated_master_full_hash_resources()
-        self._actualize_outdated_master_instances(
-            resources, tracked_field="full_hash"
-        )
+        self._actualize_outdated_master_instances(resources, tracked_field="full_hash")
 
     @sql_utils.savepoint()
     def _actualize_instance_with_outdated_tracked(
@@ -1526,9 +1470,7 @@ class UniversalBuilderService(
         # the tracked instances.
 
         # Hook to actualize instance.
-        self.actualize_instance_with_outdated_tracked(
-            instance, tracked_instances
-        )
+        self.actualize_instance_with_outdated_tracked(instance, tracked_instances)
 
         # Refresh tracked instances
         new_tracked_instances = instance.get_normalized_tracked_resources()
@@ -1623,18 +1565,16 @@ class UniversalBuilderService(
             # This is used to fetch all instances of this class.
             # {<tracked_instance_class>: [uuid1, uuid2, ...]}
             target_uuid = o.tracked_resource.target.uuid
-            tracked_instance_classes_map.setdefault(
-                tracked_instance_class, []
-            ).append(target_uuid)
+            tracked_instance_classes_map.setdefault(tracked_instance_class, []).append(
+                target_uuid
+            )
 
             container.append((tracked_instance_class, target_uuid, o))
 
         # Fetch all instances of the tracked instance classes
         instances_by_class = {}
         for _class, uuids in tracked_instance_classes_map.items():
-            _instances = _class.objects.get_all(
-                filters={"uuid": dm_filters.In(uuids)}
-            )
+            _instances = _class.objects.get_all(filters={"uuid": dm_filters.In(uuids)})
             instances_by_class[_class] = {i.uuid: i for i in _instances}
 
         # Prepare final structure for actualization
@@ -1665,12 +1605,10 @@ class UniversalBuilderService(
         for (instance, tgt_resource), tracked in outdated_map.items():
             tracked_instances, tracked_outdated = tracked
             try:
-                new_tracked_ris = (
-                    self._actualize_instance_with_outdated_tracked(
-                        instance,
-                        tgt_resource,
-                        tracked_instances,
-                    )
+                new_tracked_ris = self._actualize_instance_with_outdated_tracked(
+                    instance,
+                    tgt_resource,
+                    tracked_instances,
                 )
 
                 # Actualize tracked resources
@@ -1740,8 +1678,7 @@ class UniversalBuilderService(
                 self._actualize_outdated_master_full_hash_instances()
             except Exception:
                 LOG.exception(
-                    "Error actualizing outdated master full "
-                    "hash instances(%s)",
+                    "Error actualizing outdated master full hash instances(%s)",
                     self._instance_model.__name__,
                 )
 
@@ -1750,8 +1687,7 @@ class UniversalBuilderService(
                 self._actualize_instances_with_outdated_tracked()
             except Exception:
                 LOG.exception(
-                    "Error actualizing instances with outdated "
-                    "tracked instances"
+                    "Error actualizing instances with outdated tracked instances"
                 )
 
     # BasicService interface

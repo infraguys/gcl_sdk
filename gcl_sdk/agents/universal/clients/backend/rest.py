@@ -59,9 +59,7 @@ class RestApiBackendClient(base.AbstractBackendClient):
         collection_url = self._collection_map[resource.kind]
 
         try:
-            return self._client.update(
-                collection_url, resource.uuid, **resource.value
-            )
+            return self._client.update(collection_url, resource.uuid, **resource.value)
         except bazooka_exc.NotFoundError:
             raise exceptions.ResourceNotFound(resource=resource)
 

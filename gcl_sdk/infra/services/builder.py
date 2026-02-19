@@ -40,7 +40,6 @@ class InfraCollection(tp.NamedTuple):
 
 
 class CoreInfraBuilder(builder.UniversalBuilderService):
-
     def create_infra(
         self, instance: ua_models.InstanceWithDerivativesMixin
     ) -> tp.Collection[ua_models.TargetResourceKindAwareMixin]:
@@ -89,8 +88,7 @@ class CoreInfraBuilder(builder.UniversalBuilderService):
         derivative_pairs: tp.Collection[
             tuple[
                 ua_models.TargetResourceKindAwareMixin,  # The target resource
-                ua_models.TargetResourceKindAwareMixin
-                | None,  # The actual resource
+                ua_models.TargetResourceKindAwareMixin | None,  # The actual resource
             ]
         ],
     ) -> tp.Collection[ua_models.TargetResourceKindAwareMixin]:
@@ -101,9 +99,7 @@ class CoreInfraBuilder(builder.UniversalBuilderService):
         The default behavior is to send the same list as on instance creation.
         """
         infra_collection = InfraCollection(
-            infra_objects=tuple(
-                InfraResourcePair(*p) for p in derivative_pairs
-            ),
+            infra_objects=tuple(InfraResourcePair(*p) for p in derivative_pairs),
         )
 
         return self.actualize_infra(instance, infra_collection)
@@ -114,8 +110,7 @@ class CoreInfraBuilder(builder.UniversalBuilderService):
         derivative_pairs: tp.Collection[
             tuple[
                 ua_models.TargetResourceKindAwareMixin,  # The target resource
-                ua_models.TargetResourceKindAwareMixin
-                | None,  # The actual resource
+                ua_models.TargetResourceKindAwareMixin | None,  # The actual resource
             ]
         ],
     ) -> tp.Collection[ua_models.TargetResourceKindAwareMixin]:
@@ -148,9 +143,7 @@ class CoreInfraBuilder(builder.UniversalBuilderService):
             derivative_pairs: Changed or all derivatives of the instance.
         """
         infra_collection = InfraCollection(
-            infra_objects=tuple(
-                InfraResourcePair(*p) for p in derivative_pairs
-            ),
+            infra_objects=tuple(InfraResourcePair(*p) for p in derivative_pairs),
         )
 
         return self.actualize_infra(instance, infra_collection)

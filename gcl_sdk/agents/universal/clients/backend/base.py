@@ -69,9 +69,7 @@ class AbstractBackendClient(abc.ABC):
     @abc.abstractmethod
     def list(
         self, kind: str, **kwargs
-    ) -> tp.Collection[
-        dict[str, tp.Any] | models.Resource | models.ResourceMixin
-    ]:
+    ) -> tp.Collection[dict[str, tp.Any] | models.Resource | models.ResourceMixin]:
         """Lists all resources by kind.
 
         The method returns collection of resources in different formats:

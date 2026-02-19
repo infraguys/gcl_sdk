@@ -1,5 +1,3 @@
-import uuid as sys_uuid
-
 from gcl_iam import controllers as iam_controllers
 from restalchemy.api import controllers, resources
 

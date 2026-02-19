@@ -51,9 +51,7 @@ class RestServiceTestCase(ra_db_utils.DBEngineMixin):
                 "../../migrations",
             )
 
-        migration_engine = migrations.MigrationEngine(
-            migrations_path=migrations_path
-        )
+        migration_engine = migrations.MigrationEngine(migrations_path=migrations_path)
         return migration_engine
 
     @property
@@ -65,8 +63,7 @@ class RestServiceTestCase(ra_db_utils.DBEngineMixin):
         cascade = " CASCADE" if cascade else ""
         with cls.engine.session_manager(session=session) as s:
             s.execute(
-                "drop table if exists"
-                f" {session.engine.escape(table_name)}{cascade}"
+                f"drop table if exists {session.engine.escape(table_name)}{cascade}"
             )
 
     @classmethod
@@ -107,17 +104,13 @@ class RestServiceTestCase(ra_db_utils.DBEngineMixin):
     @classmethod
     def drop_view(cls, view_name, session=None):
         with cls.engine.session_manager(session=session) as s:
-            s.execute(
-                f"drop view if exists {session.engine.escape(view_name)}"
-            )
+            s.execute(f"drop view if exists {session.engine.escape(view_name)}")
 
     def get_endpoint(self, template: str = ENDPOINT_TEMPLATE) -> str:
         return template % self.service_port
 
     def find_free_port(self) -> int:
-        with contextlib.closing(
-            socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        ) as s:
+        with contextlib.closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
             s.bind(("127.0.0.1", 0))
             s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             return s.getsockname()[1]

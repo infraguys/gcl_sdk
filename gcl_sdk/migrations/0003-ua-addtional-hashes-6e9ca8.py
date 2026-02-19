@@ -17,7 +17,6 @@ from restalchemy.storage.sql import migrations
 
 
 class MigrationStep(migrations.AbstarctMigrationStep):
-
     def __init__(self):
         self._depends = ["0002-init-auditlog-table-c6f740.py"]
 

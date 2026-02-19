@@ -64,10 +64,7 @@ core_agent_opts = [
     cfg.StrOpt(
         "uuid",
         default=None,
-        help=(
-            "UUID of the agent, if not provided, "
-            "the system UUID will be used"
-        ),
+        help=("UUID of the agent, if not provided, the system UUID will be used"),
     ),
     cfg.StrOpt(
         "uuid5_name",
@@ -183,9 +180,7 @@ def main():
     if CONF[DOMAIN].uuid:
         agent_uuid = sys_uuid.UUID(CONF[DOMAIN].uuid)
     elif CONF[DOMAIN].uuid5_name:
-        agent_uuid = sys_uuid.uuid5(
-            ua_utils.system_uuid(), CONF[DOMAIN].uuid5_name
-        )
+        agent_uuid = sys_uuid.uuid5(ua_utils.system_uuid(), CONF[DOMAIN].uuid5_name)
     else:
         agent_uuid = ua_utils.system_uuid()
 
@@ -201,17 +196,13 @@ def main():
 
     # Load capability drivers
     for driver_name in CONF[DOMAIN].caps_drivers or tuple():
-        driver_class = utils.load_from_entry_point(
-            c.EP_UNIVERSAL_AGENT, driver_name
-        )
+        driver_class = utils.load_from_entry_point(c.EP_UNIVERSAL_AGENT, driver_name)
         driver = load_driver(driver_class)
 
         # Check for duplicate capabilities
         driver_capabilities = driver.get_capabilities()
         if set(driver_capabilities) & capabilities:
-            raise ValueError(
-                f"Driver {driver_name} has duplicate capabilities"
-            )
+            raise ValueError(f"Driver {driver_name} has duplicate capabilities")
         capabilities |= set(driver_capabilities)
 
         caps_drivers.append(driver)
@@ -219,9 +210,7 @@ def main():
 
     # Load fact drivers
     for driver_name in CONF[DOMAIN].facts_drivers or tuple():
-        driver_class = utils.load_from_entry_point(
-            c.EP_UNIVERSAL_AGENT, driver_name
-        )
+        driver_class = utils.load_from_entry_point(c.EP_UNIVERSAL_AGENT, driver_name)
         driver = load_driver(driver_class)
 
         # Check for duplicate capabilities

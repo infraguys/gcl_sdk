@@ -73,9 +73,7 @@ class ObjectType(oslo_types.String):
         if isinstance(value, str):
             return utils.cfg_load_class(value)
 
-        raise ValueError(
-            f"Invalid Object reference type: {type(value).__name__}"
-        )
+        raise ValueError(f"Invalid Object reference type: {type(value).__name__}")
 
     def __repr__(self) -> str:
         return "Object"

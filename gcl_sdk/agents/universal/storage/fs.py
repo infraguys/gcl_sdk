@@ -31,18 +31,14 @@ class TargetFieldsFileStorage(base.AbstractTargetFieldsStorage):
     """
 
     def __init__(self, storage_path: str) -> None:
-        self._storage = common.JsonFileStorageSingleton.get_instance(
-            storage_path
-        )
+        self._storage = common.JsonFileStorageSingleton.get_instance(storage_path)
 
     def get(self, kind: str, uuid: sys_uuid.UUID) -> base.TargetFieldItem:
         """Get the target fields item from the storage."""
         try:
             fields = self._storage[kind][str(uuid)]
         except KeyError:
-            raise se.ItemNotFound(
-                item=base.TargetFieldItem(kind, uuid, frozenset())
-            )
+            raise se.ItemNotFound(item=base.TargetFieldItem(kind, uuid, frozenset()))
 
         return base.TargetFieldItem(kind, uuid, frozenset(fields))
 
@@ -61,9 +57,7 @@ class TargetFieldsFileStorage(base.AbstractTargetFieldsStorage):
             if not force:
                 raise se.ItemAlreadyExists(item=item)
 
-        self._storage.setdefault(item.kind, {})[str(item.uuid)] = list(
-            item.fields
-        )
+        self._storage.setdefault(item.kind, {})[str(item.uuid)] = list(item.fields)
         return item
 
     def update(self, item: base.TargetFieldItem) -> base.TargetFieldItem:

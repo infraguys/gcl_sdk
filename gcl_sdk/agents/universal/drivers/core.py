@@ -53,17 +53,13 @@ class CoreCapabilityDriver(direct.DirectAgentDriver):
         auth = base.CoreIamAuthenticator(
             user_api_base_url, username, password, http_client=http
         )
-        self._collection_map = {
-            k: v.strip() for k, v in collection_map.items()
-        }
+        self._collection_map = {k: v.strip() for k, v in collection_map.items()}
 
         rest_client = base.CollectionBaseClient(
             http_client=http, base_url=user_api_base_url, auth=auth
         )
 
-        storage_path = os.path.join(
-            agent_work_dir, CORE_TARGET_FIELDS_FILENAME
-        )
+        storage_path = os.path.join(agent_work_dir, CORE_TARGET_FIELDS_FILENAME)
 
         storage = fs.TargetFieldsFileStorage(storage_path)
         rest_client = core_rest_back.GCRestApiBackendClient(
@@ -96,17 +92,13 @@ class RestCoreCapabilityDriver(direct.DirectAgentDriver):
         auth = base.CoreIamAuthenticator(
             user_api_base_url, username, password, http_client=http
         )
-        self._collection_map = {
-            k: v.strip() for k, v in collection_map.items()
-        }
+        self._collection_map = {k: v.strip() for k, v in collection_map.items()}
 
         rest_client = base.CollectionBaseClient(
             http_client=http, base_url=user_api_base_url, auth=auth
         )
 
-        storage_path = os.path.join(
-            agent_work_dir, CORE_TARGET_FIELDS_FILENAME
-        )
+        storage_path = os.path.join(agent_work_dir, CORE_TARGET_FIELDS_FILENAME)
 
         storage = fs.TargetFieldsFileStorage(storage_path)
         rest_client = core_rest_back.GCRestApiBackendClient(

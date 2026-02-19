@@ -43,18 +43,14 @@ class ResourcesController(sdk_controllers.BaseSdkNestedResourceController):
         convert_underscore=False,
     )
 
-    def filter(
-        self, parent_resource: models.KindModel, filters, order_by=None
-    ):
+    def filter(self, parent_resource: models.KindModel, filters, order_by=None):
         return models.Resource.objects.get_all(
             filters={
                 "kind": dm_filters.EQ(parent_resource.kind),
             }
         )
 
-    def get(
-        self, uuid: sys_uuid.UUID, parent_resource: models.KindModel, **kwargs
-    ):
+    def get(self, uuid: sys_uuid.UUID, parent_resource: models.KindModel, **kwargs):
         resource = models.Resource.objects.get_one(
             filters={
                 "kind": dm_filters.EQ(parent_resource.kind),

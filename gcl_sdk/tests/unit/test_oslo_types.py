@@ -120,6 +120,4 @@ class TestObjectOpt(unittest.TestCase):
         conf = cfg.ConfigOpts()
         conf.register_cli_opt(ObjectOpt("bad"))
         with self.assertRaises((ValueError, SystemExit)):
-            conf(
-                ["--bad", "gcl_sdk.common.oslo.types.ObjectType"]
-            )  # invalid format
+            conf(["--bad", "gcl_sdk.common.oslo.types.ObjectType"])  # invalid format

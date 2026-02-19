@@ -31,23 +31,17 @@ from gcl_sdk.agents.universal.storage import common as storage_common
 LOG = logging.getLogger(__name__)
 
 
-class MetaDataPlaneModel(
-    ra_models.ModelWithRequiredUUID, models.ResourceMixin
-):
+class MetaDataPlaneModel(ra_models.ModelWithRequiredUUID, models.ResourceMixin):
     """A base model for using in MetaFileStorageAgentDriver.
 
     Child models should implement methods to work with data plane.
     """
 
     # Store the resource target fields
-    target_fields = properties.property(
-        types.TypedList(types.String()), default=list
-    )
+    target_fields = properties.property(types.TypedList(types.String()), default=list)
 
     @classmethod
-    def from_ua_resource(
-        cls, resource: models.Resource
-    ) -> "MetaDataPlaneModel":
+    def from_ua_resource(cls, resource: models.Resource) -> "MetaDataPlaneModel":
         target_fields = list(resource.value.keys())
         return cls.restore_from_simple_view(
             target_fields=target_fields, **resource.value
@@ -161,9 +155,7 @@ class MetaFileStorageAgentDriver(base.AbstractCapabilityDriver):
         for cap_name, cap_model in self.__model_map__.items():
             # Check the model map is in the correct format
             if not issubclass(cap_model, MetaDataPlaneModel):
-                raise TypeError(
-                    f"Model {cap_model} is not a MetaDataPlaneModel"
-                )
+                raise TypeError(f"Model {cap_model} is not a MetaDataPlaneModel")
 
             if (
                 cap_name not in self._storage
@@ -181,9 +173,7 @@ class MetaFileStorageAgentDriver(base.AbstractCapabilityDriver):
         capstor = self._storage[capability]["resources"]
 
         cap_model = self.__model_map__[capability]
-        return [
-            cap_model.restore_from_simple_view(**r) for r in capstor.values()
-        ]
+        return [cap_model.restore_from_simple_view(**r) for r in capstor.values()]
 
     def _delete_from_meta(self, kind: str, uuid: sys_uuid.UUID) -> None:
         """Remove the resource from the meta file."""
@@ -193,9 +183,7 @@ class MetaFileStorageAgentDriver(base.AbstractCapabilityDriver):
         self._storage[kind]["resources"].pop(uuid)
         LOG.debug("Deleted meta resource %s", uuid)
 
-    def _add_to_meta(
-        self, capability: str, meta_object: MetaDataPlaneModel
-    ) -> None:
+    def _add_to_meta(self, capability: str, meta_object: MetaDataPlaneModel) -> None:
         """Add the resource from the meta file."""
 
         view = meta_object.dump_to_simple_view()
@@ -612,9 +600,7 @@ class MetaCoordinatorAgentDriver(MetaFileStorageAgentDriver):
             LOG.debug("Deleted resource: %s(%s)", resource.uuid, resource.kind)
 
     def start(self) -> None:
-        self._coordinator_storage = {
-            kind: {} for kind in self.__model_map__.keys()
-        }
+        self._coordinator_storage = {kind: {} for kind in self.__model_map__.keys()}
 
     def finalize(self) -> None:
         """Perform some finalization after finishing all operations.

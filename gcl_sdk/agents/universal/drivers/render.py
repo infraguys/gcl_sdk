@@ -78,9 +78,7 @@ class Render(meta.MetaDataPlaneModel):
             types_dynamic.KindModelType(OnChangeShell),
         ),
     )
-    content = properties.property(
-        types.AllowNone(types.String()), default=None
-    )
+    content = properties.property(types.AllowNone(types.String()), default=None)
 
     def get_meta_model_fields(self) -> set[str] | None:
         """Return a list of meta fields or None.

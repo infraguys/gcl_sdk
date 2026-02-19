@@ -20,12 +20,10 @@ from gcl_sdk.tests.functional import utils as test_utils
 CONF = cfg.CONF
 
 
-class UniversalAgentAuditMixin(
-    AuditLogSQLStorableMixin, models.UniversalAgent
-): ...
+class UniversalAgentAuditMixin(AuditLogSQLStorableMixin, models.UniversalAgent): ...
 
 
-introspection_info = lambda x: DummyDriver().get_introspection_info(None)
+introspection_info = lambda x: DummyDriver().get_introspection_info(None)  # noqa
 
 
 class DummyDriverIam(DummyDriver):
@@ -39,7 +37,6 @@ class DummyContext(Context):
 
 
 class TestAuditApi:
-
     @pytest.fixture(scope="class")
     def audit_api_service(self, audit_api_wsgi_app):
         class ApiRestService(test_utils.RestServiceTestCase):
@@ -66,13 +63,9 @@ class TestAuditApi:
 
     def test_audit_get(self, audit_api: test_utils.RestServiceTestCase):
         uuid_a = sys_uuid.uuid4()
-        agent_a = UniversalAgentAuditMixin(
-            name="Agent A", uuid=uuid_a, node=uuid_a
-        )
+        agent_a = UniversalAgentAuditMixin(name="Agent A", uuid=uuid_a, node=uuid_a)
         agent_a.insert()
-        audit = AuditRecord.objects.get_one(
-            filters={"object_uuid": agent_a.uuid}
-        )
+        audit = AuditRecord.objects.get_one(filters={"object_uuid": agent_a.uuid})
         url = urljoin(audit_api.base_url, f"audit/{audit.uuid}")
         contexts.get_context = mock.MagicMock(return_value=DummyContext)
         response = requests.get(url)
@@ -89,13 +82,9 @@ class TestAuditApi:
 
     def test_audit_list(self, audit_api: test_utils.RestServiceTestCase):
         uuid_a = sys_uuid.uuid4()
-        agent_a = UniversalAgentAuditMixin(
-            name="Agent A", uuid=uuid_a, node=uuid_a
-        )
+        agent_a = UniversalAgentAuditMixin(name="Agent A", uuid=uuid_a, node=uuid_a)
         uuid_b = sys_uuid.uuid4()
-        agent_b = UniversalAgentAuditMixin(
-            name="Agent B", uuid=uuid_b, node=uuid_b
-        )
+        agent_b = UniversalAgentAuditMixin(name="Agent B", uuid=uuid_b, node=uuid_b)
         agent_a.insert()
         agent_b.insert()
         audits = AuditRecord.objects.get_all()

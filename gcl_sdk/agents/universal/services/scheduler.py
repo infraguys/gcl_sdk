@@ -29,7 +29,6 @@ LOG = logging.getLogger(__name__)
 
 
 class UniversalAgentSchedulerService(looper_basic.BasicService):
-
     def __init__(
         self,
         capabilities: list[str],

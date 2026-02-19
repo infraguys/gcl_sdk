@@ -68,7 +68,5 @@ class AbstractOrchClient(abc.ABC):
         """Update the resource."""
 
     @abc.abstractmethod
-    def resources_delete(
-        self, resource: models.Resource, **kwargs: tp.Any
-    ) -> None:
+    def resources_delete(self, resource: models.Resource, **kwargs: tp.Any) -> None:
         """Delete the resource."""

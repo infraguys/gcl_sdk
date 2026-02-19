@@ -18,7 +18,6 @@ from restalchemy.storage.sql import migrations
 
 
 class MigrationStep(migrations.AbstarctMigrationStep):
-
     def __init__(self):
         self._depends = ["0001-universal-agent-391c09.py"]
 

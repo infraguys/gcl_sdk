@@ -111,9 +111,7 @@ class DatabaseBackendClient(base.AbstractBackendClient):
 
         return {"uuid": dm_filters.In(tuple(target_fields[kind].keys()))}
 
-    def _get(
-        self, session: tp.Any, resource: models.Resource
-    ) -> models.ResourceMixin:
+    def _get(self, session: tp.Any, resource: models.Resource) -> models.ResourceMixin:
         """Find and return a resource by uuid and kind."""
         model_spec = self._model_spec_map[resource.kind]
         filters = self._get_resource_filters(resource)
@@ -124,14 +122,10 @@ class DatabaseBackendClient(base.AbstractBackendClient):
                 filters=filters,
             )
         except ra_exc.RecordNotFound:
-            LOG.exception(
-                "Unable to find %s %s", str(model_spec), resource.uuid
-            )
+            LOG.exception("Unable to find %s %s", str(model_spec), resource.uuid)
             raise client_exc.ResourceNotFound(resource=resource)
 
-    def _list(
-        self, session: tp.Any, capability: str
-    ) -> list[models.ResourceMixin]:
+    def _list(self, session: tp.Any, capability: str) -> list[models.ResourceMixin]:
         """Lists all resources by capability."""
         model_spec = self._model_spec_map[capability]
         filters = self._get_filters(capability)

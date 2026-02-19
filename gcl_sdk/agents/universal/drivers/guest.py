@@ -54,9 +54,7 @@ class GuestMachineMetaModel(meta.MetaDataPlaneModel):
     def _get_hostname(self) -> str:
         """Return hostname from the system."""
         return (
-            subprocess.check_output(["hostnamectl", "hostname"])
-            .decode("utf-8")
-            .strip()
+            subprocess.check_output(["hostnamectl", "hostname"]).decode("utf-8").strip()
         )
 
     def get_meta_model_fields(self) -> set[str] | None:

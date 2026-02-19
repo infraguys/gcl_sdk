@@ -28,10 +28,7 @@ LOG = logging.getLogger(__name__)
 
 
 class EventSenderService(basic.BasicService):
-
-    def __init__(
-        self, notification_client, butch_size=100, enabled=False, **kwargs
-    ):
+    def __init__(self, notification_client, butch_size=100, enabled=False, **kwargs):
         super().__init__(**kwargs)
         self._notification_client = notification_client
         self._butch_size = butch_size
@@ -59,7 +56,7 @@ class EventSenderService(basic.BasicService):
             try:
                 self._notification_client.send_event(event)
                 event.status = models.Event.STATUS.IN_PROGRESS.value
-            except:
+            except Exception:
                 LOG.exception("Can't send event by reason:")
             event.save()
 
@@ -94,6 +91,4 @@ class EventSenderService(basic.BasicService):
         if self._enabled:
             self._send_new_events()
             self._process_status_events()
-        LOG.debug(
-            "Process Events is %s", "enabled" if self._enabled else "disabled"
-        )
+        LOG.debug("Process Events is %s", "enabled" if self._enabled else "disabled")
