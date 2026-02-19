@@ -23,7 +23,6 @@ import uuid as sys_uuid
 from gcl_looper.services import basic as looper_basic
 
 from gcl_sdk.agents.universal.drivers import base as driver_base
-from gcl_sdk.agents.universal.drivers import meta as driver_meta
 from gcl_sdk.agents.universal.drivers import exceptions as driver_exc
 from gcl_sdk.agents.universal.dm import models
 from gcl_sdk.agents.universal.clients.orch import base as orch_base
@@ -35,7 +34,6 @@ LOG = logging.getLogger(__name__)
 
 
 class UniversalAgentService(looper_basic.BasicService):
-
     def __init__(
         self,
         agent_uuid: sys_uuid.UUID,
@@ -123,9 +121,7 @@ class UniversalAgentService(looper_basic.BasicService):
                     driver, capability, payload, collected_payload
                 )
         except Exception:
-            LOG.exception(
-                "Error actualizing driver %s", driver.__class__.__name__
-            )
+            LOG.exception("Error actualizing driver %s", driver.__class__.__name__)
         finally:
             # Finalize the driver
             driver.finalize()
@@ -179,9 +175,7 @@ class UniversalAgentService(looper_basic.BasicService):
                 resource = self._create_resource(driver, r)
                 collected_resources.append(resource)
             except Exception:
-                LOG.exception(
-                    "Error creating resource(%s) %s", capability, r.uuid
-                )
+                LOG.exception("Error creating resource(%s) %s", capability, r.uuid)
 
         # Delete outdated resources
         for r in actual_resources.keys() - target_resources.keys():
@@ -333,9 +327,7 @@ class UniversalAgentService(looper_basic.BasicService):
                     collected_facts = driver.list(fact)
                     collected_payload.add_facts_resources(collected_facts)
                 except Exception:
-                    LOG.exception(
-                        "Error collecting resources for fact: %s", fact
-                    )
+                    LOG.exception("Error collecting resources for fact: %s", fact)
 
         # All work done. The target resources are applied and facts collected.
         # Calculate the hash of the collected payload

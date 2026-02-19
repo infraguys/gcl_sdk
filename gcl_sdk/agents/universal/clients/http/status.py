@@ -42,9 +42,7 @@ class ResourcesClient(base.CollectionBaseModelClient):
         encryptor: base.Encryptor | None = None,
     ) -> None:
         collecton_path = f"/{self.API_VERSION}/kind/{kind}/resources/"
-        super().__init__(
-            base_url, collecton_path, http_client, auth, encryptor
-        )
+        super().__init__(base_url, collecton_path, http_client, auth, encryptor)
         self._kind = kind
 
     def _set_kind_ref(self, resource: models.Resource | dict) -> None:

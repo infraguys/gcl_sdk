@@ -26,7 +26,6 @@ from gcl_sdk.agents.universal.api import packers
 
 
 class SdkContextMiddleware(mw_contexts.ContextMiddleware):
-
     def __init__(
         self,
         application,

@@ -79,7 +79,6 @@ class TestUAOrchApi:
         url = urljoin(orch_api.base_url, "agents/")
 
         response = requests.post(url, json=view)
-        output = response.json()
 
         assert response.status_code == 405
 
@@ -197,10 +196,7 @@ class TestUAOrchApi:
 
         url = urljoin(
             orch_api.base_url,
-            (
-                f"agents/{agent.uuid}/actions/get_payload?"
-                f"version=0&hash={current_hash}"
-            ),
+            (f"agents/{agent.uuid}/actions/get_payload?version=0&hash={current_hash}"),
         )
 
         response = requests.get(url)

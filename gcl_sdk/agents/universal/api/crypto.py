@@ -27,14 +27,10 @@ NONCE_SIZE = 12
 
 def _validate_key_and_nonce(key: bytes, nonce: bytes) -> None:
     if len(key) != KEY_SIZE:
-        raise ValueError(
-            f"Invalid key length {len(key)}. Expected {KEY_SIZE}."
-        )
+        raise ValueError(f"Invalid key length {len(key)}. Expected {KEY_SIZE}.")
 
     if len(nonce) != NONCE_SIZE:
-        raise ValueError(
-            f"Invalid nonce length {len(nonce)}. Expected {NONCE_SIZE}."
-        )
+        raise ValueError(f"Invalid nonce length {len(nonce)}. Expected {NONCE_SIZE}.")
 
 
 def generate_key() -> bytes:

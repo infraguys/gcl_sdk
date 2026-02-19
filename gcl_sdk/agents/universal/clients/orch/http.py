@@ -110,9 +110,7 @@ class HttpOrchClient(base.AbstractOrchClient):
     ) -> models.Resource:
         """Create a resource."""
         try:
-            resource = self._status_api.resources(resource.kind).create(
-                resource
-            )
+            resource = self._status_api.resources(resource.kind).create(resource)
             LOG.info("Resource created: %s", resource.uuid)
         except baz_exc.ConflictError:
             raise exceptions.ResourceAlreadyExists(uuid=resource.uuid)
@@ -141,17 +139,13 @@ class HttpOrchClient(base.AbstractOrchClient):
             if "uuid" in kwargs:
                 resource = self._status_api.resources(kind).update(**kwargs)
             else:
-                resource = self._status_api.resources(kind).update(
-                    uuid, **kwargs
-                )
+                resource = self._status_api.resources(kind).update(uuid, **kwargs)
         except baz_exc.NotFoundError:
             raise exceptions.ResourceNotFound(uuid=uuid)
 
         return resource
 
-    def resources_delete(
-        self, resource: models.Resource, **kwargs: tp.Any
-    ) -> None:
+    def resources_delete(self, resource: models.Resource, **kwargs: tp.Any) -> None:
         """Delete the resource."""
         try:
             self._status_api.resources(resource.kind).delete(resource.uuid)

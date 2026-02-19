@@ -40,12 +40,9 @@ class UserEvent(types_dynamic.AbstractKindModel):
 
 
 class AbstractEventPayload(types_dynamic.AbstractKindModel):
-
     @abc.abstractmethod
     def to_simple_dict(self):
-        raise NotImplementedError(
-            "Subclasses must implement to_simple_dict method"
-        )
+        raise NotImplementedError("Subclasses must implement to_simple_dict method")
 
 
 class DummyEventPayload(AbstractEventPayload):
