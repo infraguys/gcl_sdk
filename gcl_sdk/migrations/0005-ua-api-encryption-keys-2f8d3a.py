@@ -17,7 +17,6 @@ from restalchemy.storage.sql import migrations
 
 
 class MigrationStep(migrations.AbstractMigrationStep):
-
     def __init__(self):
         self._depends = ["0004-ua-resources-relations-e9a811.py"]
 

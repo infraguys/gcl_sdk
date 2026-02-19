@@ -38,12 +38,8 @@ class Volume(
     ra_models.ModelWithNameDesc,
     ra_models.ModelWithTimestamp,
 ):
-    node = properties.property(
-        ra_types.AllowNone(ra_types.UUID()), default=None
-    )
-    size = properties.property(
-        ra_types.Integer(min_value=1, max_value=1000000)
-    )
+    node = properties.property(ra_types.AllowNone(ra_types.UUID()), default=None)
+    size = properties.property(ra_types.Integer(min_value=1, max_value=1000000))
     image = properties.property(
         ra_types.AllowNone(ra_types.String(max_length=255)), default=None
     )
@@ -51,9 +47,7 @@ class Volume(
     label = properties.property(
         ra_types.AllowNone(ra_types.String(max_length=127)), default=None
     )
-    device_type = properties.property(
-        ra_types.String(max_length=64), default=""
-    )
+    device_type = properties.property(ra_types.String(max_length=64), default="")
     index = properties.property(
         ra_types.Integer(min_value=0, max_value=4096), default=4096
     )
@@ -193,9 +187,7 @@ class DisksSpec(AbstractDiskSpec):
     KIND = "disks"
     ROOT_LABEL = "root-volume"
 
-    disks = properties.property(
-        ra_types.TypedList(DisksSpecDiskType()), default=list
-    )
+    disks = properties.property(ra_types.TypedList(DisksSpecDiskType()), default=list)
 
     def validate(self) -> None:
         """Validate the disk spec."""
@@ -227,9 +219,7 @@ class DisksSpec(AbstractDiskSpec):
 
             # Check fs or image, but not both
             if disk.get("fs") and disk.get("image"):
-                raise ValueError(
-                    "Disk can have either fs or image, but not both"
-                )
+                raise ValueError("Disk can have either fs or image, but not both")
 
             # Check labels, the labels are mandatory and unique for extra disks
             if not disk.get("label") or disk["label"] in labels:
@@ -386,9 +376,7 @@ class AbstractSetDiskSpec(
         """Validate the disk spec."""
         pass
 
-    def node_spec(
-        self, node_set: NodeSet, node: sys_uuid.UUID
-    ) -> AbstractDiskSpec:
+    def node_spec(self, node_set: NodeSet, node: sys_uuid.UUID) -> AbstractDiskSpec:
         """Lists all volumes that should be created or modified on the node."""
         raise NotImplementedError("Subclasses must implement this method.")
 
@@ -406,9 +394,7 @@ class SetRootDiskSpec(RootDiskSpec, AbstractSetDiskSpec):
         self.validate()
         return tuple()
 
-    def node_spec(
-        self, node_set: NodeSet, node: sys_uuid.UUID
-    ) -> AbstractDiskSpec:
+    def node_spec(self, node_set: NodeSet, node: sys_uuid.UUID) -> AbstractDiskSpec:
         """Return the disk specification for the node."""
         return RootDiskSpec(
             image=self.image,
@@ -452,9 +438,7 @@ class SetDisksSpec(DisksSpec, AbstractSetDiskSpec):
         self.validate()
         return tuple()
 
-    def node_spec(
-        self, node_set: NodeSet, node: sys_uuid.UUID
-    ) -> AbstractDiskSpec:
+    def node_spec(self, node_set: NodeSet, node: sys_uuid.UUID) -> AbstractDiskSpec:
         """Return the disk specification for the node."""
         return DisksSpec(disks=self.disks)
 
@@ -531,10 +515,7 @@ class NodeSet(
         )
 
 
-class AbstractTarget(
-    types_dynamic.AbstractKindModel, ra_models.SimpleViewMixin
-):
-
+class AbstractTarget(types_dynamic.AbstractKindModel, ra_models.SimpleViewMixin):
     def target_nodes(self) -> tp.List[sys_uuid.UUID]:
         """Returns list of target nodes where config should be deployed."""
         return []
@@ -554,10 +535,7 @@ class AbstractTarget(
         raise NotImplementedError()
 
 
-class AbstractContentor(
-    types_dynamic.AbstractKindModel, ra_models.SimpleViewMixin
-):
-
+class AbstractContentor(types_dynamic.AbstractKindModel, ra_models.SimpleViewMixin):
     def render(self) -> str:
         return ""
 
@@ -599,9 +577,7 @@ class TextBodyConfig(AbstractContentor):
 class TemplateBodyConfig(AbstractContentor):
     KIND = "template"
 
-    template = properties.property(
-        ra_types.String(), required=True, default=""
-    )
+    template = properties.property(ra_types.String(), required=True, default="")
     variables = properties.property(ra_types.Dict(), default=dict)
 
     def render(self) -> str:
@@ -609,15 +585,11 @@ class TemplateBodyConfig(AbstractContentor):
         raise NotImplementedError()
 
 
-class OnChangeNoAction(
-    types_dynamic.AbstractKindModel, ra_models.SimpleViewMixin
-):
+class OnChangeNoAction(types_dynamic.AbstractKindModel, ra_models.SimpleViewMixin):
     KIND = "no_action"
 
 
-class OnChangeShell(
-    types_dynamic.AbstractKindModel, ra_models.SimpleViewMixin
-):
+class OnChangeShell(types_dynamic.AbstractKindModel, ra_models.SimpleViewMixin):
     KIND = "shell"
 
     command = properties.property(

@@ -56,10 +56,7 @@ def register_event_opts(conf=None):
         cfg.StrOpt(
             "genesis_api_token",
             default="<inser token here>",
-            help=(
-                "API token for authentication with the Genesis"
-                " Notificatio service"
-            ),
+            help=("API token for authentication with the Genesis Notificatio service"),
         ),
         cfg.StrOpt(
             "project_id",

@@ -42,10 +42,7 @@ class SdkEncryptionHeadersMixin:
 class BaseSdkResourceController(
     SdkEncryptionHeadersMixin, controllers.BaseResourceController
 ):
-
-    def process_result(
-        self, result, status_code=200, headers=None, add_location=False
-    ):
+    def process_result(self, result, status_code=200, headers=None, add_location=False):
         headers = headers or {}
         headers = self._apply_encryption_headers(headers)
 
@@ -60,10 +57,7 @@ class BaseSdkResourceController(
 class BaseSdkNestedResourceController(
     SdkEncryptionHeadersMixin, controllers.BaseNestedResourceController
 ):
-
-    def process_result(
-        self, result, status_code=200, headers=None, add_location=False
-    ):
+    def process_result(self, result, status_code=200, headers=None, add_location=False):
         headers = headers or {}
         headers = self._apply_encryption_headers(headers)
 

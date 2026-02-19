@@ -17,7 +17,6 @@ from restalchemy.storage.sql import migrations
 
 
 class MigrationStep(migrations.AbstarctMigrationStep):
-
     def __init__(self):
         self._depends = ["0000-init-events-table-2cfd220e.py"]
 

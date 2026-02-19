@@ -74,11 +74,7 @@ class ResourceTransformer:
 
         # If attributes are specified, ignore only null attributes from the list
         attributes = set(self.attributes)
-        return {
-            k: v
-            for k, v in view.items()
-            if not (v is None and k in attributes)
-        }
+        return {k: v for k, v in view.items() if not (v is None and k in attributes)}
 
     @classmethod
     def from_dict(cls, data: dict) -> ResourceTransformer:
@@ -128,9 +124,7 @@ class DirectAgentDriver(base.AbstractCapabilityDriver):
     ) -> models.Resource:
         # We need to be sure the return object is resource
         # and not target resource
-        value = model.dump_to_simple_view(
-            skip=model.get_resource_ignore_fields()
-        )
+        value = model.dump_to_simple_view(skip=model.get_resource_ignore_fields())
 
         # Apply additional transformations if needed
         if kind in self._transformer_map:
@@ -150,15 +144,11 @@ class DirectAgentDriver(base.AbstractCapabilityDriver):
         elif isinstance(value, dict):
             # Apply additional transformations if needed
             if origin_resource.kind in self._transformer_map:
-                value = self._transformer_map[origin_resource.kind].transform(
-                    value
-                )
+                value = self._transformer_map[origin_resource.kind].transform(value)
 
             return origin_resource.replace_value(value, target_fields)
         else:
-            return self._model_to_resource(
-                origin_resource.kind, value, target_fields
-            )
+            return self._model_to_resource(origin_resource.kind, value, target_fields)
 
     def _validate(self, resource: models.Resource) -> None:
         """Validate the resource."""
@@ -179,9 +169,7 @@ class DirectAgentDriver(base.AbstractCapabilityDriver):
             LOG.error("Unable to find resource on backend %s", resource.uuid)
             raise driver_exc.ResourceNotFound(resource=resource)
 
-        return self._prepare_res_response(
-            resource, value, target_fields.fields
-        )
+        return self._prepare_res_response(resource, value, target_fields.fields)
 
     def list(self, capability: str) -> list[models.Resource]:
         """Lists all resources by capability."""

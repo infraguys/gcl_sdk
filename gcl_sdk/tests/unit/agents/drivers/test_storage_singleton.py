@@ -37,9 +37,7 @@ def test_storage_singleton_get_instance_different(tmp_path):
     meta_file2 = tmp_path / "test_meta2.json"
 
     instance1 = storage_common.JsonFileStorageSingleton.get_instance(meta_file)
-    instance2 = storage_common.JsonFileStorageSingleton.get_instance(
-        meta_file2
-    )
+    instance2 = storage_common.JsonFileStorageSingleton.get_instance(meta_file2)
 
     assert instance1 is not instance2
     assert isinstance(instance1, storage_common.JsonFileStorageSingleton)
@@ -49,9 +47,7 @@ def test_storage_singleton_load_non_existent_file(tmp_path):
     meta_file = tmp_path / "non_existent.json"
 
     with patch("os.path.exists", return_value=False):
-        storage = storage_common.JsonFileStorageSingleton.get_instance(
-            meta_file
-        )
+        storage = storage_common.JsonFileStorageSingleton.get_instance(meta_file)
         storage.load()
 
     assert storage == {}
@@ -75,9 +71,7 @@ def test_storage_singleton_persist(tmp_path):
     new_vals = {"key": "new_val"}
 
     with patch("os.makedirs") as mock_makedirs:
-        storage = storage_common.JsonFileStorageSingleton.get_instance(
-            meta_file
-        )
+        storage = storage_common.JsonFileStorageSingleton.get_instance(meta_file)
         storage.update(new_vals)
         storage.persist()
 
@@ -85,9 +79,7 @@ def test_storage_singleton_persist(tmp_path):
         data = json.load(f)
 
     assert data == new_vals
-    mock_makedirs.assert_called_once_with(
-        os.path.dirname(meta_file), exist_ok=True
-    )
+    mock_makedirs.assert_called_once_with(os.path.dirname(meta_file), exist_ok=True)
 
 
 def test_storage_singleton_persist_overwrite(tmp_path):

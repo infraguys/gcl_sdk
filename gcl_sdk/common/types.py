@@ -51,9 +51,7 @@ class SchematicType(types.SoftSchemeDict):
         if len(self.__mandatory__) > 0 and not self.__mandatory__.issubset(
             self.__scheme__.keys()
         ):
-            raise ValueError(
-                "Mandatory fields have to be defined in the schema"
-            )
+            raise ValueError("Mandatory fields have to be defined in the schema")
 
         super().__init__(self.__scheme__)
 
@@ -61,6 +59,6 @@ class SchematicType(types.SoftSchemeDict):
         if len(self.__mandatory__) == 0:
             return super().validate(value)
 
-        return set(value.keys()).issuperset(
-            self.__mandatory__
-        ) and super().validate(value)
+        return set(value.keys()).issuperset(self.__mandatory__) and super().validate(
+            value
+        )

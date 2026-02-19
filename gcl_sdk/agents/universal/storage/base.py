@@ -29,9 +29,7 @@ class TargetFieldItem(tp.NamedTuple):
 
     @classmethod
     def from_ua_resource(cls, resource: models.Resource) -> TargetFieldItem:
-        return cls(
-            resource.kind, resource.uuid, frozenset(resource.value.keys())
-        )
+        return cls(resource.kind, resource.uuid, frozenset(resource.value.keys()))
 
 
 class AbstractTargetFieldsStorage(abc.ABC):

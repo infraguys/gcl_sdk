@@ -26,9 +26,7 @@ from restalchemy.dm import filters as dm_filters
 from gcl_sdk.agents.universal.api import crypto as sdk_crypto
 from gcl_sdk.agents.universal.dm import models
 
-ENCRYPTED_JSON_CONTENT_TYPE = (
-    "application/x-genesis-agent-chacha20-poly1305-encrypted"
-)
+ENCRYPTED_JSON_CONTENT_TYPE = "application/x-genesis-agent-chacha20-poly1305-encrypted"
 
 GENESIS_NODE_UUID_HEADER = "X-Genesis-Node-UUID"
 GENESIS_NONCE_HEADER = "X-Genesis-Nonce"
@@ -92,9 +90,7 @@ class EncryptionInformation(BaseEncryptionInformation):
             self._node_uuid = sys_uuid.UUID(node_uuid_str)
             return self._node_uuid
 
-        raise ValueError(
-            f"{GENESIS_NODE_UUID_HEADER} header is missing or invalid"
-        )
+        raise ValueError(f"{GENESIS_NODE_UUID_HEADER} header is missing or invalid")
 
     @property
     def request_nonce(self) -> bytes:
@@ -105,15 +101,11 @@ class EncryptionInformation(BaseEncryptionInformation):
         if self._request_nonce_base64 is not None:
             return self._request_nonce_base64
 
-        self._request_nonce_base64 = self._request.headers.get(
-            GENESIS_NONCE_HEADER
-        )
+        self._request_nonce_base64 = self._request.headers.get(GENESIS_NONCE_HEADER)
         if self._request_nonce_base64:
             return self._request_nonce_base64
 
-        raise ValueError(
-            f"{GENESIS_NONCE_HEADER} header is missing or invalid"
-        )
+        raise ValueError(f"{GENESIS_NONCE_HEADER} header is missing or invalid")
 
     @property
     def response_nonce(self) -> bytes:
@@ -138,9 +130,7 @@ class EncryptionInformation(BaseEncryptionInformation):
 
     @property
     def encryption_key(self) -> bytes:
-        return base64.b64decode(
-            self._get_node_encryption_key().private_key.encode()
-        )
+        return base64.b64decode(self._get_node_encryption_key().private_key.encode())
 
     def is_requires_encryption(self) -> bool:
         now = datetime.datetime.now(datetime.timezone.utc)
@@ -206,6 +196,4 @@ class GenesisAgentEncryptedJsonPacker(ra_packers.JSONPacker):
         return super().unpack(value)
 
 
-ra_packers.set_packer(
-    ENCRYPTED_JSON_CONTENT_TYPE, GenesisAgentEncryptedJsonPacker
-)
+ra_packers.set_packer(ENCRYPTED_JSON_CONTENT_TYPE, GenesisAgentEncryptedJsonPacker)

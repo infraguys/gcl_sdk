@@ -33,7 +33,6 @@ from gcl_sdk.agents.universal.api import packers
 
 
 class AbstractAuthenticator(abc.ABC):
-
     @abc.abstractmethod
     def authenticate(self) -> None:
         """Authenticate the client."""
@@ -61,9 +60,7 @@ class CoreIamAuthenticator(AbstractAuthenticator):
         self._http_client = http_client or bazooka.Client()
 
         client_uuid = str(client_uuid)
-        self._url = (
-            f"{base_url}/v1/iam/clients/{client_uuid}/actions/get_token/invoke"
-        )
+        self._url = f"{base_url}/v1/iam/clients/{client_uuid}/actions/get_token/invoke"
 
         self._headers = {"Content-Type": "application/x-www-form-urlencoded"}
 
@@ -156,9 +153,7 @@ class CollectionBaseClient:
         headers: dict[str, str] | None = None,
     ) -> req_models.Response:
         if self._encryptor is None:
-            return requester(
-                url, data=data, json=json, params=params, headers=headers
-            )
+            return requester(url, data=data, json=json, params=params, headers=headers)
 
         if data and json:
             raise ValueError("data and json are mutually exclusive")
@@ -181,8 +176,7 @@ class CollectionBaseClient:
         content_type = resp.headers["Content-Type"]
         if content_type != packers.ENCRYPTED_JSON_CONTENT_TYPE:
             raise ValueError(
-                f"Not suitable content type {content_type} for "
-                "encrypted response"
+                f"Not suitable content type {content_type} for encrypted response"
             )
 
         nonce_base64 = resp.headers["X-Genesis-Nonce"]
@@ -257,9 +251,7 @@ class CollectionBaseClient:
         )
         return resp.json()
 
-    def create(
-        self, collection: str, data: dict[str, tp.Any]
-    ) -> dict[str, tp.Any]:
+    def create(self, collection: str, data: dict[str, tp.Any]) -> dict[str, tp.Any]:
         resp = self._request(
             httplib.HTTPMethod.POST,
             self._collection_url(collection),
@@ -294,13 +286,9 @@ class CollectionBaseClient:
 
         if invoke:
             action_url = urljoin(action_url + "/", self.INVOKE_KEY)
-            resp = self._request(
-                httplib.HTTPMethod.POST, action_url, json=kwargs
-            )
+            resp = self._request(httplib.HTTPMethod.POST, action_url, json=kwargs)
         else:
-            resp = self._request(
-                httplib.HTTPMethod.GET, action_url, params=kwargs
-            )
+            resp = self._request(httplib.HTTPMethod.GET, action_url, params=kwargs)
 
         # Try to convert response to json
         resp.raise_for_status()
@@ -329,9 +317,7 @@ class CollectionBaseModelClient(CollectionBaseClient):
     def get_collection(self) -> str:
         return self._collection_path
 
-    def __call__(
-        self, resource_uuid: sys_uuid.UUID
-    ) -> "ResourceBaseModelClient":
+    def __call__(self, resource_uuid: sys_uuid.UUID) -> "ResourceBaseModelClient":
         if self.__resource_client__ is None:
             raise ValueError("Resource client is not defined")
         return self.__resource_client__(self, resource_uuid, self._http_client)
@@ -341,9 +327,7 @@ class CollectionBaseModelClient(CollectionBaseClient):
             **super().get(self.get_collection(), uuid)
         )
 
-    def filter(
-        self, **filters: dict[str, tp.Any]
-    ) -> list[models.SimpleViewMixin]:
+    def filter(self, **filters: dict[str, tp.Any]) -> list[models.SimpleViewMixin]:
         return [
             self.__model__.restore_from_simple_view(**o)
             for o in super().filter(self.get_collection(), **filters)
@@ -369,9 +353,7 @@ class CollectionBaseModelClient(CollectionBaseClient):
     def do_action(
         self, name: str, uuid: sys_uuid.UUID, invoke: bool = False, **kwargs
     ) -> dict[str : tp.Any] | None:
-        return super().do_action(
-            self.get_collection(), name, uuid, invoke, **kwargs
-        )
+        return super().do_action(self.get_collection(), name, uuid, invoke, **kwargs)
 
 
 class StaticCollectionBaseModelClient(CollectionBaseModelClient):

@@ -64,7 +64,7 @@ class DatabaseOrchClient(base.AbstractOrchClient):
     ) -> models.UniversalAgent:
         """Update an instance of Universal agent."""
         try:
-            with self._session_context(session=session) as s:
+            with self._session_context(session=session):
                 # Fetch the origin agent
                 origin_agent = models.UniversalAgent.objects.get_one(
                     filters={
@@ -103,9 +103,7 @@ class DatabaseOrchClient(base.AbstractOrchClient):
             except ra_exc.RecordNotFound:
                 raise exceptions.AgentNotFound(uuid=uuid)
 
-            return agent.get_payload(
-                hash=payload.hash, version=payload.version
-            )
+            return agent.get_payload(hash=payload.hash, version=payload.version)
 
     def resources_create(
         self,
@@ -154,7 +152,5 @@ class DatabaseOrchClient(base.AbstractOrchClient):
     ) -> None:
         """Delete the resource."""
         with self._session_context(session=session) as s:
-            resource = self.resources_get(
-                resource.kind, resource.uuid, session=s
-            )
+            resource = self.resources_get(resource.kind, resource.uuid, session=s)
             resource.delete(session=s)

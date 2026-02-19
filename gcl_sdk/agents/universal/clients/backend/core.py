@@ -13,9 +13,9 @@
 #    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 #    License for the specific language governing permissions and limitations
 #    under the License.
+
 from __future__ import annotations
 
-import re
 import typing as tp
 import uuid as sys_uuid
 
@@ -41,9 +41,7 @@ class GCRestApiBackendClient(rest.RestApiBackendClient):
         project_id: sys_uuid.UUID | None = None,
         tf_storage: storage_base.AbstractTargetFieldsStorage | None = None,
     ) -> None:
-        super().__init__(
-            http_client=http_client, collection_map=collection_map
-        )
+        super().__init__(http_client=http_client, collection_map=collection_map)
         self._project_id = project_id
         self._tf_storage = tf_storage
 
