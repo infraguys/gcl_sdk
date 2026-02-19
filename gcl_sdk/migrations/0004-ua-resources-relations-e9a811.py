@@ -17,7 +17,6 @@ from restalchemy.storage.sql import migrations
 
 
 class MigrationStep(migrations.AbstractMigrationStep):
-
     def __init__(self):
         self._depends = ["0003-ua-addtional-hashes-6e9ca8.py"]
 

@@ -39,9 +39,7 @@ class DummyBuilder(builder_svc.UniversalBuilderService):
     def pre_create_instance_resource(self, instance):
         self.pre_create_called = True
 
-    def post_create_instance_resource(
-        self, instance, resource, derivatives=tuple()
-    ):
+    def post_create_instance_resource(self, instance, resource, derivatives=tuple()):
         self.post_create_called = True
         instance.status = ua_c.InstanceStatus.IN_PROGRESS.value
 
@@ -49,9 +47,7 @@ class DummyBuilder(builder_svc.UniversalBuilderService):
         self.pre_update_called = True
         instance.status = ua_c.InstanceStatus.IN_PROGRESS.value
 
-    def post_update_instance_resource(
-        self, instance, resource, derivatives=tuple()
-    ):
+    def post_update_instance_resource(self, instance, resource, derivatives=tuple()):
         self.post_update_called = True
 
     def pre_delete_instance_resource(self, resource):
@@ -94,10 +90,9 @@ class DummyBuilderWithMasterTracking(DummyBuilderWithDerivatives):
         instance: ua_models.InstanceMixin,
         master_instance: ua_models.InstanceMixin,
         derivatives: tp.Collection[
-            tuple[
+            tp.Tuple[
                 ua_models.TargetResourceKindAwareMixin,  # The target resource
-                ua_models.TargetResourceKindAwareMixin
-                | None,  # The actual resource
+                tp.Optional[ua_models.TargetResourceKindAwareMixin],  # The actual resource
             ]
         ],
     ) -> tp.Collection[ua_models.TargetResourceKindAwareMixin]:
@@ -105,7 +100,6 @@ class DummyBuilderWithMasterTracking(DummyBuilderWithDerivatives):
 
 
 class TestUniversalBuilderService:
-
     # Need only to apply DB migrations
     @pytest.fixture(scope="class", autouse=True)
     def api_service(self, orch_api_wsgi_app):
@@ -152,9 +146,7 @@ class TestUniversalBuilderService:
         assert svc.post_create_called
         assert not svc.create_instance_derivatives_called
 
-    def test_create_multiple_instances(
-        self, dummy_instance_factory: tp.Callable
-    ):
+    def test_create_multiple_instances(self, dummy_instance_factory: tp.Callable):
         instances = dummy_instance_factory({"new": 2})
 
         svc = DummyBuilder(instance_model=conftest.DummyInstance)
@@ -191,9 +183,7 @@ class TestUniversalBuilderService:
         assert not svc.post_create_called
         assert not svc.create_instance_derivatives_called
 
-    def test_delete_multiple_instances(
-        self, dummy_instance_factory: tp.Callable
-    ):
+    def test_delete_multiple_instances(self, dummy_instance_factory: tp.Callable):
         instance_resources = dummy_instance_factory({"deleted": 2})
 
         svc = DummyBuilder(instance_model=conftest.DummyInstance)
@@ -210,9 +200,7 @@ class TestUniversalBuilderService:
         assert not svc.post_create_called
         assert not svc.create_instance_derivatives_called
 
-    def test_actualize_updated_instances(
-        self, dummy_instance_factory: tp.Callable
-    ):
+    def test_actualize_updated_instances(self, dummy_instance_factory: tp.Callable):
         instance = dummy_instance_factory({"updated": 1})[0]
 
         resources = ua_models.TargetResource.objects.get_all()
@@ -249,9 +237,7 @@ class TestUniversalBuilderService:
         resources = ua_models.TargetResource.objects.get_all()
         assert len(resources) == 2
         assert {r.uuid for r in resources} == {i.uuid for i in instances}
-        assert not (
-            {r.value["name"] for r in resources} & {i.name for i in instances}
-        )
+        assert not ({r.value["name"] for r in resources} & {i.name for i in instances})
 
         svc = DummyBuilder(instance_model=conftest.DummyInstance)
         svc._iteration()
@@ -259,9 +245,7 @@ class TestUniversalBuilderService:
         resources = ua_models.TargetResource.objects.get_all()
         assert len(resources) == 2
         assert {r.uuid for r in resources} == {i.uuid for i in instances}
-        assert {r.value["name"] for r in resources} == {
-            i.name for i in instances
-        }
+        assert {r.value["name"] for r in resources} == {i.name for i in instances}
 
         resources = ua_models.Resource.objects.get_all()
         assert len(resources) == 0
@@ -272,9 +256,7 @@ class TestUniversalBuilderService:
         assert svc.pre_update_called
         assert svc.post_update_called
 
-    def test_actualize_outdated_instances(
-        self, dummy_instance_factory: tp.Callable
-    ):
+    def test_actualize_outdated_instances(self, dummy_instance_factory: tp.Callable):
         class Builder(DummyBuilder):
             actualized = False
 
@@ -289,9 +271,7 @@ class TestUniversalBuilderService:
         instance = dummy_instance_factory({"existing": 1})[0]
 
         conftest.DummyInstance.objects = mock.MagicMock()
-        conftest.DummyInstance.objects.get_all = mock.MagicMock(
-            return_value=[instance]
-        )
+        conftest.DummyInstance.objects.get_all = mock.MagicMock(return_value=[instance])
 
         # Sanity: only target resource exists, no actual resources yet
         t_resources = ua_models.TargetResource.objects.get_all()
@@ -331,9 +311,7 @@ class TestUniversalBuilderService:
 
         assert Builder.actualized
 
-    def test_skip_create_when_not_ready(
-        self, dummy_instance_factory: tp.Callable
-    ):
+    def test_skip_create_when_not_ready(self, dummy_instance_factory: tp.Callable):
         class DummyInstanceNotReadyCreate(
             conftest.DummyInstance, ua_models.ReadinessMixin
         ):
@@ -358,9 +336,7 @@ class TestUniversalBuilderService:
         assert not svc.post_create_called
         assert not svc.create_instance_derivatives_called
 
-    def test_skip_update_when_not_ready(
-        self, dummy_instance_factory: tp.Callable
-    ):
+    def test_skip_update_when_not_ready(self, dummy_instance_factory: tp.Callable):
         class DummyInstanceNotReadyUpdate(
             conftest.DummyInstance, ua_models.ReadinessMixin
         ):
@@ -370,9 +346,7 @@ class TestUniversalBuilderService:
         # Prepare storage for the subclass
         storage = {"new": [], "updated": [], "deleted": [], "existing": []}
         project_id = sys_uuid.uuid4()
-        uuid = sys_uuid.uuid5(
-            DummyInstanceNotReadyUpdate.NAMESPACE, "updated-0"
-        )
+        uuid = sys_uuid.uuid5(DummyInstanceNotReadyUpdate.NAMESPACE, "updated-0")
         instance = DummyInstanceNotReadyUpdate(
             uuid=uuid, name="inst-updated-0", project_id=project_id
         )
@@ -408,16 +382,12 @@ class TestUniversalBuilderService:
         class Builder(DummyBuilder):
             actualized = False
 
-            def actualize_outdated_instance(
-                self, current_instance, actual_instance
-            ):
+            def actualize_outdated_instance(self, current_instance, actual_instance):
                 self.__class__.actualized = True
 
         storage = {"new": [], "updated": [], "deleted": [], "existing": []}
         project_id = sys_uuid.uuid4()
-        uuid = sys_uuid.uuid5(
-            DummyInstanceNotReadyActualize.NAMESPACE, "existing-0"
-        )
+        uuid = sys_uuid.uuid5(DummyInstanceNotReadyActualize.NAMESPACE, "existing-0")
         instance = DummyInstanceNotReadyActualize(
             uuid=uuid, name="inst-existing-0", project_id=project_id
         )
@@ -432,9 +402,7 @@ class TestUniversalBuilderService:
         DummyInstanceNotReadyActualize.__dummy_storage__ = storage
 
         actual_value = instance.dump_to_simple_view()
-        actual = ua_models.Resource.from_value(
-            value=actual_value, kind=target.kind
-        )
+        actual = ua_models.Resource.from_value(value=actual_value, kind=target.kind)
         actual.save()
 
         before_full_hash = target.full_hash
@@ -453,9 +421,7 @@ class TestUniversalBuilderService:
         assert target.status == before_status
         assert not Builder.actualized
 
-    def test_skip_delete_when_not_ready(
-        self, dummy_instance_factory: tp.Callable
-    ):
+    def test_skip_delete_when_not_ready(self, dummy_instance_factory: tp.Callable):
         class DummyInstanceNotReadyDelete(
             conftest.DummyInstance, ua_models.ReadinessMixin
         ):
@@ -464,9 +430,7 @@ class TestUniversalBuilderService:
 
         storage = {"new": [], "updated": [], "deleted": [], "existing": []}
         project_id = sys_uuid.uuid4()
-        uuid = sys_uuid.uuid5(
-            DummyInstanceNotReadyDelete.NAMESPACE, "deleted-0"
-        )
+        uuid = sys_uuid.uuid5(DummyInstanceNotReadyDelete.NAMESPACE, "deleted-0")
         instance = DummyInstanceNotReadyDelete(
             uuid=uuid, name="inst-deleted-0", project_id=project_id
         )
@@ -501,9 +465,7 @@ class TestUniversalBuilderService:
         instance = dummy_instance_factory({"existing": 1})[0]
 
         conftest.DummyInstance.objects = mock.MagicMock()
-        conftest.DummyInstance.objects.get_all = mock.MagicMock(
-            return_value=[instance]
-        )
+        conftest.DummyInstance.objects.get_all = mock.MagicMock(return_value=[instance])
 
         # Sanity: only target resource exists, no actual resources yet
         t_resources = ua_models.TargetResource.objects.get_all()
@@ -588,7 +550,7 @@ class TestUniversalBuilderService:
     def test_create_multiple_instance_derivatives(
         self, dummy_instance_with_derivatives_factory: tp.Callable
     ):
-        instances = dummy_instance_with_derivatives_factory({"new": 2})
+        dummy_instance_with_derivatives_factory({"new": 2})
 
         svc = DummyBuilderWithDerivatives(
             instance_model=conftest.DummyInstanceWithDerivatives
@@ -681,10 +643,7 @@ class TestUniversalBuilderService:
                 self.__class__.actualized = True
                 assert len(derivative_pairs) == 1
                 assert instance.get_resource_kind() == "foo"
-                assert (
-                    derivative_pairs[0][0].get_resource_kind()
-                    == "foo-derivative"
-                )
+                assert derivative_pairs[0][0].get_resource_kind() == "foo-derivative"
 
                 return tuple(p[0] for p in derivative_pairs)
 
@@ -744,10 +703,7 @@ class TestUniversalBuilderService:
                 self.__class__.called += 1
                 assert len(derivative_pairs) == 1
                 assert instance.get_resource_kind() == "foo"
-                assert (
-                    derivative_pairs[0][0].get_resource_kind()
-                    == "foo-derivative"
-                )
+                assert derivative_pairs[0][0].get_resource_kind() == "foo-derivative"
 
                 raise RuntimeError("Failed to actualize instance derivatives")
 
@@ -960,9 +916,7 @@ class TestUniversalBuilderService:
                 )
 
         storage = {"new": [], "updated": [], "deleted": [], "existing": []}
-        uuid = sys_uuid.uuid5(
-            SchedulableInstanceWithDerivatives.NAMESPACE, "new-0"
-        )
+        uuid = sys_uuid.uuid5(SchedulableInstanceWithDerivatives.NAMESPACE, "new-0")
         name = "inst-new-0"
 
         # Prepare the agents for scheduling
@@ -996,9 +950,7 @@ class TestUniversalBuilderService:
         ):
             pass
 
-        class SchedulableInstanceWithDerivatives(
-            conftest.DummyInstanceWithDerivatives
-        ):
+        class SchedulableInstanceWithDerivatives(conftest.DummyInstanceWithDerivatives):
             __derivative_model_map__ = {
                 "foo-derivative": SchedulableDummyDerivative,
             }
@@ -1011,9 +963,7 @@ class TestUniversalBuilderService:
                 )
 
         storage = {"new": [], "updated": [], "deleted": [], "existing": []}
-        uuid = sys_uuid.uuid5(
-            SchedulableInstanceWithDerivatives.NAMESPACE, "updated-0"
-        )
+        uuid = sys_uuid.uuid5(SchedulableInstanceWithDerivatives.NAMESPACE, "updated-0")
         name = "inst-updated-0"
 
         inst = SchedulableInstanceWithDerivatives(uuid=uuid, name=name)
@@ -1054,8 +1004,6 @@ class TestUniversalBuilderService:
         inst_res = [r for r in resources if r.uuid == inst.uuid][0]
         new_der_uuid = sys_uuid.uuid5(inst.uuid, inst.name)
         der_res = [
-            r
-            for r in resources
-            if r.master == inst_res.uuid and r.uuid == new_der_uuid
+            r for r in resources if r.master == inst_res.uuid and r.uuid == new_der_uuid
         ][0]
         assert der_res.agent == new_der_uuid

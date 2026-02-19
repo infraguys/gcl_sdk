@@ -63,7 +63,6 @@ CONDITIONS_MAPPING = {
 
 
 class Service(s_models.Service, meta.MetaDataPlaneModel):
-
     def get_my_name(self):
         return self.get_service_name(self.name, self.uuid)
 
@@ -100,8 +99,9 @@ class Service(s_models.Service, meta.MetaDataPlaneModel):
                 # Disabled, service relationships should be reworked
                 # res.append(f"{CONDITIONS_MAPPING[when]["service"]}={self.get_service_name(cond.service, cond.service_name)}")
                 continue
+            cmd = cond.command.replace("'", "\\'")
             res.append(
-                f"{CONDITIONS_MAPPING[when]["shell"]}=+/usr/bin/bash -c '{cond.command.replace("'", "\\'")}'"
+                f"{CONDITIONS_MAPPING[when]['shell']}=+/usr/bin/bash -c '{cmd}'"
             )
         return res
 
@@ -127,20 +127,14 @@ class Service(s_models.Service, meta.MetaDataPlaneModel):
 
         subprocess.check_call(["systemctl", "daemon-reload"])
         if self.target_status == "enabled":
-            subprocess.check_call(
-                ["systemctl", "enable", "--now", self.get_my_name()]
-            )
+            subprocess.check_call(["systemctl", "enable", "--now", self.get_my_name()])
         else:
-            subprocess.check_call(
-                ["systemctl", "disable", "--now", self.get_my_name()]
-            )
+            subprocess.check_call(["systemctl", "disable", "--now", self.get_my_name()])
         self.status = ic.InstanceStatus.ACTIVE.value
 
     def restore_from_dp(self) -> None:
         try:
-            subprocess.check_output(
-                ["systemctl", "is-active", self.get_my_name()]
-            )
+            subprocess.check_output(["systemctl", "is-active", self.get_my_name()])
             self.status = ic.InstanceStatus.ACTIVE.value
         except subprocess.CalledProcessError as e:
             # It's ok that oneshot is already finished and inactive
@@ -160,14 +154,10 @@ class Service(s_models.Service, meta.MetaDataPlaneModel):
                         obj={"uuid": str(self.uuid)}
                     )
         except FileNotFoundError:
-            raise driver_exc.InvalidDataPlaneObjectError(
-                obj={"uuid": str(self.uuid)}
-            )
+            raise driver_exc.InvalidDataPlaneObjectError(obj={"uuid": str(self.uuid)})
 
     def delete_from_dp(self) -> None:
-        subprocess.check_call(
-            ["systemctl", "disable", "--now", self.get_my_name()]
-        )
+        subprocess.check_call(["systemctl", "disable", "--now", self.get_my_name()])
         try:
             os.remove(f"{SERVICES_DIR}{self.get_my_name()}")
         except FileNotFoundError:

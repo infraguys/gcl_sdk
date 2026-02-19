@@ -38,7 +38,6 @@ class EventNotFound(root.Error):
 
 
 class AbstractEventClient(metaclass=abc.ABCMeta):
-
     def __init__(self, event_type_mapping):
         self._event_type_mapping = event_type_mapping
         super().__init__()
@@ -47,9 +46,7 @@ class AbstractEventClient(metaclass=abc.ABCMeta):
     def build_from_config(cls, conf=None, **kwags):
         conf = conf or CONF
 
-        config_file = conf.find_file(
-            conf[event_c.DOMAIN].event_type_mapping_filepath
-        )
+        config_file = conf.find_file(conf[event_c.DOMAIN].event_type_mapping_filepath)
 
         with open(config_file) as fp:
             event_type_mapping = yaml.safe_load(fp)
@@ -82,7 +79,6 @@ class AbstractEventClient(metaclass=abc.ABCMeta):
 
 
 class DummyEventClient(AbstractEventClient):
-
     def __init__(self, event_type_mapping=None, **kwargs):
         event_type_mapping = event_type_mapping or {}
         super().__init__(event_type_mapping=event_type_mapping, **kwargs)
@@ -98,7 +94,6 @@ class DummyEventClient(AbstractEventClient):
 
 
 class HttpEventClient(AbstractEventClient, bzk_common.RESTClientMixIn):
-
     def __init__(
         self,
         event_type_mapping,
@@ -175,7 +170,6 @@ class HttpEventClient(AbstractEventClient, bzk_common.RESTClientMixIn):
 
 
 class AsyncEventClient(AbstractEventClient):
-
     def send_event(self, event):
         event.save()
         return event

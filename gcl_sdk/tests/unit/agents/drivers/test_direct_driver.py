@@ -260,16 +260,12 @@ class TestDirectDriver:
     def test_update_success_applies_transformer_map_on_model_response(self):
         client = MagicMock()
         storage = MagicMock()
-        transformer_map = {
-            "config": ResourceTransformer(ignore_null_attributes=True)
-        }
+        transformer_map = {"config": ResourceTransformer(ignore_null_attributes=True)}
         drv = _driver_with_caps(
             client, storage, caps=["config"], transformer_map=transformer_map
         )
 
-        res = _make_resource(
-            "config", value={"uuid": str(sys_uuid.uuid4()), "a": 1}
-        )
+        res = _make_resource("config", value={"uuid": str(sys_uuid.uuid4()), "a": 1})
 
         model_obj = MagicMock()
         model_obj.get_resource_ignore_fields.return_value = set()

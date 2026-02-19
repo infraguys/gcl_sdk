@@ -1,4 +1,3 @@
-import datetime
 import inspect
 import uuid as sys_uuid
 
@@ -47,9 +46,7 @@ class AuditLogSQLStorableMixin(orm.SQLStorableMixin):
             super().insert(session=s)
             self._write_audit_log(action, object_type, session=s)
 
-    def update(
-        self, session=None, force=False, action: str = None, object_type=None
-    ):
+    def update(self, session=None, force=False, action: str = None, object_type=None):
         if force or self.is_dirty():
             with self._get_engine().session_manager(session=session) as s:
                 super().update(session=s, force=force)
@@ -60,9 +57,7 @@ class AuditLogSQLStorableMixin(orm.SQLStorableMixin):
             super().delete(session=s)
             self._write_audit_log(action, object_type, session=s)
 
-    def _write_audit_log(
-        self, action: str = None, object_type=None, session=None
-    ):
+    def _write_audit_log(self, action: str = None, object_type=None, session=None):
         if action is None:
             action = inspect.stack()[1].function
             action = getattr(constants.Action, action, action)
