@@ -316,8 +316,6 @@ class TestEncryptedStatusApi:
         response = requests.get(url, headers=headers)
 
         assert response.status_code == 200
-        assert response.headers["Content-Type"] == (
-            packers.ENCRYPTED_JSON_CONTENT_TYPE
-        )
+        assert response.headers["Content-Type"] == (packers.ENCRYPTED_JSON_CONTENT_TYPE)
         assert packers.GENESIS_NONCE_HEADER in response.headers
         assert packers.GENESIS_NODE_UUID_HEADER in response.headers

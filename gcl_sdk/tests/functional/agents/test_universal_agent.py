@@ -16,6 +16,7 @@
 
 import os
 import tempfile
+import typing as tp
 import uuid as sys_uuid
 from unittest import mock
 
@@ -36,7 +37,7 @@ class FooCapDriver(base.AbstractCapabilityDriver):
     list_called = False
     get_called = False
 
-    def get_capabilities(self) -> list[str]:
+    def get_capabilities(self) -> tp.List[str]:
         return ["foo"]
 
     def get(self, resource: models.Resource) -> models.Resource:
@@ -51,7 +52,7 @@ class FooCapDriver(base.AbstractCapabilityDriver):
         self.__class__.update_called = True
         return resource
 
-    def list(self, capability: str) -> list[models.Resource]:
+    def list(self, capability: str) -> tp.List[models.Resource]:
         self.__class__.list_called = True
         return []
 
@@ -64,14 +65,14 @@ class FooFactDriver(base.AbstractFactDriver):
     get_called = False
     list_called = False
 
-    def get_facts(self) -> list[str]:
+    def get_facts(self) -> tp.List[str]:
         return ["foo"]
 
     def get(self, resource: models.Resource) -> models.Resource:
         self.__class__.get_called = True
         return resource
 
-    def list(self, fact: str) -> list[models.Resource]:
+    def list(self, fact: str) -> tp.List[models.Resource]:
         self.__class__.list_called = True
         return []
 
@@ -144,12 +145,9 @@ class TestUniversalAgent:
         payload.add_caps_resource(resource.to_ua_resource(kind="foo"))
         payload.calculate_hash()
 
-        self.orch_client.agents_get_payload = mock.MagicMock(
-            return_value=payload
-        )
+        self.orch_client.agents_get_payload = mock.MagicMock(return_value=payload)
 
         class CapDriver(FooCapDriver):
-
             def create(self, resource):
                 assert resource.uuid == uuid
                 return super().create(resource)
@@ -186,9 +184,7 @@ class TestUniversalAgent:
         payload.add_facts_resource(resource.to_ua_resource(kind="foo"))
         payload.calculate_hash()
 
-        self.orch_client.agents_get_payload = mock.MagicMock(
-            return_value=payload
-        )
+        self.orch_client.agents_get_payload = mock.MagicMock(return_value=payload)
 
         class CapDriver(FooCapDriver):
             def list(self, capability):
@@ -227,9 +223,7 @@ class TestUniversalAgent:
         payload.add_facts_resource(resource.to_ua_resource(kind="foo"))
         payload.calculate_hash()
 
-        self.orch_client.agents_get_payload = mock.MagicMock(
-            return_value=payload
-        )
+        self.orch_client.agents_get_payload = mock.MagicMock(return_value=payload)
 
         class CapDriver(FooCapDriver):
             def list(self, capability):
@@ -270,12 +264,9 @@ class TestUniversalAgent:
         payload.add_caps_resource(resource_b.to_ua_resource(kind="foo"))
         payload.calculate_hash()
 
-        self.orch_client.agents_get_payload = mock.MagicMock(
-            return_value=payload
-        )
+        self.orch_client.agents_get_payload = mock.MagicMock(return_value=payload)
 
         class CapDriver(FooCapDriver):
-
             def create(self, resource):
                 assert resource.uuid in {uuid_a, uuid_b}
                 return super().create(resource)
@@ -309,12 +300,9 @@ class TestUniversalAgent:
         payload.add_facts_resource(resource_c.to_ua_resource(kind="foo"))
         payload.calculate_hash()
 
-        self.orch_client.agents_get_payload = mock.MagicMock(
-            return_value=payload
-        )
+        self.orch_client.agents_get_payload = mock.MagicMock(return_value=payload)
 
         class CapDriver(FooCapDriver):
-
             def list(self, capability):
                 res = resource_b.dump_to_simple_view()
                 res["name"] = "foo-name-updated"
@@ -359,12 +347,9 @@ class TestUniversalAgent:
         payload.facts = {"foo": {"resources": []}}
         payload.calculate_hash()
 
-        self.orch_client.agents_get_payload = mock.MagicMock(
-            return_value=payload
-        )
+        self.orch_client.agents_get_payload = mock.MagicMock(return_value=payload)
 
         class FactDriver(FooFactDriver):
-
             def list(self, fact):
                 super().list(fact)
                 return [resource.to_ua_resource(kind="foo")]
@@ -399,12 +384,9 @@ class TestUniversalAgent:
         res["name"] = "foo-name-updated"
         res = conftest.FooResource.restore_from_simple_view(**res)
 
-        self.orch_client.agents_get_payload = mock.MagicMock(
-            return_value=payload
-        )
+        self.orch_client.agents_get_payload = mock.MagicMock(return_value=payload)
 
         class FactDriver(FooFactDriver):
-
             def list(self, fact):
                 super().list(fact)
                 return [res.to_ua_resource(kind="foo")]
@@ -430,9 +412,7 @@ class TestUniversalAgent:
         data.pop("node", None)
         uuid = data.pop("uuid")
         kind = data.pop("kind")
-        self.orch_client.resources_update.assert_called_once_with(
-            kind, uuid, **data
-        )
+        self.orch_client.resources_update.assert_called_once_with(kind, uuid, **data)
 
     def test_agent_delete_fact(self):
         uuid = sys_uuid.uuid4()
@@ -441,9 +421,7 @@ class TestUniversalAgent:
         payload.add_facts_resource(resource.to_ua_resource(kind="foo"))
         payload.calculate_hash()
 
-        self.orch_client.agents_get_payload = mock.MagicMock(
-            return_value=payload
-        )
+        self.orch_client.agents_get_payload = mock.MagicMock(return_value=payload)
 
         class FactDriver(FooFactDriver):
             pass
@@ -475,12 +453,9 @@ class TestUniversalAgent:
         payload.facts = {"foo": {"resources": []}}
         payload.calculate_hash()
 
-        self.orch_client.agents_get_payload = mock.MagicMock(
-            return_value=payload
-        )
+        self.orch_client.agents_get_payload = mock.MagicMock(return_value=payload)
 
         class FactDriver(FooFactDriver):
-
             def list(self, fact):
                 super().list(fact)
                 return [
@@ -519,12 +494,9 @@ class TestUniversalAgent:
         res["name"] = "foo-name-updated"
         res = conftest.FooResource.restore_from_simple_view(**res)
 
-        self.orch_client.agents_get_payload = mock.MagicMock(
-            return_value=payload
-        )
+        self.orch_client.agents_get_payload = mock.MagicMock(return_value=payload)
 
         class FactDriver(FooFactDriver):
-
             def list(self, fact):
                 super().list(fact)
                 return [
@@ -559,6 +531,4 @@ class TestUniversalAgent:
         data.pop("node", None)
         uuid = data.pop("uuid")
         kind = data.pop("kind")
-        self.orch_client.resources_update.assert_called_once_with(
-            kind, uuid, **data
-        )
+        self.orch_client.resources_update.assert_called_once_with(kind, uuid, **data)

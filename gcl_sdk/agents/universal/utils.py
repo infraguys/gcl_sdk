@@ -53,11 +53,7 @@ def calculate_hash(
     value: dict, hash_method: tp.Callable[[str], str] = xxhash.xxh3_64
 ) -> str:
     m = hash_method()
-    m.update(
-        json.dumps(value, separators=(",", ":"), sort_keys=True).encode(
-            "utf-8"
-        )
-    )
+    m.update(json.dumps(value, separators=(",", ":"), sort_keys=True).encode("utf-8"))
     return m.hexdigest()
 
 
@@ -84,9 +80,7 @@ def cfg_load_class(model_path: str) -> tp.Type:
     try:
         class_model = getattr(module, class_name)
     except AttributeError:
-        raise ValueError(
-            f"Class {class_name} not found in module {module_path}"
-        )
+        raise ValueError(f"Class {class_name} not found in module {module_path}")
 
     return class_model
 

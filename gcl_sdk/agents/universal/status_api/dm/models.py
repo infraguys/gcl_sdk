@@ -13,9 +13,9 @@
 #    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 #    License for the specific language governing permissions and limitations
 #    under the License.
+
 from __future__ import annotations
 
-from restalchemy.dm import models
 from restalchemy.dm import properties
 from restalchemy.dm import filters as dm_filters
 from restalchemy.dm import types
@@ -55,15 +55,12 @@ class KindCollection(base_storage.AbstractObjectCollection):
         try:
             kind = filters["kind"].value
         except Exception:
-            raise storage_exc.RecordNotFound(
-                model=self.model_cls, filters=filters
-            )
+            raise storage_exc.RecordNotFound(model=self.model_cls, filters=filters)
 
         return self.model_cls(kind=kind)
 
 
 class KindModel(ra_models.ModelWithID):
-
     kind = properties.property(
         types.String(max_length=64),
         required=True,

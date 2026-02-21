@@ -26,9 +26,7 @@ from restalchemy.dm import types_dynamic as ra_types_dyn
 from gcl_sdk.infra import constants as ic
 
 
-class ServiceTypeSimple(
-    ra_types_dyn.AbstractKindModel, models.SimpleViewMixin
-):
+class ServiceTypeSimple(ra_types_dyn.AbstractKindModel, models.SimpleViewMixin):
     KIND = "simple"
 
     count = properties.property(
@@ -36,15 +34,11 @@ class ServiceTypeSimple(
     )
 
 
-class ServiceTypeOneshot(
-    ra_types_dyn.AbstractKindModel, models.SimpleViewMixin
-):
+class ServiceTypeOneshot(ra_types_dyn.AbstractKindModel, models.SimpleViewMixin):
     KIND = "oneshot"
 
 
-class ServiceTypeMonopoly(
-    ra_types_dyn.AbstractKindModel, models.SimpleViewMixin
-):
+class ServiceTypeMonopoly(ra_types_dyn.AbstractKindModel, models.SimpleViewMixin):
     KIND = "monopoly"
 
     count = properties.property(
@@ -67,9 +61,7 @@ class ServiceTarget(ra_types_dyn.AbstractKindModel, models.SimpleViewMixin):
 class ServiceDPTarget(ServiceTarget):
     """Use to pass service name to dapaplane"""
 
-    service_name = properties.property(
-        ra_types.String(max_length=100), default=""
-    )
+    service_name = properties.property(ra_types.String(max_length=100), default="")
 
 
 class CmdShell(ra_types_dyn.AbstractKindModel, models.SimpleViewMixin):

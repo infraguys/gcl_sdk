@@ -61,13 +61,11 @@ ADD_HEADERS_MAPPING = {
     "X-Forwarded-For": "proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;",
     "X-Forwarded-Proto": "proxy_set_header X-Forwarded-Proto $scheme;",
     "X-Forwarded-Port": (
-        lambda vhost, route: (
-            f'proxy_set_header X-Forwarded-Port "{vhost['port']}";'
-        )
+        lambda vhost, route: f'proxy_set_header X-Forwarded-Port "{vhost["port"]}";'
     ),
     "X-Forwarded-Prefix": (
         lambda vhost, route: (
-            f'proxy_set_header X-Forwarded-Prefix "{route['value']}";'
+            f'proxy_set_header X-Forwarded-Prefix "{route["value"]}";'
             if route["value"] != "/"
             else ""
         )
@@ -188,16 +186,12 @@ class LB(lb_models.LB, meta.MetaDataPlaneModel):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._meta_file = self.META_PATH
-        self._common_storage = (
-            storage_common.JsonFileStorageSingleton.get_instance(
-                self._meta_file
-            )
+        self._common_storage = storage_common.JsonFileStorageSingleton.get_instance(
+            self._meta_file
         )
         if "lb_driver_info" not in self._common_storage:
             self._common_storage["lb_driver_info"] = {"download_dirs": {}}
-        self._download_dirs = self._common_storage["lb_driver_info"][
-            "download_dirs"
-        ]
+        self._download_dirs = self._common_storage["lb_driver_info"]["download_dirs"]
 
     def get_meta_model_fields(self) -> set[str] | None:
         """Return a list of meta fields or None.
@@ -219,14 +213,19 @@ class LB(lb_models.LB, meta.MetaDataPlaneModel):
     def _gen_backends(self, proto_lvl):
         upstreams = []
         for pid, pool in self.backend_pools.items():
+            servers = "\n    ".join(
+                f"server {e['host']}:{e['port']} weight={e['weight']};"
+                for e in pool["endpoints"]
+                if e["kind"] == "host"
+            )
             upstreams.append(f"""\
-upstream {pid} {{
-    {BALANCE_MAPPING[pool.get('balance', 'roundrobin')]}
-    zone {pid}_{proto_lvl} 64K;
-    {'\n    '.join(f"    server {e['host']}:{e['port']} weight={e['weight']};" for e in pool['endpoints'] if e['kind'] == 'host')}
-    {'keepalive 2;' if proto_lvl == 'l7' else ''}
-}}
-""")
+            upstream {pid} {{
+                {BALANCE_MAPPING[pool.get("balance", "roundrobin")]}
+                zone {pid}_{proto_lvl} 64K;
+                {servers}
+                {"keepalive 2;" if proto_lvl == "l7" else ""}
+            }}
+            """)
         return upstreams
 
     def _gen_modifiers(self, vhost, route, modifiers):
@@ -237,12 +236,16 @@ upstream {pid} {{
                     val = ADD_HEADERS_MAPPING[h]
                     res.append(val(vhost, route) if callable(val) else val)
             elif m["kind"] == "set_header":
+                name = m["name"].replace('"', '\\"')
+                value = m["value"].replace('"', '\\"')
                 res.append(
-                    f'proxy_set_header "{m['name'].replace('"', '\\"')}" "{m['value'].replace('"', '\\"')}";'
+                    f'proxy_set_header "{name}" "{value}";'
                 )
             elif m["kind"] == "rewrite_url":
+                reg = m["regex"].replace('"', '\\"')
+                repl = m["replacement"].replace('"', '\\"')
                 res.append(
-                    f'rewrite "{m['regex'].replace('"', '\\"')}" "{m['replacement'].replace('"', '\\"')}" break;'
+                    f'rewrite "{reg}" "{repl}" break;'
                 )
         return res
 
@@ -271,10 +274,11 @@ upstream {pid} {{
     def _gen_vhost_l4(self, v):
         for r in v["routes"].values():
             c = r["cond"]
+            ips = "    \n".join(f"allow {ip};" for ip in c["allowed_ips"])
             return f"""\
 server {{
-listen 0.0.0.0:{v['port']}{f" {v['proto']}" if v['proto'] != 'tcp' else ""};
-{('    \n').join(f"allow {ip};" for ip in c['allowed_ips'])}
+listen 0.0.0.0:{v["port"]}{f" {v['proto']}" if v["proto"] != "tcp" else ""};
+{ips}
 deny all;
 proxy_pass {c["actions"][0]["pool"]};
 }}
@@ -282,11 +286,13 @@ proxy_pass {c["actions"][0]["pool"]};
         return ""
 
     def _gen_file_content_l4(self, vhosts) -> str:
+        backends = "\n".join(b for b in self._gen_backends(proto_lvl="l4"))
+        vhosts = "\n".join(v for v in vhosts)
         return f"""\
 stream {{
-{"\n".join(b for b in self._gen_backends(proto_lvl="l4"))}
+{backends}
 
-{"\n".join(v for v in vhosts)}
+{vhosts}
 }}
 """
 
@@ -312,23 +318,25 @@ return {a["code"]} {a["url"]}$request_uri;""")
                     break
                 elif a["kind"] == "local_dir":
                     actions.append(f"""\
-alias {os.path.join(a['path'], '')};""")
+alias {os.path.join(a["path"], "")};""")
                     if a.get("is_spa"):
                         actions.append("try_files $uri $uri/ /index.html;")
                     break
                 elif a["kind"] == "local_dir_download":
                     actions.append(
                         f"""\
-alias {os.path.join(DOWNLOAD_DIR, str(uuid.uuid5(uuid.NAMESPACE_URL, f"{v['uuid']}{c['kind']}{c['value']}")), '')};"""
+alias {os.path.join(DOWNLOAD_DIR, str(uuid.uuid5(uuid.NAMESPACE_URL, f"{v['uuid']}{c['kind']}{c['value']}")), "")};"""
                     )
                     if a.get("is_spa"):
                         actions.append("try_files $uri $uri/ /index.html;")
                     break
             # Upgrade + Connection headers must be inside location
+            acts = "\n    ".join(a for a in actions)
+            mods = "\n    ".join(m for m in self._gen_modifiers(v, c, c["modifiers"]))
             loc = f"""
-location {LOCATION_TYPE_MAPPING[c['kind']]} {c['value']} {{
-    {"\n    ".join(a for a in actions)}
-    {"\n    ".join(m for m in self._gen_modifiers(v, c, c['modifiers']))}
+location {LOCATION_TYPE_MAPPING[c["kind"]]} {c["value"]} {{
+    {acts}
+    {mods}
     proxy_http_version 1.1;
     proxy_set_header Upgrade $http_upgrade;
     proxy_set_header Connection $connection_upgrade;
@@ -339,27 +347,32 @@ location {LOCATION_TYPE_MAPPING[c['kind']]} {c['value']} {{
             else:
                 locations.append(loc)
 
+        part = f"""\
+        set_real_ip_from {v['proxy_proto_from']};
+        real_ip_header proxy_protocol;""" if v.get('proxy_proto_from') else ""
+
         if v["proto"] == "https":
             ssl_info = f"""
-ssl_certificate      {NGINX_SSL_DIR}{v['uuid']}_genesis.crt;
-ssl_certificate_key  {NGINX_SSL_DIR}{v['uuid']}_genesis.key;
+ssl_certificate      {NGINX_SSL_DIR}{v["uuid"]}_genesis.crt;
+ssl_certificate_key  {NGINX_SSL_DIR}{v["uuid"]}_genesis.key;
 ssl_protocols TLSv1.2 TLSv1.3;
 ssl_ecdh_curve X25519:prime256v1:secp384r1;
 ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384:DHE-RSA-CHACHA20-POLY1305;
 """
         else:
             ssl_info = ""
+
+        locs = "\n    ".join(locations)
+        ips = "    \n".join(f"allow {ip};" for ip in c["allowed_ips"])
+
         return f"""\
 server {{
 listen 0.0.0.0:{v['port']}{' ssl http2' if v['proto'] == 'https' else ''}{" proxy_protocol" if v.get('proxy_proto_from') else ""};
-{f"""\
-set_real_ip_from {v['proxy_proto_from']};
-real_ip_header proxy_protocol;"""
-if v.get('proxy_proto_from') else ""}
+{part}
 server_name {' '.join(v['domains'])};{ssl_info}
-{('    \n').join(f"allow {ip};" for ip in c['allowed_ips'])}
+{ips}
 deny all;
-{"\n    ".join(locations)}
+{locs}
 }}
 """
 
@@ -379,12 +392,15 @@ map $http_upgrade $connection_upgrade {
 """
 
     def _gen_file_content_l7(self, vhosts) -> str:
+        backends = "\n".join(b for b in self._gen_backends(proto_lvl="l7"))
+        vhosts = "\n".join(v for v in vhosts)
+
         return f"""\
 {self._gen_http_defaults()}
 
-{"\n".join(b for b in self._gen_backends(proto_lvl="l7"))}
+{backends}
 
-{"\n".join(v for v in vhosts)}
+{vhosts}
 """
 
     # We use tmp dir existence as a fact to unfinished download, so clean insides only
@@ -507,18 +523,14 @@ map $http_upgrade $connection_upgrade {
                 continue
             if self._download_dirs.get(p) != u:
                 # Url changed, get new one
-                self._download_dirs_futures[p] = TPOOL.submit(
-                    self._download_url, p, u
-                )
-            elif os.path.isdir(
-                os.path.join(DOWNLOAD_DIR, p)
-            ) and not os.path.isdir(os.path.join(DOWNLOAD_DIR_TMP, p)):
+                self._download_dirs_futures[p] = TPOOL.submit(self._download_url, p, u)
+            elif os.path.isdir(os.path.join(DOWNLOAD_DIR, p)) and not os.path.isdir(
+                os.path.join(DOWNLOAD_DIR_TMP, p)
+            ):
                 # already exists and "ok", just track it
                 self._download_dirs[p] = u
             else:
-                self._download_dirs_futures[p] = TPOOL.submit(
-                    self._download_url, p, u
-                )
+                self._download_dirs_futures[p] = TPOOL.submit(self._download_url, p, u)
         # Clean orphan dirs
         actual_ondisk_dirs = set(
             entry.name for entry in os.scandir(DOWNLOAD_DIR) if entry.is_dir()
@@ -599,9 +611,7 @@ map $http_upgrade $connection_upgrade {
                             REMOTE_SCRIPT.format(
                                 port=e["lport"],
                                 mode=e["lproto"],
-                                proto=(
-                                    e["lproto"] if e["lproto"] == "udp" else ""
-                                ),
+                                proto=(e["lproto"] if e["lproto"] == "udp" else ""),
                             )
                             if e["proxy_proto_from"]
                             else ""
@@ -627,27 +637,19 @@ map $http_upgrade $connection_upgrade {
                         obj={"uuid": str(self.uuid)}
                     )
         except FileNotFoundError:
-            raise driver_exc.InvalidDataPlaneObjectError(
-                obj={"uuid": str(self.uuid)}
-            )
+            raise driver_exc.InvalidDataPlaneObjectError(obj={"uuid": str(self.uuid)})
 
     def restore_from_dp(self) -> None:
         self.status = ic.InstanceStatus.IN_PROGRESS.value
         try:
             subprocess.check_output(["systemctl", "is-active", "nginx"])
         except subprocess.CalledProcessError:
-            raise driver_exc.InvalidDataPlaneObjectError(
-                obj={"uuid": str(self.uuid)}
-            )
+            raise driver_exc.InvalidDataPlaneObjectError(obj={"uuid": str(self.uuid)})
 
         vhosts_l4, vhosts_l7, ext_sources = self._gen_vhosts()
         # Force file validation
-        self._validate_file(
-            NGINX_L4_CONFIG_FILE, self._gen_file_content_l4(vhosts_l4)
-        )
-        self._validate_file(
-            NGINX_L7_CONFIG_FILE, self._gen_file_content_l7(vhosts_l7)
-        )
+        self._validate_file(NGINX_L4_CONFIG_FILE, self._gen_file_content_l4(vhosts_l4))
+        self._validate_file(NGINX_L7_CONFIG_FILE, self._gen_file_content_l7(vhosts_l7))
         for v in self.vhosts:
             if v["proto"] == "https":
                 self._validate_file(
@@ -686,9 +688,7 @@ map $http_upgrade $connection_upgrade {
                 )
             self._download_dirs_futures.pop(path, None)
         if not self._validate_downloaded_dirs():
-            raise driver_exc.InvalidDataPlaneObjectError(
-                obj={"uuid": str(self.uuid)}
-            )
+            raise driver_exc.InvalidDataPlaneObjectError(obj={"uuid": str(self.uuid)})
 
         for n, e in ext_sources.items():
             self._validate_file(
@@ -753,9 +753,7 @@ map $http_upgrade $connection_upgrade {
 
             for ext in (".sh", ".key"):
                 try:
-                    os.remove(
-                        os.path.join(TUNNEL_SCRIPT_PATH, f"{sname}{ext}")
-                    )
+                    os.remove(os.path.join(TUNNEL_SCRIPT_PATH, f"{sname}{ext}"))
                 except OSError:
                     pass
 
@@ -794,5 +792,4 @@ class LBCapabilityDriver(meta.MetaFileStorageAgentDriver):
 
 
 class LBAgentCapabilityDriver(LBCapabilityDriver):
-
     __model_map__ = {LB_AGENT_TARGET_KIND: LB}

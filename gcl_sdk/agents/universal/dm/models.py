@@ -106,9 +106,7 @@ class Payload(models.Model, models.SimpleViewMixin):
     capabilities = properties.property(types.Dict(), default=dict)
     facts = properties.property(types.Dict(), default=dict)
     hash = properties.property(types.String(max_length=256), default="")
-    version = properties.property(
-        types.Integer(min_value=0), default=0, required=True
-    )
+    version = properties.property(types.Integer(min_value=0), default=0, required=True)
 
     def __hash__(self):
         return hash((self.hash, self.version))
@@ -127,9 +125,7 @@ class Payload(models.Model, models.SimpleViewMixin):
         hashes = [r.hash for r in caps_resources]
         hashes.extend([r.full_hash for r in facts_resources])
         m.update(
-            json.dumps(hashes, separators=(",", ":"), sort_keys=True).encode(
-                "utf-8"
-            )
+            json.dumps(hashes, separators=(",", ":"), sort_keys=True).encode("utf-8")
         )
         self.hash = m.hexdigest()
 
@@ -190,9 +186,7 @@ class Payload(models.Model, models.SimpleViewMixin):
         os.replace(tmp_file, payload_path)
 
     @classmethod
-    def _resources(
-        cls, source: dict, res_filter: str | None = None
-    ) -> list[Resource]:
+    def _resources(cls, source: dict, res_filter: str | None = None) -> list[Resource]:
         """
         Lists all resources by capability/fact or all resources in the basket.
         """
@@ -368,9 +362,7 @@ class UniversalAgent(
         for fact in self.list_facts:
             payload.facts.setdefault(fact, {"resources": []})
 
-        LOG.debug(
-            "Target and agents payloads are different. Agent %s", self.uuid
-        )
+        LOG.debug("Target and agents payloads are different. Agent %s", self.uuid)
         return payload
 
     @classmethod
@@ -403,14 +395,10 @@ class UniversalAgent(
             # There is known issue with date format so we need
             # to handle it manually.
             if created_at := data.get("created_at"):
-                data["created_at"] = created_at.replace(
-                    tzinfo=datetime.timezone.utc
-                )
+                data["created_at"] = created_at.replace(tzinfo=datetime.timezone.utc)
 
             if updated_at := data.get("updated_at"):
-                data["updated_at"] = updated_at.replace(
-                    tzinfo=datetime.timezone.utc
-                )
+                data["updated_at"] = updated_at.replace(tzinfo=datetime.timezone.utc)
 
             agent = cls(**data)
             caps = set(agent.list_capabilities) & set(capabilities)
@@ -430,9 +418,7 @@ class NodeEncryptionKey(
 
     __tablename__ = "ua_node_encryption_keys"
 
-    private_key = properties.property(
-        types.String(max_length=44), required=True
-    )
+    private_key = properties.property(types.String(max_length=44), required=True)
     encryption_disabled_until = properties.property(
         types.UTCDateTimeZ(),
         default=lambda: datetime.datetime.now(datetime.timezone.utc),
@@ -656,9 +642,7 @@ class TargetResource(Resource):
         default=lambda: datetime.datetime.now(datetime.timezone.utc),
     )
     master_hash = properties.property(types.String(max_length=256), default="")
-    master_full_hash = properties.property(
-        types.String(max_length=256), default=""
-    )
+    master_full_hash = properties.property(types.String(max_length=256), default="")
 
     def update_value(self, other: TargetResource) -> None:
         """Update the resource value."""
@@ -686,24 +670,18 @@ class ResourceMixin(models.SimpleViewMixin):
         return set()
 
     def get_ua_all_and_target_values(self):
-        value = self.dump_to_simple_view(
-            skip=self.get_resource_ignore_fields()
-        )
+        value = self.dump_to_simple_view(skip=self.get_resource_ignore_fields())
 
         # Need to get only target fields with values to calculate hash
         target_fields = self.get_resource_target_fields()
 
         if target_fields:
-            target_data = {
-                k: v for k, v in value.items() if k in target_fields
-            }
+            target_data = {k: v for k, v in value.items() if k in target_fields}
         else:
             target_data = value
         return value, target_data
 
-    def to_ua_resource(
-        self, kind: str, extract_status: bool = True
-    ) -> Resource:
+    def to_ua_resource(self, kind: str, extract_status: bool = True) -> Resource:
         value, target_data = self.get_ua_all_and_target_values()
 
         if extract_status and "status" in value:
@@ -752,9 +730,7 @@ class TargetResourceMixin(ResourceMixin):
         return TargetResource(
             uuid=self.get_resource_uuid(),
             kind=kind,
-            res_uuid=TargetResource.gen_res_uuid(
-                self.get_resource_uuid(), kind
-            ),
+            res_uuid=TargetResource.gen_res_uuid(self.get_resource_uuid(), kind),
             value=target_data,
             hash=utils.calculate_hash(target_data),
             full_hash="",
@@ -767,7 +743,6 @@ class TargetResourceMixin(ResourceMixin):
 
 
 class TargetResourceSQLStorableMixin:
-
     @classmethod
     def _execute_expression(
         cls, expression: str, params: tp.Collection, session=None
@@ -790,9 +765,7 @@ class TargetResourceSQLStorableMixin:
         """Fast method to convert clause to the SQL clause."""
         # TODO(akremenetsky): support multiple clauses
         property_name, abs_clause = next(iter(clause.items()))
-        property_type = cls.properties.properties[
-            property_name
-        ].get_property_type()
+        property_type = cls.properties.properties[property_name].get_property_type()
 
         engine = engines.engine_factory.get_engine()
         sql_clause_class = sql_filters.FILTER_MAPPING[engine.dialect.name][
@@ -946,9 +919,7 @@ class ResourcePairView(models.ModelWithID, orm.SQLStorableMixin):
 
     kind = properties.property(types.String(max_length=64), required=True)
     uuid = properties.property(types.UUID(), required=True)
-    res_uuid = properties.property(
-        types.UUID(), id_property=True, required=True
-    )
+    res_uuid = properties.property(types.UUID(), id_property=True, required=True)
     target_resource = relationships.relationship(
         TargetResource,
         prefetch=True,
@@ -1028,9 +999,7 @@ class OutdatedMasterHashResource(models.ModelWithUUID, orm.SQLStorableMixin):
     )
 
 
-class OutdatedMasterFullHashResource(
-    models.ModelWithUUID, orm.SQLStorableMixin
-):
+class OutdatedMasterFullHashResource(models.ModelWithUUID, orm.SQLStorableMixin):
     __tablename__ = "ua_outdated_master_full_hash_resources_view"
 
     kind = properties.property(types.String(max_length=64), required=True)
@@ -1053,12 +1022,8 @@ class PlainTrackedResource(
 
     watcher = properties.property(types.UUID(), required=True)
     target = properties.property(types.UUID(), required=True)
-    watcher_kind = properties.property(
-        types.String(max_length=64), required=True
-    )
-    target_kind = properties.property(
-        types.String(max_length=64), required=True
-    )
+    watcher_kind = properties.property(types.String(max_length=64), required=True)
+    target_kind = properties.property(types.String(max_length=64), required=True)
     tracked_at = properties.property(
         types.UTCDateTimeZ(),
         default=lambda: datetime.datetime.now(datetime.timezone.utc),
@@ -1096,7 +1061,6 @@ class PlainTrackedResource(
 
 
 class TrackedResource(PlainTrackedResource):
-
     watcher = relationships.relationship(
         TargetResource,
         prefetch=True,
@@ -1150,9 +1114,7 @@ class TrackedResource(PlainTrackedResource):
 class OutdatedTrackedResource(models.ModelWithUUID, orm.SQLStorableMixin):
     __tablename__ = "ua_outdated_tracked_resources_view"
 
-    watcher_kind = properties.property(
-        types.String(max_length=64), required=True
-    )
+    watcher_kind = properties.property(types.String(max_length=64), required=True)
 
     tracked_resource = relationships.relationship(
         TrackedResource,
@@ -1226,7 +1188,6 @@ class SchedulableToAgentMixin:
 
 
 class SchedulableToAgentFromNodeMixin(SchedulableToAgentMixin):
-
     def schedule_to_ua_agent(self, **kwargs) -> sys_uuid.UUID | None:
         """Schedule the resource to the UA agent.
 
@@ -1240,10 +1201,7 @@ class SchedulableToAgentFromAgentUUIDMixin(
     SchedulableToAgentMixin,
     models.Model,
 ):
-
-    agent_uuid = properties.property(
-        types.AllowNone(types.UUID()), default=None
-    )
+    agent_uuid = properties.property(types.AllowNone(types.UUID()), default=None)
 
     def schedule_to_ua_agent(self, **kwargs) -> sys_uuid.UUID | None:
         """Schedule the resource to the UA agent.
@@ -1289,9 +1247,7 @@ class DependenciesExistReadinessMixin(ReadinessMixin):
 
     def _fetch_dependencies(
         self,
-    ) -> tuple[
-        set[ResourceIdentifier], dict[ResourceIdentifier, TargetResource]
-    ]:
+    ) -> tuple[set[ResourceIdentifier], dict[ResourceIdentifier, TargetResource]]:
         """Fetch all dependencies and return them as a dictionary."""
         # Fetch dependencies
         dependencies = set()
@@ -1416,9 +1372,7 @@ class TargetResourceKindAwareMixin(KindAwareMixin, TargetResourceMixin):
             master_full_hash=master_full_hash,
             tracked_at=tracked_at,
         )
-        resource.status = (
-            status or self.__init_resource_status__ or resource.status
-        )
+        resource.status = status or self.__init_resource_status__ or resource.status
         return resource
 
     @classmethod
@@ -1480,9 +1434,7 @@ class InstanceMixin(
     def tracked_instance_model(cls, kind: str) -> tp.Type["InstanceMixin"]:
         """Return the tracked instance model by kind."""
         if not cls._has_model_tracked_instances():
-            raise ValueError(
-                "The tracked instance model map is not initialized."
-            )
+            raise ValueError("The tracked instance model map is not initialized.")
 
         if kind not in cls.__tracked_instances_model_map__:
             raise ValueError(
@@ -1528,9 +1480,7 @@ class InstanceMixin(
         limit: int = c.DEF_SQL_LIMIT,
     ) -> list["ResourcePair"]:
         kind = cls.get_resource_kind()
-        return cls.get_outdated_entities(
-            cls.__tablename__, kind, clause, limit
-        )
+        return cls.get_outdated_entities(cls.__tablename__, kind, clause, limit)
 
     @classmethod
     def get_deleted_instances(
@@ -1540,9 +1490,7 @@ class InstanceMixin(
         return cls.get_deleted_target_resources(cls.__tablename__, kind, limit)
 
     @classmethod
-    def get_filter_clause(
-        cls, **kwargs
-    ) -> dict[str, dm_filters.AbstractClause] | None:
+    def get_filter_clause(cls, **kwargs) -> dict[str, dm_filters.AbstractClause] | None:
         """Get filter clause for the instance model.
 
         The clause is returned back to the service to take a chance for
@@ -1650,16 +1598,12 @@ class InstanceWithDerivativesMixin(InstanceMixin):
         return False
 
     @classmethod
-    def derivative_model(
-        cls, kind: str
-    ) -> tp.Type[TargetResourceKindAwareMixin]:
+    def derivative_model(cls, kind: str) -> tp.Type[TargetResourceKindAwareMixin]:
         """Return the derivative model by kind."""
         if cls.__derivative_model_map__ is None:
             raise ValueError("The derivative model map is not initialized.")
 
         if kind not in cls.__derivative_model_map__:
-            raise ValueError(
-                f"The derivative model for kind {kind} is not found."
-            )
+            raise ValueError(f"The derivative model for kind {kind} is not found.")
 
         return cls.__derivative_model_map__[kind]

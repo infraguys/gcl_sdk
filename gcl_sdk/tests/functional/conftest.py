@@ -47,21 +47,13 @@ FIRST_MIGRATION = "0000-init-events-table-2cfd220e.py"
 
 
 class FooResource(ra_models.ModelWithUUID, models.ResourceMixin):
-    name = properties.property(
-        ra_types.String(max_length=64), default="foo-name"
-    )
-    project_id = properties.property(
-        ra_types.UUID(), default=lambda: sys_uuid.uuid4()
-    )
+    name = properties.property(ra_types.String(max_length=64), default="foo-name")
+    project_id = properties.property(ra_types.UUID(), default=lambda: sys_uuid.uuid4())
 
 
 class FooTargetResource(ra_models.ModelWithUUID, models.TargetResourceMixin):
-    name = properties.property(
-        ra_types.String(max_length=64), default="foo-name"
-    )
-    project_id = properties.property(
-        ra_types.UUID(), default=lambda: sys_uuid.uuid4()
-    )
+    name = properties.property(ra_types.String(max_length=64), default="foo-name")
+    project_id = properties.property(ra_types.UUID(), default=lambda: sys_uuid.uuid4())
 
 
 class DummyInstance(
@@ -78,12 +70,8 @@ class DummyInstance(
         "existing": [],
     }
 
-    name = properties.property(
-        ra_types.String(max_length=64), default="foo-name"
-    )
-    project_id = properties.property(
-        ra_types.UUID(), default=lambda: sys_uuid.uuid4()
-    )
+    name = properties.property(ra_types.String(max_length=64), default="foo-name")
+    project_id = properties.property(ra_types.UUID(), default=lambda: sys_uuid.uuid4())
 
     def save(self, **kwargs):
         pass
@@ -103,9 +91,7 @@ class DummyInstance(
         return False
 
     @classmethod
-    def get_new_instances(
-        cls, limit: int = c.DEF_SQL_LIMIT
-    ) -> list["DummyInstance"]:
+    def get_new_instances(cls, limit: int = c.DEF_SQL_LIMIT) -> list["DummyInstance"]:
         return cls.__dummy_storage__["new"]
 
     @classmethod
@@ -134,21 +120,15 @@ class DummyDerivative(
         "existing": [],
     }
 
-    name = properties.property(
-        ra_types.String(max_length=64), default="foo-name"
-    )
-    project_id = properties.property(
-        ra_types.UUID(), default=lambda: sys_uuid.uuid4()
-    )
+    name = properties.property(ra_types.String(max_length=64), default="foo-name")
+    project_id = properties.property(ra_types.UUID(), default=lambda: sys_uuid.uuid4())
 
     @classmethod
     def get_resource_kind(cls) -> str:
         return "foo-derivative"
 
 
-class DummyInstanceWithDerivatives(
-    DummyInstance, models.InstanceWithDerivativesMixin
-):
+class DummyInstanceWithDerivatives(DummyInstance, models.InstanceWithDerivativesMixin):
     __derivative_model_map__ = {
         "foo-derivative": DummyDerivative,
     }
@@ -231,9 +211,7 @@ def orch_api_wsgi_app():
             functools.partial(
                 sdk_middlewares.SdkContextMiddleware,
                 context_kwargs={
-                    "encryption_information_class": (
-                        packers.NoEncryptionInformation
-                    )
+                    "encryption_information_class": (packers.NoEncryptionInformation)
                 },
             ),
             errors_mw.ErrorsHandlerMiddleware,
@@ -272,9 +250,7 @@ def status_api_wsgi_app():
             functools.partial(
                 sdk_middlewares.SdkContextMiddleware,
                 context_kwargs={
-                    "encryption_information_class": (
-                        packers.NoEncryptionInformation
-                    )
+                    "encryption_information_class": (packers.NoEncryptionInformation)
                 },
             ),
             errors_mw.ErrorsHandlerMiddleware,
@@ -338,9 +314,7 @@ def dummy_instance_factory():
                 uuid = sys_uuid.uuid5(DummyInstance.NAMESPACE, f"{mode}-{i}")
                 name = f"inst-{mode}-{i}"
 
-                instance = DummyInstance(
-                    uuid=uuid, name=name, project_id=project_id
-                )
+                instance = DummyInstance(uuid=uuid, name=name, project_id=project_id)
                 if mode == "deleted":
                     instance = instance.to_ua_resource()
                 elif mode == "existing":
@@ -407,16 +381,10 @@ def dummy_instance_with_derivatives_factory():
                 elif mode == "existing":
                     derivative = instance.to_derivative()
                     resource = instance.to_ua_resource(
-                        master=(
-                            master_instance.uuid if master_instance else None
-                        ),
-                        master_hash=(
-                            master_resource.hash if master_instance else ""
-                        ),
+                        master=(master_instance.uuid if master_instance else None),
+                        master_hash=(master_resource.hash if master_instance else ""),
                         master_full_hash=(
-                            master_resource.full_hash
-                            if master_instance
-                            else ""
+                            master_resource.full_hash if master_instance else ""
                         ),
                     )
                     derivative_resource = derivative.to_ua_resource(

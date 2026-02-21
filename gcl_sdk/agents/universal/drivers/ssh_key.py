@@ -65,9 +65,7 @@ class SSHKey(meta.MetaDataPlaneModel):
         """Save the key to the data plane."""
 
         # Check if authorized_keys file exists
-        authorized_keys = os.path.join(
-            self.HOME, self.user, self.authorized_keys
-        )
+        authorized_keys = os.path.join(self.HOME, self.user, self.authorized_keys)
         if not os.path.exists(authorized_keys):
             os.makedirs(os.path.dirname(authorized_keys), exist_ok=True)
 
@@ -99,9 +97,7 @@ class SSHKey(meta.MetaDataPlaneModel):
 
     def restore_from_dp(self) -> None:
         """Load the key from the file system."""
-        authorized_keys = os.path.join(
-            self.HOME, self.user, self.authorized_keys
-        )
+        authorized_keys = os.path.join(self.HOME, self.user, self.authorized_keys)
         if not os.path.exists(authorized_keys):
             resource = self.to_ua_resource(SSH_KEY_TARGET_KIND)
             raise exceptions.ResourceNotFound(resource=resource)
@@ -117,9 +113,7 @@ class SSHKey(meta.MetaDataPlaneModel):
 
     def delete_from_dp(self) -> None:
         """Delete the key from the data plane."""
-        authorized_keys = os.path.join(
-            self.HOME, self.user, self.authorized_keys
-        )
+        authorized_keys = os.path.join(self.HOME, self.user, self.authorized_keys)
         if not os.path.exists(authorized_keys):
             return
 

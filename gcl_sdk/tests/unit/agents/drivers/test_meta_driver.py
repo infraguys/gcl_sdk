@@ -13,8 +13,10 @@
 #    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 #    License for the specific language governing permissions and limitations
 #    under the License.
+
 import json
 import os
+import typing as tp
 import uuid as sys_uuid
 
 import pytest
@@ -27,7 +29,9 @@ from restalchemy.dm import types
 
 
 def _make_resource(
-    kind: str, uuid: sys_uuid.UUID | None = None, value: dict | None = None
+    kind: str,
+    uuid: tp.Optional[sys_uuid.UUID] = None,
+    value: tp.Optional[dict] = None
 ) -> models.Resource:
     uuid = uuid or sys_uuid.uuid4()
     value = value or {"uuid": str(uuid), "foo": 1}
@@ -42,14 +46,14 @@ class DummyModel(meta.MetaDataPlaneModel):
     It records calls to DP-like methods in a class-level log.
     """
 
-    call_log: dict[str, list[str]] = {}
+    call_log: tp.Dict[str, tp.List[str]] = {}
 
     # Custom fields that may appear in resource.value
     foo = properties.property(types.Integer(), default=0)
     raise_on_restore = properties.property(types.Boolean(), default=False)
     invalid_dp = properties.property(types.Boolean(), default=False)
 
-    def get_meta_model_fields(self) -> set[str] | None:
+    def get_meta_model_fields(self) -> tp.Optional[tp.Set[str]]:
         # Save all fields into meta file (including any service flags)
         return None
 
@@ -69,9 +73,7 @@ class DummyModel(meta.MetaDataPlaneModel):
             )
         # Optional flag to simulate invalid DP object
         if getattr(self, "invalid_dp", False):
-            raise driver_exc.InvalidDataPlaneObjectError(
-                obj={"uuid": str(self.uuid)}
-            )
+            raise driver_exc.InvalidDataPlaneObjectError(obj={"uuid": str(self.uuid)})
         self._log("restore_from_dp")
 
     def delete_from_dp(self, coordinator=None) -> None:
@@ -177,9 +179,7 @@ class TestMetaDriver:
 
         # Create two resources, one will be marked to raise on restore
         uuid1, uuid2 = sys_uuid.uuid4(), sys_uuid.uuid4()
-        res1 = _make_resource(
-            "dummy", uuid=uuid1, value={"uuid": str(uuid1), "foo": 1}
-        )
+        res1 = _make_resource("dummy", uuid=uuid1, value={"uuid": str(uuid1), "foo": 1})
         res2 = _make_resource(
             "dummy",
             uuid=uuid2,
@@ -202,9 +202,7 @@ class TestMetaDriver:
 
         # Create two resources, one will be marked invalid on DP
         uuid1, uuid2 = sys_uuid.uuid4(), sys_uuid.uuid4()
-        res1 = _make_resource(
-            "dummy", uuid=uuid1, value={"uuid": str(uuid1), "foo": 1}
-        )
+        res1 = _make_resource("dummy", uuid=uuid1, value={"uuid": str(uuid1), "foo": 1})
         res2 = _make_resource(
             "dummy",
             uuid=uuid2,
