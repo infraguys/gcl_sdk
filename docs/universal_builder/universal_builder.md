@@ -3,7 +3,7 @@
 The Universal Builder is a service that provides some common logic to build resources and prepare them for agents based on the universal agent.
 Every builder works with a particular instance model. The instance is a key element of the builder and it sets in the builder constructor. The instance represents a real object of the control plane we want to build. For example, `Config`, `Secret`, `PGInstance` and so on.
 
-The key feature of the universal builder is to do all routine work for service live cycle management, preparing and converting instances to universal agent resources, tracking and actualizing their states. The universal builder has an interface as a set of methods that may be overridden to provide custom logic but most of them have default implementation.
+The key feature of the universal builder is to do all routine work for service lifecycle management, preparing and converting instances to universal agent resources, tracking and actualizing their states. The universal builder has an interface as a set of methods that may be overridden to provide custom logic but most of them have default implementation.
 
 ## Quick start
 
