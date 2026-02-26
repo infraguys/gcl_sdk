@@ -1,6 +1,6 @@
 # Capability driver: Quick start quide
 
-This page provides a quick start guide for capability drivers. Please refer to main terms of the [Universal Agent](docs/universal_agent/universal_agent) to be in the right context.
+This page provides a quick start guide for capability drivers. Please refer to main terms of the [Universal Agent](universal_agent.md) to be in the right context.
 
 ## Driver interface
 
