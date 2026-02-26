@@ -57,7 +57,7 @@ The hook is performed before updating instance resource.
 
 ### update_instance_derivatives
 
-The hook to update instance derivatives. The hook is called when an initiator of updating is an user. The default implementation is to delete the outdated derivatives and create new ones.
+The hook to update instance derivatives. The hook is called when an initiator of updating is a user. The default implementation is to delete the outdated derivatives and create new ones.
 
 NOTE: The default implementation of the method may be dangerous in cases if the derivatives are changed in live cycle of the instance. For instance, if new derivatives are added after the instance was created, they will be dropped in the default implementation of the method.
 
