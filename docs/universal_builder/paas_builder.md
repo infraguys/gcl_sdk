@@ -2,7 +2,7 @@
 
 The `PaaSBuilder` is a builder that is focused on PaaS entities management. The main purpose of this builder is to provide a simple way to manage PaaS entities resources. The builder inherits from `UniversalBuilder` so you can override any method of the builder to provide custom logic. The builder extends the interface of the `UniversalBuilder` with some specific methods.
 
-Also the builder has a set of method allowing to schedule PaaS objects to particular agents based on the agent capabilities.
+Also the builder has a set of methods allowing to schedule PaaS objects to particular agents based on the agent capabilities.
 
 ## create_paas_objects
 
