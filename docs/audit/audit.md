@@ -54,7 +54,7 @@ from gcl_sdk import migrations as sdk_migrations
 
 SDK_MIGRATION_FILE_NAME = "0002-init-auditlog-table-c6f740.py"
 
-class MigrationStep(migrations.AbstarctMigrationStep):
+class MigrationStep(migrations.AbstractMigrationStep):
     ...
     def upgrade(self, session):
         migration_engine = MigrationEngine._get_migration_engine(sdk_migrations)
