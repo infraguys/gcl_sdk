@@ -13,7 +13,7 @@ Follow the [quick start guide](universal_builder_quick_start) to run the Univers
 
 ### Instance
 
-How it was described above the instance is a real object of the control plane but to work with the universal builder such instances should inherit from `InstanceMixin` or `InstanceWithDerivativesMixin`. They are useful mixins allows to translate the real object (from the control plane) to the universal agent resources.
+As described above the instance is a real object of the control plane but to work with the universal builder such instances should inherit from `InstanceMixin` or `InstanceWithDerivativesMixin`. They are useful mixins that allow to translate the real object (from the control plane) to the universal agent resources.
 
 ### InstanceMixin
 
