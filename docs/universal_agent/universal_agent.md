@@ -81,7 +81,7 @@ Almost the same as `Resource` but it's used as a target resource. Additonal fiel
 
 ### Payload
 
-This model is used to represent the payload of the agent. The models is used as for control plane and data plane as well. The control plane payload is received from Orch API and it has be applied to the data plane, excepting `facts`. A data plane payload is a collected payload from the data. If CP and DP payloads are different from target values of resources that means we need to update something on the data plane. If CP and DP payloads are different from facts point of view, it means we need to update something in the Status API to save new facts.
+This model is used to represent the payload of the agent. The model is used as for control plane and data plane as well. The control plane payload is received from Orch API and it has to be applied to the data plane, except for `facts`. A data plane payload is a collected payload from the data. If CP and DP payloads are different from target values of resources that means we need to update something on the data plane. If CP and DP payloads are different from facts point of view, it means we need to update something in the Status API to save new facts.
 
 **capabilities** - a set of managed resources, for example, configuration,
     secrets and so on. An orchestrator sets which resources should be
