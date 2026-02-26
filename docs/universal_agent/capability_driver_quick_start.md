@@ -48,7 +48,7 @@ The implementation of `create` can look like this:
 ```python
 def create(self, resource: models.Resource) -> models.Resource:
     """Creates a new file in the work directory."""
-    name = f"{resource.value['uuid']}-{resource.value['name']}"
+    name = f"{resource.value['uuid']}_{resource.value['name']}"
     path = os.path.join(self.work_dir, name)
     with open(path, "w") as f:
         f.write("")
