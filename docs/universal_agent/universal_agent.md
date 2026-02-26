@@ -71,7 +71,7 @@ For hash calculation only the target fields are used as discussed above. `full_h
 
 ### TargetResource
 
-Almost the same as `Resource` but it's used as a target resource. Additonal fields are:
+Almost the same as `Resource` but it's used as a target resource. Additional fields are:
 
 - *agent* - agent uuid that will handle this resource.
 - *master* - reference to the master resource if it exists.
