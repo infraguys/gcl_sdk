@@ -30,7 +30,7 @@ Follow the [quick start guide](universal_agent_quick_start) to run the Universal
 
 As described it's a model that represents an abstract resource and the model is mostly used as an actual resource, for instance, gathered from the data plane. In this case the `value` dict contains a real object gathered from the data plane in dict format. The essential fields are:
 
-- *kind* - resource kind, for instance, "config", "secret" and son on.
+- *kind* - resource kind, for instance, "config", "secret" and so on.
 - *value* - resource value in dict format.
 - *hash* - hash value only for the target fields.
 - *full_hash* - hash value for the whole value (all fields).
