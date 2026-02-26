@@ -23,7 +23,7 @@ Any models that is going to be used in universal builders should inherit from th
 - methods to fetch entities from the database.
 - methods to work with derivatives.
 
-The derivatives objects are the objects that are created from the instance object and strongly coupled with it. For example, the config instance has derivatives like renders objects. Single config instance can have multiple renders objects.
+The derivatives objects are the objects that are created from the instance object and strongly coupled with it. For example, the config instance has derivatives like render objects. Single config instance can have multiple render objects.
 
 The default behavior for the `InstanceMixin` is to not have derivatives.
 
