@@ -1,6 +1,6 @@
 # Audit
 
-Audit Log enhance system security by tracking changes to key entities (records in tables).
+Audit logs enhance system security by tracking changes to key entities (records in tables).
 
 Main components:
 
