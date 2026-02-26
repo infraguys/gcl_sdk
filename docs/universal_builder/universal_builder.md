@@ -45,7 +45,7 @@ The hook is performed before creating instance resource. The hook is called only
 
 ### create_instance_derivatives
 
-Create the instance. The result is a collection of derivative objects that are required for the instance. For example, the main instance is a `Config` so the derivative objects for the the config is a list of `Render`. The result is a collection of render objects. The derivative objects should inherit from the `TargetResourceMixin`.
+Create the instance. The result is a collection of derivative objects that are required for the instance. For example, the main instance is a `Config` so the derivative objects for the config is a list of `Render`. The result is a collection of render objects. The derivative objects should inherit from the `TargetResourceMixin`.
 
 ### post_create_instance_resource
 
