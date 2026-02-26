@@ -12,7 +12,7 @@ You don't need to implement the method `create_instance_derivatives` as `PaaSBui
 
 ## actualize_paas_objects_source_data_plane
 
-Actualize the PaaS objects. Changes from the data plane. The method is called when the instance is outdated. For example, the instance `Database` has derivative `PGDatabase`. Single `Database` may have multiple `PGDatabase` derivatives. If any of the derivatives is outdated, this method is called to reactualize this PaaS objects.
+Actualize the PaaS objects. Changes from the data plane. The method is called when the instance is outdated. For example, the instance `Database` has derivative `PGDatabase`. Single `Database` may have multiple `PGDatabase` derivatives. If any of the derivatives is outdated, this method is called to reactualize these PaaS objects.
 
 This methods replace the `actualize_outdated_instance_derivatives` method of the `UniversalBuilder`.
 
