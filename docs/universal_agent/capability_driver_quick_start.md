@@ -104,7 +104,7 @@ def delete(self, resource: models.Resource) -> None:
         # Nothing to do, the resource does not exist
         return
     
-    name = f"{res.value['uuid']}-{res.value['name']}"
+    name = f"{res.value['uuid']}_{res.value['name']}"
     path = os.path.join(self.work_dir, name)
     os.remove(path)
 ```
