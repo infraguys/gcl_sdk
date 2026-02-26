@@ -16,7 +16,7 @@ Follow the [quick start guide](universal_agent_quick_start) to run the Universal
 
 ## Main terms
 
-**Universal agent service** is an unified agent that implements common logic of abstract `resource` and `fact` management. The agent operates on high level abstractions such as `Resource` and `TargetResource` but actual interaction with data plane is performing via drivers. These drivers are loaded at launch time and registered as agent capabilities or facts. After registration the agent can handle resources with specified capabilities.
+**Universal agent service** is a unified agent that implements common logic of abstract `resource` and `fact` management. The agent operates on high level abstractions such as `Resource` and `TargetResource` but actual interaction with data plane is performed via drivers. These drivers are loaded at launch time and registered as agent capabilities or facts. After registration the agent can handle resources with specified capabilities.
 
 **Universal scheduler service** is a service that provides some common logic to schedule resources to particular agents based on the agent capabilities. The simplest logic is implemented for now. First agent that can handle a resource by its capability(kind) is selected and the resource is scheduled to this agent.
 
