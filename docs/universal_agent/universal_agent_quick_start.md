@@ -24,7 +24,7 @@ The configuration file will be described later.
 
 # Configuration
 
-The agent use a configuration file in the `ini` format. The default path to the configuration file is `/etc/genesis_universal_agent/genesis_universal_agent.conf`. The main agent section is `universal_agent`:
+The agent uses a configuration file in the `ini` format. The default path to the configuration file is `/etc/genesis_universal_agent/genesis_universal_agent.conf`. The main agent section is `universal_agent`:
 
 ```ini
 [universal_agent]
