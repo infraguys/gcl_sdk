@@ -49,7 +49,7 @@ Some explanation for the `hash` and `full_hash`. Let's assume we have the follow
     }
 ```
 
-All these fields are considered as target fields and they are used to calculate `hash`. After node creation we have the the follwing:
+All these fields are considered as target fields and they are used to calculate `hash`. After node creation we have the the following:
 
 ```json
     {
