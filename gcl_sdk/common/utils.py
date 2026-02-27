@@ -13,13 +13,21 @@
 #    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 #    License for the specific language governing permissions and limitations
 #    under the License.
+import sys
 
-import os
-import logging
-import typing as tp
 import importlib_metadata
-
+import logging
+import os
+import shutil
+import tempfile
+import typing as tp
 from restalchemy.storage.sql import migrations
+
+if sys.platform.startswith("linux"):
+    import renameat2
+else:
+    renameat2 = None
+
 
 LOG = logging.getLogger(__name__)
 
@@ -101,3 +109,69 @@ class MigrationEngine(migrations.MigrationEngine):
         else:
             LOG.info("Rolling back migration '%s'", migration.name)
             migrations[filename].rollback(session, migrations)
+
+
+def swap_dirs(dir1, dir2):
+    """
+    Platform-independent directory swapping.
+    Uses renameat2 on Linux (since it's only available for Linux and is atomic,
+    which is required for production use), and plain `os` calls on macOS.
+    """
+    if renameat2:
+        # Linux way:
+        renameat2.exchange(dir1, dir2)
+    else:
+        # Generic (macOS-friendly) way:
+        _swap_dirs_mac_compatible(dir1, dir2)
+
+
+def _swap_dirs_mac_compatible(dir1, dir2):
+    """
+    Swap the contents (or existence) of two directory paths on macOS/Windows.
+
+    Behavior:
+      - If both exist as directories → swap their contents by renaming.
+      - If one exists and the other doesn't → move the existing one to the other's path.
+      - If either is a file → raises ValueError (directories only).
+      - Works across filesystems (uses copy+delete if needed).
+
+    Not atomic.
+    """
+    dir1_exists = os.path.exists(dir1)
+    dir2_exists = os.path.exists(dir2)
+
+    # Validate types: if something exists, it must be a directory
+    if dir1_exists and not os.path.isdir(dir1):
+        raise ValueError(f"'{dir1}' exists but is not a directory")
+    if dir2_exists and not os.path.isdir(dir2):
+        raise ValueError(f"'{dir2}' exists but is not a directory")
+
+    # Case 1: Both don't exist → nothing to do
+    if not dir1_exists and not dir2_exists:
+        return
+
+    # Case 2: Only one exists → just rename it
+    if dir1_exists and not dir2_exists:
+        os.rename(dir1, dir2)
+        return
+    if dir2_exists and not dir1_exists:
+        os.rename(dir2, dir1)
+        return
+
+    # Case 3: Both exist → perform three-way swap using a temporary name
+    parent = os.path.dirname(os.path.abspath(dir1))
+    if os.path.dirname(os.path.abspath(dir2)) != parent:
+        raise ValueError(
+            "Both directories must be in the same parent "
+            "directory for reliable swapping"
+        )
+
+    with tempfile.TemporaryDirectory(
+        dir=parent, prefix=".swap_tmp_"
+    ) as tmp_dir:
+        # Step 1: Move 'dir1' → tmp
+        shutil.move(dir1, tmp_dir + "_a")
+        # Step 2: Move 'dir2' → 'dir1'
+        shutil.move(dir2, dir1)
+        # Step 3: Move tmp → 'dir2'
+        shutil.move(tmp_dir + "_a", dir2)
