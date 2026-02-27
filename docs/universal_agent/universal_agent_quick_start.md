@@ -2,12 +2,11 @@
 
 This page provides a quick start guide for the Universal Agent. How to run, configure and work with it.
 
-# Install & run
+## Install & run
 
 The agent is embedded into [Genesis base image](https://github.com/infraguys/gci_base) and the simplest way to test it just to run a VM from the base image or its inherited images.
 
 For manual installation prepare a virtual environment and install the [gcl-sdk](https://github.com/infraguys/gcl_sdk).
-
 
 ```bash
 python3 -m venv venv
@@ -16,13 +15,14 @@ pip install gcl-sdk
 ```
 
 Run the agent:
+
 ```bash
 genesis-universal-agent --config-file /etc/genesis_universal_agent/genesis_universal_agent.conf
 ```
 
 The configuration file will be described later.
 
-# Configuration
+## Configuration
 
 The agent uses a configuration file in the `ini` format. The default path to the configuration file is `/etc/genesis_universal_agent/genesis_universal_agent.conf`. The main agent section is `universal_agent`:
 
@@ -39,6 +39,7 @@ facts_drivers = CoreFactDriver
 - `facts_drivers`- the list of fact drivers.
 
 For the universal scheduler:
+
 ```ini
 [universal_agent_scheduler]
 capabilities = em_core_*,password
@@ -47,6 +48,7 @@ capabilities = em_core_*,password
 - `capabilities` - the list of capabilities to schedule. You can use wildcards like `em_core_*` to schedule all capabilities starting with `em_core_`.
 
 If any of drivers use a database it should be configured in the `[db]` section. Example:
+
 ```ini
 [db]
 connection_url = postgresql://genesis_core:genesis_core@127.0.0.1:5432/genesis_core
@@ -54,6 +56,7 @@ connection_pool_size = 2
 ```
 
 Also you may specify specific configuration for each driver, for example, for the `CoreCapabilityDriver`:
+
 ```ini
 [CoreCapabilityDriver]
 username = test

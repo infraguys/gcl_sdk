@@ -1,0 +1,82 @@
+site_name: gcl_sdk
+site_url: https://github.com/infraguys/
+repo_name: gcl_sdk
+repo_url: https://github.com/infraguys/gcl_sdk
+edit_uri: browse/docs/
+
+theme:
+  name: material
+  language: ru
+  features:
+    - search.suggest
+    - search.highlight
+    - navigation.tabs
+    - toc.integrate
+  palette:
+    - scheme: default
+      toggle:
+        icon: material/lightbulb-outline
+        name: Switch to dark mode
+    - scheme: slate
+      toggle:
+        icon: material/lightbulb
+        name: Switch to light mode
+
+plugins:
+  - search:
+      lang:
+        - en
+        - ru
+  - glightbox
+
+extra:
+  repo_icon: github
+
+markdown_extensions:
+  - meta
+  - admonition
+  - footnotes
+  - attr_list
+  - codehilite:
+      guess_lang: false
+  - toc:
+      slugify: !!python/name:pymdownx.slugs.uslugify
+      permalink: '#'
+  - pymdownx.arithmatex
+  - pymdownx.betterem:
+      smart_enable: all
+  - pymdownx.keys
+  - pymdownx.emoji:
+      emoji_index: !!python/name:pymdownx.emoji.gemoji
+      emoji_generator: !!python/name:pymdownx.emoji.to_svg
+  - pymdownx.caret
+  - pymdownx.critic
+  - pymdownx.details
+  - pymdownx.inlinehilite
+  - pymdownx.magiclink
+  - pymdownx.mark
+  - pymdownx.smartsymbols
+  - pymdownx.superfences:
+      preserve_tabs: true
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.tilde
+  - pymdownx.tabbed:
+      alternate_style: true
+
+nav:
+  - Audit: audit/audit.md
+  - Events: events/events.md
+  - Universal Agent:
+    - Capability driver Quick start: universal_agent/capability_driver_quick_start.md
+    - Universal Agent: universal_agent/universal_agent.md
+    - Universal Agent Quick start: universal_agent/universal_agent_quick_start.md
+  - Universal Agent:
+    - CoreInfraBuilder: universal_builder/core_infra_builder.md
+    - PaaSBuilder: universal_builder/paas_builder.md
+    - Universal Builder: universal_builder/universal_builder.md
+    - Universal Builder Quick start: universal_builder/universal_builder_quick_start.md
