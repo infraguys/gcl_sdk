@@ -10,11 +10,9 @@ Common plan to implement own builder based on the universal builder:
 2. Create a builder that inherits from `UniversalBuilder`.
 3. Implement minimal set of methods.
 
-
 ## CoreInfraBuilder
 
 For the example we will implement `CoreInfraBuilder` that will build infrastructure for the instance `PGInstance`. The instance `PGInstance` is a model that represents a cluster of PostgreSQL. For simplicity we will skip the part that configure the PostgreSQL cluster and focus on the infrastructure part.
-
 
 ### Instance
 

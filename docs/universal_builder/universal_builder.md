@@ -20,6 +20,7 @@ As described above the instance is a real object of the control plane but to wor
 This is a core mixin for models that is going to be used in builder.
 
 Any models that is going to be used in universal builders should inherit from this mixin since it provides the necessary methods to work with the universal builder. Two main group of methods are provided:
+
 - methods to fetch entities from the database.
 - methods to work with derivatives.
 
@@ -114,4 +115,3 @@ The `CoreInfraBuilder` is a builder that is focused on infrastructure management
 ### PaaSBuilder
 
 The `PaaSBuilder` is a builder that is focused on management of PaaS entities. See the [PaaSBuilder](paas_builder) for more details.
-

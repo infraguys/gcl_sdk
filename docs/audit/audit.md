@@ -8,28 +8,27 @@ Main components:
 - Mixin for models - **AuditLogSQLStorableMixin** automatically creates entries in the Audit model.
 - API endpoints - **/audit** endpoint for viewing data from AuditRecord (requires **audit_log.audit_record.read** access rights)
 
-
 ## AuditLogSQLStorableMixin summary
 
 AuditLogSQLStorableMixin extends the insert, update and delete methods of SQLStorableMixin.
 
 Adds new **action** and **object_type** strings parameters to these methods.
 
-- Action refers to the operation performed on an object. If not specified, the base method name is used ("insert" is replaced with "create").
+-   Action refers to the operation performed on an object. If not specified, the base method name is used ("insert" is replaced with "create").
 
-- Object Type refers to the type of object being operated on. If not specified, the table name is used.
+-   Object Type refers to the type of object being operated on. If not specified, the table name is used.
 
 Also attempts to retrieve the **user_uuid** from the IAM context for the corresponding field in the AuditRecord table.
 
 Within the transaction, the base method is called followed by inserting an entry in the audit table.
-
 
 ## Quick start
 
 Replace **orm.SQLStorableMixin** with **AuditLogSQLStorableMixin** in any model that requires audit tracking.
 
 API routes:
-```
+
+```python
 from gcl_sdk.audit.api import routes as audit_routes
 ...
 class ApiEndpointRoute(routes.Route):
@@ -38,7 +37,8 @@ class ApiEndpointRoute(routes.Route):
 ```
 
 SDK migrations on startup (cmd/user_api):
-```
+
+```python
 from gcl_sdk import migrations as sdk_migrations
 
 def main():
@@ -47,8 +47,9 @@ def main():
     ...
 ```
 
-Migration for test and applications - create a new migration as usual, then add this code 
-```
+Migration for test and applications - create a new migration as usual, then add this code
+
+```python
 from gcl_sdk.common.utils import MigrationEngine
 from gcl_sdk import migrations as sdk_migrations
 
