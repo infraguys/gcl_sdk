@@ -72,10 +72,12 @@ nav:
   - Audit: audit/audit.md
   - Events: events/events.md
   - Universal Agent:
-    - Capability driver Quick start: universal_agent/capability_driver_quick_start.md
     - Universal Agent: universal_agent/universal_agent.md
     - Universal Agent Quick start: universal_agent/universal_agent_quick_start.md
-  - Universal Agent:
+    - Capability driver Quick start: universal_agent/capability_driver_quick_start.md
+    - Metadata driver Quick start: universal_agent/metadata_driver_quick_start.md
+    - Direct driver Quick start: universal_agent/direct_driver_quick_start.md
+  - Universal Builder:
     - CoreInfraBuilder: universal_builder/core_infra_builder.md
     - PaaSBuilder: universal_builder/paas_builder.md
     - Universal Builder: universal_builder/universal_builder.md
