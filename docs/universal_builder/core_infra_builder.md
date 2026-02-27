@@ -12,6 +12,3 @@ You don't need to implement the method `create_instance_derivatives` as `CoreInf
 Actualize the infrastructure objects. The method is called when the instance is outdated. For example, the instance `Config` has derivative `Render`. Single `Config` may have multiple `Render` derivatives. If any of the derivatives is outdated, this method is called to reactualize this infrastructure.
 
 This method replaces the `actualize_outdated_instance_derivatives` method of the `UniversalBuilder`.
-
-
-

@@ -37,6 +37,7 @@ As described it's a model that represents an abstract resource and the model is 
 - *status* - resource status, for instance, "ACTIVE", "NEW" and others.
 
 Some explanation for the `hash` and `full_hash`. Let's assume we have the following target node resource:
+
 ```json
     {
         "uuid": "a1b2c3d4-e5f6-7890-a1b2-c3d4e5f67890",
@@ -67,6 +68,7 @@ All these fields are considered as target fields and they are used to calculate 
         "default_network": {}
     }
 ```
+
 For hash calculation only the target fields are used as discussed above. `full_hash` is calculated for all fields.
 
 ### TargetResource
@@ -97,7 +99,8 @@ This model is used to represent the payload of the agent. The model is used as f
     are network interfaces.
 
 **hash** - a hash of the payload. The formula is described below:
-```
+
+```python
     hash(
         cap_resource0.hash,
         cap_resource1.hash,

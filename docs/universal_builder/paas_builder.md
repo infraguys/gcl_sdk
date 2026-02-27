@@ -24,7 +24,6 @@ Enable schedule PaaS objects.
 
 Actualize the PaaS objects. Changes from the master instance. The method is called when the instance is outdated from master instance point of view. For example, the instance `Database` is linked to the `NodeSet` instance. If the `NodeSet` is outdated, this method is called to reactualize the `Database` instance.
 
-
 ## schedule_paas_objects
 
 Schedule the PaaS objects. The method schedules the PaaS objects. The result is a dictionary where the key is a UUID of an agent and the value is a list of PaaS objects that should be scheduled on this agent. If you don't want to schedule the PaaS objects, skip implementation of this method.

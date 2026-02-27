@@ -1,4 +1,4 @@
-# Capability driver: Quick start guide
+# Capability driver Quick start
 
 This page provides a quick start guide for capability drivers. Please refer to main terms of the [Universal Agent](universal_agent.md) to be in the right context.
 
@@ -33,7 +33,7 @@ def create(self, resource: models.Resource) -> models.Resource:
     """Creates a resource."""
 ```
 
-The agent sends `resource` to the driver to create _something_, in our case it's a `file`. The actual data is stored in the `resource.value` field. It's an ordinary `dict` and we can assume if somebody wants to create a file, he will send a file name. In other words the `resource.value` may look like this:
+The agent sends `resource` to the driver to create *something*, in our case it's a `file`. The actual data is stored in the `resource.value` field. It's an ordinary `dict` and we can assume if somebody wants to create a file, he will send a file name. In other words the `resource.value` may look like this:
 
 ```json
 {
@@ -41,6 +41,7 @@ The agent sends `resource` to the driver to create _something_, in our case it's
     "name": "test.txt"
 }
 ```
+
 Where `uuid` is a mandatory field.
 
 The implementation of `create` can look like this:
@@ -91,7 +92,6 @@ def list(self, capability: str) -> list[models.Resource]:
 ```
 
 As described above, the first step is collecting raw data, then create a resource and append it to the list.
-
 
 The next step is to implement `delete`:
 
