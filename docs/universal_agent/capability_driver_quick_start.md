@@ -115,12 +115,11 @@ Now we have a working driver for the `file` capability.
 
 ### Register the driver
 
-When the implementation is ready, you should register the driver in [entry points](https://setuptools.pypa.io/en/latest/userguide/entry_point.html). For example, if you use `setup.cfg` in your project you can do it like this:
+When the implementation is ready, you should register the driver in [entry points](https://setuptools.pypa.io/en/latest/userguide/entry_point.html). For example, if you use `pyproject.toml` in your project you can do it like this:
 
-```ini
-[entry_points]
-gcl_sdk_universal_agent =
-    RenderAgentDriver = gcl_sdk.agents.universal.drivers.dummy:DummyFilesDriver
+```toml
+[project.entry-points.gcl_sdk_universal_agent]
+RenderAgentDriver = "gcl_sdk.agents.universal.drivers.dummy:DummyFilesDriver"
 ```
 
 Specify your driver class name in the `gcl_sdk_universal_agent` section.
@@ -131,6 +130,8 @@ The driver and package are ready, it's time to use it in the universal agent. Fi
 
 ```bash
 pip install your-package-with-driver
+# or with uv
+uv pip install your-package-with-driver
 ```
 
 Then add the driver to the configuration file `/etc/genesis_universal_agent/genesis_universal_agent.conf`:

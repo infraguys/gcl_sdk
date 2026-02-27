@@ -43,10 +43,13 @@ Some explanation for the `hash` and `full_hash`. Let's assume we have the follow
         "uuid": "a1b2c3d4-e5f6-7890-a1b2-c3d4e5f67890",
         "name": "vm",
         "project_id": "12345678-c625-4fee-81d5-f691897b8142",
-        "root_disk_size": 15,
         "cores": 1,
         "ram": 1024,
-        "image": "http://10.20.0.1:8080/genesis-base.raw"
+        "disk_spec": {
+            "kind": "root_disk",
+            "root_disk_size": 15,
+            "image": "http://10.20.0.1:8080/genesis-base.raw",
+        }
     }
 ```
 
@@ -57,10 +60,13 @@ All these fields are considered as target fields and they are used to calculate 
         "uuid": "a1b2c3d4-e5f6-7890-a1b2-c3d4e5f67890",
         "name": "vm",
         "project_id": "12345678-c625-4fee-81d5-f691897b8142",
-        "root_disk_size": 15,
         "cores": 1,
         "ram": 1024,
-        "image": "http://10.20.0.1:8080/genesis-base.raw",
+        "disk_spec": {
+            "kind": "root_disk",
+            "root_disk_size": 15,
+            "image": "http://10.20.0.1:8080/genesis-base.raw",
+        },
 
         // Not target fields below
         "created_at": "2022-01-01T00:00:00+00:00",
@@ -125,12 +131,18 @@ Look at [quick start guide](capability_driver_quick_start) for capability driver
 
 ### Metadata driver
 
-Metadata driver handles models that partly are placed into the metafile. This driver is useful when it's not possible to get all necessary information from the data plane. For instance, configuration files. There are hundreds or thousands of them in the system. How to know which files should be handled by the driver? A `meta file` may be used for this purpose. This file contains some meta information such path, uuid and so on but this file does not contain the information that can be fetched from the data plane. Particular models should be derived from `MetaDataPlaneModel` to work properly with the driver.
+Metadata driver handles models that are partly stored in a `meta file`. This approach is useful when the data plane cannot provide all fields required to manage resources.
+
+See [Metadata driver quick start](metadata_driver_quick_start) for details, examples, and implementation guidance.
 
 #### SSHKeyCapabilityDriver
 
 The driver handles SSH keys on the host. The `SSHKeyCapabilityDriver` is derived from `MetaFileStorageAgentDriver`. The main data plane model is `SSHKey`, it's derived from `MetaDataPlaneModel`. The meta file is located at `/var/lib/genesis/universal_agent/ssh_key_meta.json`.
 
 ### Direct driver
+
+Direct driver gets resources directly from backend systems without a meta file. It keeps target fields in dedicated storage to preserve stable hash calculation.
+
+See [Direct driver quick start](direct_driver_quick_start) for details, examples, and implementation guidance.
 
 ## Clients
