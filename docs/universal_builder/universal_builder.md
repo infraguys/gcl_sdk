@@ -258,7 +258,7 @@ The scheduling is a process of assigning a resource to an agent. There are sever
 - **SchedulableToAgentMixin** - A helpful mixin that an instance can inherit from to schedule itself to an agent. For that it should implement the `schedule_to_ua_agent` method. There are already several implementations of this mixin in the SDK:
     - `SchedulableToAgentFromNodeMixin` - schedules the resource to the UA agent based on the node UUID.
     - `SchedulableToAgentFromAgentUUIDMixin` - schedules the resource to the UA agent based on the agent UUID.
-- **Own scheduler service** - If you need to complex logic for scheduling, you can create your own scheduler service.
+- **Own scheduler service** - If you need complex logic for scheduling, you can create your own scheduler service.
 
 ## Readiness to perform operations
 
