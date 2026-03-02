@@ -165,7 +165,7 @@ The hook is performed before updating instance resource.
 
 The hook to update instance derivatives. The hook is called when an initiator of updating is a user or outer automation. The default implementation is **to delete the outdated derivatives and create new ones**.
 
-NOTE: The default implementation of the method may be dangerous in cases if the derivatives are changed in live cycle of the instance. For instance, if new derivatives are added after the instance was created, they will be dropped in the default implementation of the method.
+NOTE: The default implementation of the method may be dangerous in cases if the derivatives are changed in life cycle of the instance. For instance, if new derivatives are added after the instance was created, they will be dropped in the default implementation of the method.
 
 #### post_update_instance_resource
 
