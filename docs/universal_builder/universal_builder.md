@@ -23,7 +23,7 @@ Any models that is going to be used in universal builders should inherit from th
 
 - methods to fetch entities from the database.
 - methods to work with derivatives.
-- methods to work tracked resources
+- methods to work with tracked resources
 
 The derivatives objects are the objects that are created from the instance object and strongly coupled with it. For example, the config instance has derivatives like render objects. Single config instance can have multiple render objects.
 
