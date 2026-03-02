@@ -60,7 +60,7 @@ There are five vectors of the interaction with instances:
 | Outdate | Derivative objects are changed for some reason. For instance, the derivative object is ready and its status is set to `ACTIVE` | Derivative objects |
 | Track | Tracked resources are changed for some reason. For instance, the tracked resource is ready and its status is set to `ACTIVE` | Tracked resources |
 
-Also a master resource that can be outdated by some reason but it's very similar to `derivatives` vector so it's handled in the same way.
+Also a master resource that can be outdated for some reason but it's very similar to `derivatives` vector so it's handled in the same way.
 
 ```
                                                  User/Outer automation
