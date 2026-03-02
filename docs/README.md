@@ -5,4 +5,5 @@ The Genesis SDK is a set of tools for developing Genesis elements. There are sev
 * [Events](events/events.md)
 * [Universal Agent](universal_agent/universal_agent.md)
 * [Universal Builder](universal_builder/universal_builder.md)
+* [Universal Scheduler](universal_scheduler/universal_scheduler.md)
 * [Audit](audit/audit.md)

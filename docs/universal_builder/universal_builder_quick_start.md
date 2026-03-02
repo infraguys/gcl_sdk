@@ -111,4 +111,4 @@ class CoreInfraBuilder(builder.UniversalAgentBuilderService):
 
 The first method `create_instance_derivatives` is called when the instance is created. It creates infrastructure for the instance or a list of derivatives for the instance if more formal. The second method `actualize_outdated_instance_derivatives` is called when the instance is outdated. In our case it's called when something is changed in nodes. For example, a node changes its status or get IP address or something else. We need this method to update the instance status based on the nodes status.
 
-And that's it! You have your own builder based on the universal builder. We can override more methods to provide custom logic but for the example we will stop here. See [Universal Builder](universal_builder) for more details.
+And that's it! You have your own builder based on the universal builder. We can override more methods to provide custom logic but for the example we will stop here. See [Universal Builder](universal_builder.md) for more details.
