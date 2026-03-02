@@ -255,7 +255,7 @@ Track outdated master instances. It's called if the full hash of the master inst
 The scheduling is a process of assigning a resource to an agent. There are several ways to schedule a resource:
 
 - **Universal scheduler** - If resources have simple scheduling logic, for example, they are assigned to the first available agent, you can use the universal scheduler. Please see the [UniversalScheduler](../universal_scheduler/universal_scheduler.md) for more details.
-- **SchedulableToAgentMixin** - A helpful mixin an instance can inherit from to schedule itself to an agent. For that it should implement the `schedule_to_ua_agent` method. There are already several implementations of this mixin in the SDK:
+- **SchedulableToAgentMixin** - A helpful mixin that an instance can inherit from to schedule itself to an agent. For that it should implement the `schedule_to_ua_agent` method. There are already several implementations of this mixin in the SDK:
     - `SchedulableToAgentFromNodeMixin` - schedules the resource to the UA agent based on the node UUID.
     - `SchedulableToAgentFromAgentUUIDMixin` - schedules the resource to the UA agent based on the agent UUID.
 - **Own scheduler service** - If you need to complex logic for scheduling, you can create your own scheduler service.
