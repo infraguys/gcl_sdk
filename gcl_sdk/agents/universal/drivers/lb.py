@@ -238,15 +238,11 @@ class LB(lb_models.LB, meta.MetaDataPlaneModel):
             elif m["kind"] == "set_header":
                 name = m["name"].replace('"', '\\"')
                 value = m["value"].replace('"', '\\"')
-                res.append(
-                    f'proxy_set_header "{name}" "{value}";'
-                )
+                res.append(f'proxy_set_header "{name}" "{value}";')
             elif m["kind"] == "rewrite_url":
                 reg = m["regex"].replace('"', '\\"')
                 repl = m["replacement"].replace('"', '\\"')
-                res.append(
-                    f'rewrite "{reg}" "{repl}" break;'
-                )
+                res.append(f'rewrite "{reg}" "{repl}" break;')
         return res
 
     def _gen_vhosts(self):
@@ -347,9 +343,13 @@ location {LOCATION_TYPE_MAPPING[c["kind"]]} {c["value"]} {{
             else:
                 locations.append(loc)
 
-        part = f"""\
-        set_real_ip_from {v['proxy_proto_from']};
-        real_ip_header proxy_protocol;""" if v.get('proxy_proto_from') else ""
+        part = (
+            f"""\
+        set_real_ip_from {v["proxy_proto_from"]};
+        real_ip_header proxy_protocol;"""
+            if v.get("proxy_proto_from")
+            else ""
+        )
 
         if v["proto"] == "https":
             ssl_info = f"""
@@ -367,9 +367,9 @@ ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDS
 
         return f"""\
 server {{
-listen 0.0.0.0:{v['port']}{' ssl http2' if v['proto'] == 'https' else ''}{" proxy_protocol" if v.get('proxy_proto_from') else ""};
+listen 0.0.0.0:{v["port"]}{" ssl http2" if v["proto"] == "https" else ""}{" proxy_protocol" if v.get("proxy_proto_from") else ""};
 {part}
-server_name {' '.join(v['domains'])};{ssl_info}
+server_name {" ".join(v["domains"])};{ssl_info}
 {ips}
 deny all;
 {locs}

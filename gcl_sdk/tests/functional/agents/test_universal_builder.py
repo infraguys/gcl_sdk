@@ -92,7 +92,9 @@ class DummyBuilderWithMasterTracking(DummyBuilderWithDerivatives):
         derivatives: tp.Collection[
             tp.Tuple[
                 ua_models.TargetResourceKindAwareMixin,  # The target resource
-                tp.Optional[ua_models.TargetResourceKindAwareMixin],  # The actual resource
+                tp.Optional[
+                    ua_models.TargetResourceKindAwareMixin
+                ],  # The actual resource
             ]
         ],
     ) -> tp.Collection[ua_models.TargetResourceKindAwareMixin]:

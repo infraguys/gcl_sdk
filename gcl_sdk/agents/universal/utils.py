@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import os
 import sys
+import base64
 import importlib
 import json
 import xxhash
@@ -25,6 +26,7 @@ import uuid as sys_uuid
 import configparser
 
 from gcl_sdk.agents.universal import constants as c
+from gcl_sdk.clients.http import base as http_base
 
 
 def system_uuid(
@@ -109,3 +111,16 @@ def cfg_load_section_map(config_file: str, section: str) -> dict[str, str]:
         params[option] = parser.get(section, option)
 
     return params
+
+
+def get_encryptor(private_key_path: str) -> http_base.Encryptor:
+    if not os.path.exists(private_key_path):
+        raise FileNotFoundError(f"Private key file not found: {private_key_path}")
+
+    with open(private_key_path) as f:
+        private_key_base64 = f.read()
+
+    private_key = base64.b64decode(private_key_base64)
+    node = system_uuid()
+
+    return http_base.Encryptor(private_key, node)
