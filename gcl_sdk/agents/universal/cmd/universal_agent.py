@@ -14,8 +14,6 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-import os
-import base64
 import logging
 import sys
 import typing as tp
@@ -30,7 +28,6 @@ from restalchemy.storage.sql import engines
 from gcl_sdk.common import config
 from gcl_sdk.common import log as infra_log
 from gcl_sdk.common import utils
-from gcl_sdk.clients.http import base as http_base
 from gcl_sdk.agents.universal.services import agent
 from gcl_sdk.agents.universal.drivers import base as driver_base
 from gcl_sdk.agents.universal import constants as c
@@ -129,21 +126,6 @@ def register_db_opts(config_file: str) -> bool:
     return False
 
 
-def get_encryptor() -> http_base.Encryptor:
-    if not os.path.exists(CONF[DOMAIN].private_key_path):
-        raise FileNotFoundError(
-            f"Private key file not found: {CONF[DOMAIN].private_key_path}"
-        )
-
-    with open(CONF[DOMAIN].private_key_path, "r") as f:
-        private_key_base64 = f.read()
-
-    private_key = base64.b64decode(private_key_base64)
-    node = ua_utils.system_uuid()
-
-    return http_base.Encryptor(private_key, node)
-
-
 def main():
     # Get the config file path
     for i, arg in enumerate(sys.argv):
@@ -163,7 +145,7 @@ def main():
 
     # Enable encrypted communication with the orchestrator APIs.
     if CONF[DOMAIN].orch_secure_communication:
-        encryptor = get_encryptor()
+        encryptor = ua_utils.get_encryptor(CONF[DOMAIN].private_key_path)
     else:
         encryptor = None
 

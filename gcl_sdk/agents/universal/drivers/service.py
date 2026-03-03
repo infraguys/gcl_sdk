@@ -100,9 +100,7 @@ class Service(s_models.Service, meta.MetaDataPlaneModel):
                 # res.append(f"{CONDITIONS_MAPPING[when]["service"]}={self.get_service_name(cond.service, cond.service_name)}")
                 continue
             cmd = cond.command.replace("'", "\\'")
-            res.append(
-                f"{CONDITIONS_MAPPING[when]['shell']}=+/usr/bin/bash -c '{cmd}'"
-            )
+            res.append(f"{CONDITIONS_MAPPING[when]['shell']}=+/usr/bin/bash -c '{cmd}'")
         return res
 
     def _gen_file_content(self):
