@@ -34,6 +34,7 @@ from gcl_sdk.agents.universal.clients.orch import db as orch_db
 from gcl_sdk.agents.universal.clients.orch import http as orch_http
 from gcl_sdk.agents.universal.clients.backend import db as db_back
 from gcl_sdk.agents.universal.drivers import core as ua_core_drivers
+from gcl_sdk.agents.universal import constants as c
 
 DOMAIN = "agent"
 
@@ -78,6 +79,16 @@ core_agent_opts = [
         "payload_path",
         default=None,
         help="Path to the payload file.",
+    ),
+    cfg.BoolOpt(
+        "orch_secure_communication",
+        default=True,
+        help="Enable encrypted communication with the orchestrator APIs.",
+    ),
+    cfg.StrOpt(
+        "private_key_path",
+        default=c.PRIVATE_KEY_PATH,
+        help="Path to the private key file.",
     ),
 ]
 
@@ -176,11 +187,18 @@ def main():
 
     # Prepare orch client
     if CONF[DOMAIN].orch_client == "http":
+        # Enable encrypted communication with the orchestrator APIs.
+        if CONF[DOMAIN].orch_secure_communication:
+            encryptor = ua_utils.get_encryptor(CONF[DOMAIN].private_key_path)
+        else:
+            encryptor = None
+
         http_client = bazooka.Client(default_timeout=20)
         orch_client = orch_http.HttpOrchClient(
             orch_endpoint=CONF[DOMAIN].orch_endpoint,
             status_endpoint=CONF[DOMAIN].status_endpoint,
             http_client=http_client,
+            encryptor=encryptor,
         )
     elif CONF[DOMAIN].orch_client == "db":
         orch_client = orch_db.DatabaseOrchClient()

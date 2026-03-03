@@ -29,9 +29,7 @@ from restalchemy.dm import types
 
 
 def _make_resource(
-    kind: str,
-    uuid: tp.Optional[sys_uuid.UUID] = None,
-    value: tp.Optional[dict] = None
+    kind: str, uuid: tp.Optional[sys_uuid.UUID] = None, value: tp.Optional[dict] = None
 ) -> models.Resource:
     uuid = uuid or sys_uuid.uuid4()
     value = value or {"uuid": str(uuid), "foo": 1}

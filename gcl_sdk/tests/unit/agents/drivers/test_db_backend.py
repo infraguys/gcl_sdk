@@ -31,9 +31,7 @@ from gcl_sdk.agents.universal.dm import models
 
 
 def _make_resource(
-    kind: str,
-    uuid: tp.Optional[sys_uuid.UUID] = None,
-    value: tp.Optional[dict] = None
+    kind: str, uuid: tp.Optional[sys_uuid.UUID] = None, value: tp.Optional[dict] = None
 ) -> models.Resource:
     uuid = uuid or sys_uuid.uuid4()
     value = value or {"uuid": str(uuid), "a": 1, "b": 2}
