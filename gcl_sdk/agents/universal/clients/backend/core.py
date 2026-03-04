@@ -45,7 +45,7 @@ class GCRestApiBackendClient(rest.RestApiBackendClient):
         self._project_id = project_id
         self._tf_storage = tf_storage
 
-    def _get_filters(self, kind: str) -> dict[str, str]:
+    def _get_filters(self, kind: str) -> dict[str, str | tuple[str]]:
         """Get filters for the kind.
 
         If the project_id is set, return it.
@@ -60,14 +60,7 @@ class GCRestApiBackendClient(rest.RestApiBackendClient):
         if kind not in target_fields or not target_fields[kind]:
             return {}
 
-        uuids = tuple(target_fields[kind].keys())
-        if len(uuids) == 1:
-            return {"uuid": str(uuids[0])}
-
-        filter_str = "&".join(f"uuid={str(u)}" for u in uuids)
-
-        # Remove "uuid=" prefix
-        return {"uuid": filter_str[5:]}
+        return {"uuid": tuple(str(u) for u in target_fields[kind].keys())}
 
     def create(self, resource: models.Resource) -> dict[str, tp.Any]:
         """Creates the resource. Returns the created resource."""
