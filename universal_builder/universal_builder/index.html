@@ -1,0 +1,1220 @@
+<!DOCTYPE html><html lang="ru" class="no-js"><head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://github.com/infraguys/universal_builder/universal_builder/">
+      
+      
+        <link rel="prev" href="../../universal_agent/direct_driver_quick_start/">
+      
+      
+        <link rel="next" href="../universal_builder_quick_start/">
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.1.0">
+    
+    
+      
+        <title>Universal Builder - gcl_sdk</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.402914a4.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.a0c5b2b5.min.css">
+      
+      
+
+    
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&amp;display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce((e,_)=>(e<<5)-e+_.charCodeAt(0),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  <link href="../../assets/stylesheets/glightbox.min.css" rel="stylesheet"><script src="../../assets/javascripts/glightbox.min.js"></script><style id="glightbox-style">
+            html.glightbox-open { overflow: initial; height: 100%; }
+            .gslide-title { margin-top: 0px; user-select: text; }
+            .gslide-desc { color: #666; user-select: text; }
+            .gslide-image img { background: white; }
+            .gscrollbar-fixer { padding-right: 15px; }
+            .gdesc-inner { font-size: 0.75rem; }
+            body[data-md-color-scheme="slate"] .gdesc-inner { background: var(--md-default-bg-color); }
+            body[data-md-color-scheme="slate"] .gslide-title { color: var(--md-default-fg-color); }
+            body[data-md-color-scheme="slate"] .gslide-desc { color: var(--md-default-fg-color); }
+        </style></head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="" data-md-color-accent="">
+  
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&"object"==typeof palette.color)for(var key of Object.keys(palette.color))document.body.setAttribute("data-md-color-"+key,palette.color[key])</script>
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#universal-builder" class="md-skip">
+          Перейти к содержанию
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Верхний колонтитул">
+    <a href="../.." title="gcl_sdk" class="md-header__button md-logo" aria-label="gcl_sdk" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54Z"></path></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3V6m0 5h18v2H3v-2m0 5h18v2H3v-2Z"></path></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            gcl_sdk
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Universal Builder
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      <form class="md-header__option" data-md-component="palette">
+        
+          
+          <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="" data-md-color-accent="" aria-label="Switch to dark mode" type="radio" name="__palette" id="__palette_1">
+          
+            <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_2" hidden>
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 2a7 7 0 0 1 7 7c0 2.38-1.19 4.47-3 5.74V17a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1v-2.26C6.19 13.47 5 11.38 5 9a7 7 0 0 1 7-7M9 21v-1h6v1a1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1m3-17a5 5 0 0 0-5 5c0 2.05 1.23 3.81 3 4.58V16h4v-2.42c1.77-.77 3-2.53 3-4.58a5 5 0 0 0-5-5Z"></path></svg>
+            </label>
+          
+        
+          
+          <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="" data-md-color-accent="" aria-label="Switch to light mode" type="radio" name="__palette" id="__palette_2">
+          
+            <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 2a7 7 0 0 0-7 7c0 2.38 1.19 4.47 3 5.74V17a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-2.26c1.81-1.27 3-3.36 3-5.74a7 7 0 0 0-7-7M9 21a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1v-1H9v1Z"></path></svg>
+            </label>
+          
+        
+      </form>
+    
+    
+    
+      <label class="md-header__button md-icon" for="__search">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5Z"></path></svg>
+      </label>
+      <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Поиск" placeholder="Поиск" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5Z"></path></svg>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12Z"></path></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Поиск">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Очистить" aria-label="Очистить" tabindex="-1">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41Z"></path></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Инициализация поиска
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/infraguys/gcl_sdk" title="Перейти к репозиторию" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.3.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2023 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81z"></path></svg>
+  </div>
+  <div class="md-source__repository">
+    gcl_sdk
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Вкладки" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+
+
+  <li class="md-tabs__item">
+    <a href="../../audit/audit/" class="md-tabs__link">
+      Audit
+    </a>
+  </li>
+
+      
+        
+  
+  
+
+
+  <li class="md-tabs__item">
+    <a href="../../events/events/" class="md-tabs__link">
+      Events
+    </a>
+  </li>
+
+      
+        
+  
+  
+
+
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../universal_agent/universal_agent/" class="md-tabs__link">
+        Universal Agent
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+    
+  
+
+
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="./" class="md-tabs__link md-tabs__link--active">
+        Universal Builder
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+
+
+  <li class="md-tabs__item">
+    <a href="../../universal_scheduler/universal_scheduler/" class="md-tabs__link">
+      Universal Scheduler
+    </a>
+  </li>
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation">
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+  
+
+
+  
+
+<nav class="md-nav md-nav--primary md-nav--lifted md-nav--integrated" aria-label="Навигация" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="gcl_sdk" class="md-nav__button md-logo" aria-label="gcl_sdk" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54Z"></path></svg>
+
+    </a>
+    gcl_sdk
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/infraguys/gcl_sdk" title="Перейти к репозиторию" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.3.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2023 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81z"></path></svg>
+  </div>
+  <div class="md-source__repository">
+    gcl_sdk
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../audit/audit/" class="md-nav__link">
+        Audit
+      </a>
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../events/events/" class="md-nav__link">
+        Events
+      </a>
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+  
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+      
+      
+      
+      <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3">
+      
+      
+      
+        <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+          Universal Agent
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+        <label class="md-nav__title" for="__nav_3">
+          <span class="md-nav__icon md-icon"></span>
+          Universal Agent
+        </label>
+        <ul class="md-nav__list" data-md-scrollfix>
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../universal_agent/universal_agent/" class="md-nav__link">
+        Universal Agent
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../universal_agent/universal_agent_quick_start/" class="md-nav__link">
+        Universal Agent Quick start
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../universal_agent/capability_driver_quick_start/" class="md-nav__link">
+        Capability driver Quick start
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../universal_agent/metadata_driver_quick_start/" class="md-nav__link">
+        Metadata driver Quick start
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../universal_agent/direct_driver_quick_start/" class="md-nav__link">
+        Direct driver Quick start
+      </a>
+    </li>
+  
+
+            
+          
+        </ul>
+      </nav>
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+    
+  
+  
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+      
+      
+      
+      <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+      
+      
+      
+        <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+          Universal Builder
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+        <label class="md-nav__title" for="__nav_4">
+          <span class="md-nav__icon md-icon"></span>
+          Universal Builder
+        </label>
+        <ul class="md-nav__list" data-md-scrollfix>
+          
+            
+              
+  
+  
+    
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          Universal Builder
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        Universal Builder
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Содержание раздела">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Содержание раздела
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#quick-start" class="md-nav__link">
+    Quick start
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#main-terms" class="md-nav__link">
+    Main terms
+  </a>
+  
+    <nav class="md-nav" aria-label="Main terms">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#instance" class="md-nav__link">
+    Instance
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#instancemixin" class="md-nav__link">
+    InstanceMixin
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#instancewithderivativesmixin" class="md-nav__link">
+    InstanceWithDerivativesMixin
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#universal-builder-interface" class="md-nav__link">
+    Universal Builder interface
+  </a>
+  
+    <nav class="md-nav" aria-label="Universal Builder interface">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#common" class="md-nav__link">
+    Common
+  </a>
+  
+    <nav class="md-nav" aria-label="Common">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#ua_service_spec" class="md-nav__link">
+    ua_service_spec
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#prepare_iteration" class="md-nav__link">
+    prepare_iteration
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#create-vector" class="md-nav__link">
+    Create vector
+  </a>
+  
+    <nav class="md-nav" aria-label="Create vector">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#can_create_instance_resource" class="md-nav__link">
+    can_create_instance_resource
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pre_create_instance_resource" class="md-nav__link">
+    pre_create_instance_resource
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#create_instance_derivatives" class="md-nav__link">
+    create_instance_derivatives
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post_create_instance_resource" class="md-nav__link">
+    post_create_instance_resource
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#update-vector" class="md-nav__link">
+    Update vector
+  </a>
+  
+    <nav class="md-nav" aria-label="Update vector">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#can_update_instance_resource" class="md-nav__link">
+    can_update_instance_resource
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pre_update_instance_resource" class="md-nav__link">
+    pre_update_instance_resource
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#update_instance_derivatives" class="md-nav__link">
+    update_instance_derivatives
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post_update_instance_resource" class="md-nav__link">
+    post_update_instance_resource
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#outdate-vector" class="md-nav__link">
+    Outdate vector
+  </a>
+  
+    <nav class="md-nav" aria-label="Outdate vector">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#can_actualize_outdated_instance_resource" class="md-nav__link">
+    can_actualize_outdated_instance_resource
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#actualize_outdated_instance" class="md-nav__link">
+    actualize_outdated_instance
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#actualize_outdated_instance_derivatives" class="md-nav__link">
+    actualize_outdated_instance_derivatives
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#actualize_outdated_master_hash_instance" class="md-nav__link">
+    actualize_outdated_master_hash_instance
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#actualize_outdated_master_full_hash_instance" class="md-nav__link">
+    actualize_outdated_master_full_hash_instance
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#delete-vector" class="md-nav__link">
+    Delete vector
+  </a>
+  
+    <nav class="md-nav" aria-label="Delete vector">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#can_delete_instance_resource" class="md-nav__link">
+    can_delete_instance_resource
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pre_delete_instance_resource" class="md-nav__link">
+    pre_delete_instance_resource
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#track-vector" class="md-nav__link">
+    Track vector
+  </a>
+  
+    <nav class="md-nav" aria-label="Track vector">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#get_tracked_instances_on_create" class="md-nav__link">
+    get_tracked_instances_on_create
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get_tracked_instances_on_update" class="md-nav__link">
+    get_tracked_instances_on_update
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#track_outdated_master_hash_instances" class="md-nav__link">
+    track_outdated_master_hash_instances
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#track_outdated_master_full_hash_instances" class="md-nav__link">
+    track_outdated_master_full_hash_instances
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scheduling" class="md-nav__link">
+    Scheduling
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#readiness-to-perform-operations" class="md-nav__link">
+    Readiness to perform operations
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#specific-builders" class="md-nav__link">
+    Specific builders
+  </a>
+  
+    <nav class="md-nav" aria-label="Specific builders">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#collectionuniversalbuilderservice" class="md-nav__link">
+    CollectionUniversalBuilderService
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#coreinfrabuilder" class="md-nav__link">
+    CoreInfraBuilder
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#paasbuilder" class="md-nav__link">
+    PaaSBuilder
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../universal_builder_quick_start/" class="md-nav__link">
+        Universal Builder Quick start
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../core_infra_builder/" class="md-nav__link">
+        CoreInfraBuilder
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../paas_builder/" class="md-nav__link">
+        PaaSBuilder
+      </a>
+    </li>
+  
+
+            
+          
+        </ul>
+      </nav>
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../universal_scheduler/universal_scheduler/" class="md-nav__link">
+        Universal Scheduler
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+  
+  
+
+
+<h1 id="universal-builder">Universal Builder<a class="headerlink" href="#universal-builder" title="Permanent link">#</a></h1>
+<p>The Universal Builder is a service that provides some common logic to build resources and prepare them for agents based on the universal agent.
+Every builder works with a particular instance model. The instance is a key element of the builder and it sets in the builder constructor. The instance represents a real object of the control plane we want to build. For example, <code>Config</code>, <code>Secret</code>, <code>PGInstance</code> and so on.</p>
+<p>The key feature of the universal builder is to do all routine work for service lifecycle management, preparing and converting instances to universal agent resources, tracking and actualizing their states. The universal builder has an interface as a set of methods that may be overridden to provide custom logic but most of them have default implementation.</p>
+<h2 id="quick-start">Quick start<a class="headerlink" href="#quick-start" title="Permanent link">#</a></h2>
+<p>Follow the <a href="../universal_builder_quick_start/">quick start guide</a> to run the Universal Builder.</p>
+<h2 id="main-terms">Main terms<a class="headerlink" href="#main-terms" title="Permanent link">#</a></h2>
+<h3 id="instance">Instance<a class="headerlink" href="#instance" title="Permanent link">#</a></h3>
+<p>As described above the instance is a real object of the control plane but to work with the universal builder such instances should inherit from <code>InstanceMixin</code> or <code>InstanceWithDerivativesMixin</code>. They are useful mixins that allow to translate a real object (from the control plane) to universal agent resources.</p>
+<h3 id="instancemixin">InstanceMixin<a class="headerlink" href="#instancemixin" title="Permanent link">#</a></h3>
+<p>This is a core mixin for models that is going to be used in builder.</p>
+<p>Any models that is going to be used in universal builders should inherit from this mixin since it provides the necessary methods to work with the universal builder. Three main group of methods are provided:</p>
+<ul>
+<li>methods to fetch entities from the database.</li>
+<li>methods to work with derivatives.</li>
+<li>methods to work with tracked resources</li>
+</ul>
+<p>The derivatives objects are the objects that are created from the instance object and strongly coupled with it. For example, the config instance has derivatives like render objects. Single config instance can have multiple render objects.</p>
+<p>The default behavior for the <code>InstanceMixin</code> is to not have derivatives.</p>
+<p>Tracked resources are the resources that are tracked by the instance. For example, the config instance tracks the node resource to ensure that the node is alive.</p>
+<h3 id="instancewithderivativesmixin">InstanceWithDerivativesMixin<a class="headerlink" href="#instancewithderivativesmixin" title="Permanent link">#</a></h3>
+<p>Another core mixin for models that is going to be used in builder.</p>
+<p>See <code>InstanceMixin</code> for core functionality. The key difference is that this mixin is focusing on instances that have derivatives.</p>
+<p>The default behavior is to have derivatives objects.</p>
+<h2 id="universal-builder-interface">Universal Builder interface<a class="headerlink" href="#universal-builder-interface" title="Permanent link">#</a></h2>
+<p>The Universal Builder inherits from <code>RegistrableUAServiceMixin</code> which is a helper mixin for services that work with Universal Builder and Universal Agent.</p>
+<p>For the Universal Builder, this mixin provides:</p>
+<ul>
+<li>a unified interface for registering a service with the Universal Agent;</li>
+<li>a description of which capabilities and resources the service can handle;</li>
+</ul>
+<p>The universal builder interface is a set of methods that may be overridden to provide custom logic but most of them have default implementation.</p>
+<p>There are five vectors of the interaction with instances:</p>
+<table>
+<thead>
+<tr>
+<th>Vector</th>
+<th>Description</th>
+<th>Initiator</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Create</td>
+<td>Create an instance. By a user or outer automation.</td>
+<td>User/Outer automation</td>
+</tr>
+<tr>
+<td>Update</td>
+<td>Update an instance. By a user or outer automation.</td>
+<td>User/Outer automation</td>
+</tr>
+<tr>
+<td>Delete</td>
+<td>Delete an instance. By a user or outer automation.</td>
+<td>User/Outer automation</td>
+</tr>
+<tr>
+<td>Outdate</td>
+<td>Derivative objects are changed for some reason. For instance, the derivative object is ready and its status is set to <code>ACTIVE</code></td>
+<td>Derivative objects</td>
+</tr>
+<tr>
+<td>Track</td>
+<td>Tracked resources are changed for some reason. For instance, the tracked resource is ready and its status is set to <code>ACTIVE</code></td>
+<td>Tracked resources</td>
+</tr>
+</tbody>
+</table>
+<p>Also a master resource that can be outdated for some reason but it's very similar to <code>derivatives</code> vector so it's handled in the same way.</p>
+<div class="highlight"><pre><span></span><code>                                                 User/Outer automation
+                                                         |
+                                                         | <span class="gs">**Create vector**</span>
+                                                         | can_create_instance_resource
+                                                         | pre_create_instance_resource
+                                                         | create_instance_derivatives
+                                                         | post_create_instance_resource
+                                                         v
+        Tracked resources                              +---------------------------+     User/Outer automation
+        |                                              |     UniversalBuilder      |       |
+        |                                              |                           |       |
+        |                                              |   +-------------------+   |       |
+        | <span class="gs">**Track vector**</span>                             |   |                   |   |       | <span class="gs">**Update vector**</span>
+        | get_tracked_instances_on_create              |   |    Instance       |   |       | can_update_instance_resource
+        | get_tracked_instances_on_update              |   |                   |   |       | pre_update_instance_resource
+        | track_outdated_master_hash_instances         |   |                   |   |       | update_instance_derivatives
+        | track_outdated_master_full_hash_instances    |   |                   |   |       | post_update_instance_resource
+        |                                              |   |                   |   | &lt;-----+
+        +------------------------------------------&gt;   |   |                   |   |
+                                                       |   |                   |   |
+        Derivative resources                           |   +-------------------+   |
+        |                                              |                           |
+        | <span class="gs">**Outdate vector**</span>                           |                           |
+        | can_actualize_outdated_instance_resource     |                           |
+        | actualize_outdated_instance                  |                           |
+        | actualize_outdated_instance_derivatives      |                           |
+        | actualize_outdated_master_hash_instance      |                           |
+        | actualize_outdated_master_full_hash_instance |                           |
+        |                                              |                           |
+        +------------------------------------------&gt;   |                           |
+                                                       +---------------------------+
+                                                          ^
+                                                          |
+                                                          | <span class="gs">**Delete vector**</span>
+                                                          | can_delete_instance_resource
+                                                          | pre_delete_instance_resource
+                                                          |
+                                                 User/Outer automation
+</code></pre></div>
+<h3 id="common">Common<a class="headerlink" href="#common" title="Permanent link">#</a></h3>
+<h4 id="ua_service_spec">ua_service_spec<a class="headerlink" href="#ua_service_spec" title="Permanent link">#</a></h4>
+<p>The service specification for the universal builder service. It can be used to define the capabilities of the service in <code>UAServiceSpec</code> format.</p>
+<h4 id="prepare_iteration">prepare_iteration<a class="headerlink" href="#prepare_iteration" title="Permanent link">#</a></h4>
+<p>The hook to prepare the iteration. The hook is called before the iteration and should return the iteration context. The iteration context is a dictionary. The context is available in the iteration methods as <code>self._iteration_context</code>.</p>
+<h3 id="create-vector">Create vector<a class="headerlink" href="#create-vector" title="Permanent link">#</a></h3>
+<p>Hooks related to the create vector.</p>
+<h4 id="can_create_instance_resource">can_create_instance_resource<a class="headerlink" href="#can_create_instance_resource" title="Permanent link">#</a></h4>
+<p>The hook to check if the instance can be created.</p>
+<p>If the hook returns <code>False</code>, the code related to the instance:</p>
+<ul>
+<li><code>pre_create_instance_resource</code></li>
+<li><code>create_instance_derivatives</code></li>
+<li><code>post_create_instance_resource</code>
+will be skipped for the current iteration. The
+<code>can_create_instance_resource</code> will be called again on the next
+iteration until it returns <code>True</code>.</li>
+</ul>
+<h4 id="pre_create_instance_resource">pre_create_instance_resource<a class="headerlink" href="#pre_create_instance_resource" title="Permanent link">#</a></h4>
+<p>The hook is performed before creating instance resource. The hook is called only for new instances.</p>
+<h4 id="create_instance_derivatives">create_instance_derivatives<a class="headerlink" href="#create_instance_derivatives" title="Permanent link">#</a></h4>
+<p>Create the instance. The result is a collection of derivative objects that are required for the instance. For example, the main instance is a <code>Config</code> so the derivative objects for the config is a list of <code>Render</code>. The result is a collection of render objects. The derivative objects should inherit from the <code>TargetResourceMixin</code>.</p>
+<h4 id="post_create_instance_resource">post_create_instance_resource<a class="headerlink" href="#post_create_instance_resource" title="Permanent link">#</a></h4>
+<p>The hook is performed after saving instance resource. The hook is called only for new instances.</p>
+<h3 id="update-vector">Update vector<a class="headerlink" href="#update-vector" title="Permanent link">#</a></h3>
+<p>Hooks related to the update vector.</p>
+<h4 id="can_update_instance_resource">can_update_instance_resource<a class="headerlink" href="#can_update_instance_resource" title="Permanent link">#</a></h4>
+<p>The hook to check if the instance can be updated.</p>
+<p>If the hook returns <code>False</code>, the code related to the instance:</p>
+<ul>
+<li><code>pre_update_instance_resource</code></li>
+<li><code>update_instance_derivatives</code></li>
+<li><code>post_update_instance_resource</code>
+will be skipped for the current iteration. The
+<code>can_update_instance_resource</code> will be called again on the next
+iteration until it returns <code>True</code>.</li>
+</ul>
+<h4 id="pre_update_instance_resource">pre_update_instance_resource<a class="headerlink" href="#pre_update_instance_resource" title="Permanent link">#</a></h4>
+<p>The hook is performed before updating instance resource.</p>
+<h4 id="update_instance_derivatives">update_instance_derivatives<a class="headerlink" href="#update_instance_derivatives" title="Permanent link">#</a></h4>
+<p>The hook to update instance derivatives. The hook is called when an initiator of updating is a user or outer automation. The default implementation is <strong>to delete the outdated derivatives and create new ones</strong>.</p>
+<p>NOTE: The default implementation of the method may be dangerous in cases if the derivatives are changed in life cycle of the instance. For instance, if new derivatives are added after the instance was created, they will be dropped in the default implementation of the method.</p>
+<h4 id="post_update_instance_resource">post_update_instance_resource<a class="headerlink" href="#post_update_instance_resource" title="Permanent link">#</a></h4>
+<p>The hook is performed after updating instance resource.</p>
+<h3 id="outdate-vector">Outdate vector<a class="headerlink" href="#outdate-vector" title="Permanent link">#</a></h3>
+<p>The outdate vector is used to actualize instances that are outdated. It means some changes occurred on the data plane and the instance is outdated now.</p>
+<h4 id="can_actualize_outdated_instance_resource">can_actualize_outdated_instance_resource<a class="headerlink" href="#can_actualize_outdated_instance_resource" title="Permanent link">#</a></h4>
+<p>The hook to check if the instance can be actualized.</p>
+<p>If the hook returns <code>False</code>, the code related to the instance:</p>
+<ul>
+<li><code>actualize_outdated_instance</code></li>
+<li><code>actualize_outdated_instance_derivatives</code>
+will be skipped for the current iteration. The
+<code>can_actualize_outdated_instance_resource</code> will be called again on
+the next iteration until it returns <code>True</code>.</li>
+</ul>
+<h4 id="actualize_outdated_instance">actualize_outdated_instance<a class="headerlink" href="#actualize_outdated_instance" title="Permanent link">#</a></h4>
+<p>Actualize outdated instance. It means some changes occurred on the data plane and the instance is outdated now. For example, the instance <code>Password</code> has field <code>value</code> that is stored in the secret storage. If the value is changed or created on the data plane, the instance is outdated and this method is called to reactualize the instance.</p>
+<h4 id="actualize_outdated_instance_derivatives">actualize_outdated_instance_derivatives<a class="headerlink" href="#actualize_outdated_instance_derivatives" title="Permanent link">#</a></h4>
+<p>Actualize outdated instance with derivatives. It means some changes occurred on the data plane and the instance is outdated now. For example, the instance <code>Config</code> has derivative <code>Render</code>. Single <code>Config</code> may have multiple <code>Render</code> derivatives. If any of the derivatives is outdated, this method is called to reactualize the derivatives. The method returns the list of <code>updated</code> derivatives. If nothing needs to be updated, the method returns the same list of target derivatives as it received. Otherwise, the method should return the list of updated derivatives. It also can add new or remove old derivatives.</p>
+<p>Depends on the <code>fetch_all_derivatives_on_outdate</code> the behavior of the method is different:</p>
+<p><strong>fetch_all_derivatives_on_outdate == True:</strong>
+The method receives the list of all derivatives currently available for the instance even though the derivatives aren't outdated.</p>
+<p><strong>fetch_all_derivatives_on_outdate == False:</strong>
+The method receives the list only changed derivatives from the last actualization. For example, a config has two renders. Only one of them is outdated. The method receives the list of only one outdated render.</p>
+<h4 id="actualize_outdated_master_hash_instance">actualize_outdated_master_hash_instance<a class="headerlink" href="#actualize_outdated_master_hash_instance" title="Permanent link">#</a></h4>
+<p>Actualize instance if the hash of the master instance isn't equal to the saved master hash. The logic is quite similar to <code>actualize_outdated_instance_derivatives</code>.
+But the reason when this method is called is different. The <code>actualize_outdated_instance_derivatives</code> allows to track changes on the data plane but this method allows to track changes on a related master instance. For example, the instance model is <code>Database</code>, the related master for this instance is <code>NodeSet</code>. If the <code>NodeSet</code> is updated, this method is called for all <code>Database</code> instances that are related to this <code>NodeSet</code> to reactualize them. This method tracks changes for target fields of the master instance.</p>
+<h4 id="actualize_outdated_master_full_hash_instance">actualize_outdated_master_full_hash_instance<a class="headerlink" href="#actualize_outdated_master_full_hash_instance" title="Permanent link">#</a></h4>
+<p>Actualize instance if the full hash of the master instance isn't equal to the saved master full hash. The logic is quite similar to <code>actualize_outdated_instance_derivatives</code>.
+But the reason when this method is called is different. The <code>actualize_outdated_instance_derivatives</code> allows to track changes on the data plane but this method allows to track changes on a related master instance. For example, the instance model is <code>Database</code>, the related master for this instance is <code>NodeSet</code>. If the <code>NodeSet</code> is updated, this method is called for all <code>Database</code> instances that are related to this <code>NodeSet</code> to reactualize them. This method tracks changes for all fields of the master instance.</p>
+<h3 id="delete-vector">Delete vector<a class="headerlink" href="#delete-vector" title="Permanent link">#</a></h3>
+<p>Hooks to delete instance resources.</p>
+<h4 id="can_delete_instance_resource">can_delete_instance_resource<a class="headerlink" href="#can_delete_instance_resource" title="Permanent link">#</a></h4>
+<p>The hook to check if the instance can be deleted.</p>
+<p>If the hook returns <code>False</code>, the code related to the instance:</p>
+<ul>
+<li><code>pre_delete_instance_resource</code>
+will be skipped for the current iteration. The
+<code>can_delete_instance_resource</code> will be called again on the next
+iteration until it returns <code>True</code>.</li>
+</ul>
+<h4 id="pre_delete_instance_resource">pre_delete_instance_resource<a class="headerlink" href="#pre_delete_instance_resource" title="Permanent link">#</a></h4>
+<p>The hook is performed before deleting instance resource.</p>
+<h3 id="track-vector">Track vector<a class="headerlink" href="#track-vector" title="Permanent link">#</a></h3>
+<p>Hooks to track instance resources.</p>
+<h4 id="get_tracked_instances_on_create">get_tracked_instances_on_create<a class="headerlink" href="#get_tracked_instances_on_create" title="Permanent link">#</a></h4>
+<p>The hook to collect tracked instances on create. The hook is called only for new instances.</p>
+<h4 id="get_tracked_instances_on_update">get_tracked_instances_on_update<a class="headerlink" href="#get_tracked_instances_on_update" title="Permanent link">#</a></h4>
+<p>The hook to collect tracked instances on update. The hook is called only for updated instances.</p>
+<h4 id="track_outdated_master_hash_instances">track_outdated_master_hash_instances<a class="headerlink" href="#track_outdated_master_hash_instances" title="Permanent link">#</a></h4>
+<p>Track outdated master instances. It's called if the hash of the master instance isn't equal to the saved master hash.</p>
+<h4 id="track_outdated_master_full_hash_instances">track_outdated_master_full_hash_instances<a class="headerlink" href="#track_outdated_master_full_hash_instances" title="Permanent link">#</a></h4>
+<p>Track outdated master instances. It's called if the full hash of the master instance isn't equal to the saved master full hash.</p>
+<h2 id="scheduling">Scheduling<a class="headerlink" href="#scheduling" title="Permanent link">#</a></h2>
+<p>The scheduling is a process of assigning a resource to an agent. There are several ways to schedule a resource:</p>
+<ul>
+<li><strong>Universal scheduler</strong> - If resources have simple scheduling logic, for example, they are assigned to the first available agent, you can use the universal scheduler. Please see the <a href="../../universal_scheduler/universal_scheduler/">UniversalScheduler</a> for more details.</li>
+<li><strong>SchedulableToAgentMixin</strong> - A helpful mixin that an instance can inherit from to schedule itself to an agent. For that it should implement the <code>schedule_to_ua_agent</code> method. There are already several implementations of this mixin in the SDK:<ul>
+<li><code>SchedulableToAgentFromNodeMixin</code> - schedules the resource to the UA agent based on the node UUID.</li>
+<li><code>SchedulableToAgentFromAgentUUIDMixin</code> - schedules the resource to the UA agent based on the agent UUID.</li>
+</ul>
+</li>
+<li><strong>Own scheduler service</strong> - If you need complex logic for scheduling, you can create your own scheduler service.</li>
+</ul>
+<h2 id="readiness-to-perform-operations">Readiness to perform operations<a class="headerlink" href="#readiness-to-perform-operations" title="Permanent link">#</a></h2>
+<p>The readiness is a process of checking if an instance is ready to perform an operation such as create, update, delete or actualize. For example, the instance <code>config</code> depends on a node, the config cannot be created until the node is created. To implement such readiness logic, you can use the <code>ReadinessMixin</code> mixin.</p>
+<p><strong>ReadinessMixin</strong> - A helpful mixin that an instance can inherit from to check if it is ready to perform an operation. For that it should implement the <code>is_ready_to_*</code> methods. There are already several implementations of this mixin in the SDK:</p>
+<ul>
+<li><code>DependenciesExistReadinessMixin</code> - checks if all dependencies exist.</li>
+<li><code>DependenciesActiveReadinessMixin</code> - checks if all dependencies exist and are active.</li>
+</ul>
+<h2 id="specific-builders">Specific builders<a class="headerlink" href="#specific-builders" title="Permanent link">#</a></h2>
+<p>There is a set of specific builders that are already implemented in the SDK and they are focused on particular aspects.</p>
+<h3 id="collectionuniversalbuilderservice">CollectionUniversalBuilderService<a class="headerlink" href="#collectionuniversalbuilderservice" title="Permanent link">#</a></h3>
+<p>The <code>CollectionUniversalBuilderService</code> is a service that is focused on managing a collection of instances. You can pass a list of instance models via <code>instance_models</code> parameter.</p>
+<h3 id="coreinfrabuilder">CoreInfraBuilder<a class="headerlink" href="#coreinfrabuilder" title="Permanent link">#</a></h3>
+<p>The <code>CoreInfraBuilder</code> is a builder that is focused on infrastructure management. See the <a href="../core_infra_builder/">CoreInfraBuilder</a> for more details.</p>
+<h3 id="paasbuilder">PaaSBuilder<a class="headerlink" href="#paasbuilder" title="Permanent link">#</a></h3>
+<p>The <code>PaaSBuilder</code> is a builder that is focused on management of PaaS entities. See the <a href="../paas_builder/">PaaSBuilder</a> for more details.</p>
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    <script id="__config" type="application/json">{"base": "../..", "features": ["search.suggest", "search.highlight", "navigation.tabs", "toc.integrate"], "search": "../../assets/javascripts/workers/search.208ed371.min.js", "translations": {"clipboard.copied": "\u0421\u043a\u043e\u043f\u0438\u0440\u043e\u0432\u0430\u043d\u043e \u0432 \u0431\u0443\u0444\u0435\u0440", "clipboard.copy": "\u041a\u043e\u043f\u0438\u0440\u043e\u0432\u0430\u0442\u044c \u0432 \u0431\u0443\u0444\u0435\u0440", "search.result.more.one": "\u0415\u0449\u0451 1 \u043d\u0430 \u044d\u0442\u043e\u0439 \u0441\u0442\u0440\u0430\u043d\u0438\u0446\u0435", "search.result.more.other": "\u0415\u0449\u0451 # \u043d\u0430 \u044d\u0442\u043e\u0439 \u0441\u0442\u0440\u0430\u043d\u0438\u0446\u0435", "search.result.none": "\u0421\u043e\u0432\u043f\u0430\u0434\u0435\u043d\u0438\u0439 \u043d\u0435 \u043d\u0430\u0439\u0434\u0435\u043d\u043e", "search.result.one": "\u041d\u0430\u0439\u0434\u0435\u043d\u043e 1 \u0441\u043e\u0432\u043f\u0430\u0434\u0435\u043d\u0438\u0435", "search.result.other": "\u041d\u0430\u0439\u0434\u0435\u043d\u043e \u0441\u043e\u0432\u043f\u0430\u0434\u0435\u043d\u0438\u0439: #", "search.result.placeholder": "\u041d\u0430\u0447\u043d\u0438\u0442\u0435 \u043f\u0435\u0447\u0430\u0442\u0430\u0442\u044c \u0434\u043b\u044f \u043f\u043e\u0438\u0441\u043a\u0430", "search.result.term.missing": "\u041e\u0442\u0441\u0443\u0442\u0441\u0442\u0432\u0443\u0435\u0442", "select.version": "\u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u0432\u0435\u0440\u0441\u0438\u044e"}}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.ce72ebac.min.js"></script>
+      
+    
+  
+<script id="init-glightbox">const lightbox = GLightbox({"touchNavigation": true, "loop": false, "zoomable": true, "draggable": true, "openEffect": "zoom", "closeEffect": "zoom", "slideEffect": "slide"});
+document$.subscribe(()=>{ lightbox.reload(); });
+</script></body></html>

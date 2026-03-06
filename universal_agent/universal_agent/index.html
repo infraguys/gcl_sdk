@@ -1,0 +1,868 @@
+<!DOCTYPE html><html lang="ru" class="no-js"><head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://github.com/infraguys/universal_agent/universal_agent/">
+      
+      
+        <link rel="prev" href="../../events/events/">
+      
+      
+        <link rel="next" href="../universal_agent_quick_start/">
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.1.0">
+    
+    
+      
+        <title>Universal Agent - gcl_sdk</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.402914a4.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.a0c5b2b5.min.css">
+      
+      
+
+    
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&amp;display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce((e,_)=>(e<<5)-e+_.charCodeAt(0),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  <link href="../../assets/stylesheets/glightbox.min.css" rel="stylesheet"><script src="../../assets/javascripts/glightbox.min.js"></script><style id="glightbox-style">
+            html.glightbox-open { overflow: initial; height: 100%; }
+            .gslide-title { margin-top: 0px; user-select: text; }
+            .gslide-desc { color: #666; user-select: text; }
+            .gslide-image img { background: white; }
+            .gscrollbar-fixer { padding-right: 15px; }
+            .gdesc-inner { font-size: 0.75rem; }
+            body[data-md-color-scheme="slate"] .gdesc-inner { background: var(--md-default-bg-color); }
+            body[data-md-color-scheme="slate"] .gslide-title { color: var(--md-default-fg-color); }
+            body[data-md-color-scheme="slate"] .gslide-desc { color: var(--md-default-fg-color); }
+        </style></head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="" data-md-color-accent="">
+  
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&"object"==typeof palette.color)for(var key of Object.keys(palette.color))document.body.setAttribute("data-md-color-"+key,palette.color[key])</script>
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#universal-agent" class="md-skip">
+          Перейти к содержанию
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Верхний колонтитул">
+    <a href="../.." title="gcl_sdk" class="md-header__button md-logo" aria-label="gcl_sdk" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54Z"></path></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3V6m0 5h18v2H3v-2m0 5h18v2H3v-2Z"></path></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            gcl_sdk
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Universal Agent
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      <form class="md-header__option" data-md-component="palette">
+        
+          
+          <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="" data-md-color-accent="" aria-label="Switch to dark mode" type="radio" name="__palette" id="__palette_1">
+          
+            <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_2" hidden>
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 2a7 7 0 0 1 7 7c0 2.38-1.19 4.47-3 5.74V17a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1v-2.26C6.19 13.47 5 11.38 5 9a7 7 0 0 1 7-7M9 21v-1h6v1a1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1m3-17a5 5 0 0 0-5 5c0 2.05 1.23 3.81 3 4.58V16h4v-2.42c1.77-.77 3-2.53 3-4.58a5 5 0 0 0-5-5Z"></path></svg>
+            </label>
+          
+        
+          
+          <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="" data-md-color-accent="" aria-label="Switch to light mode" type="radio" name="__palette" id="__palette_2">
+          
+            <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 2a7 7 0 0 0-7 7c0 2.38 1.19 4.47 3 5.74V17a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-2.26c1.81-1.27 3-3.36 3-5.74a7 7 0 0 0-7-7M9 21a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1v-1H9v1Z"></path></svg>
+            </label>
+          
+        
+      </form>
+    
+    
+    
+      <label class="md-header__button md-icon" for="__search">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5Z"></path></svg>
+      </label>
+      <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Поиск" placeholder="Поиск" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5Z"></path></svg>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12Z"></path></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Поиск">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Очистить" aria-label="Очистить" tabindex="-1">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41Z"></path></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Инициализация поиска
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/infraguys/gcl_sdk" title="Перейти к репозиторию" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.3.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2023 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81z"></path></svg>
+  </div>
+  <div class="md-source__repository">
+    gcl_sdk
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Вкладки" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+
+
+  <li class="md-tabs__item">
+    <a href="../../audit/audit/" class="md-tabs__link">
+      Audit
+    </a>
+  </li>
+
+      
+        
+  
+  
+
+
+  <li class="md-tabs__item">
+    <a href="../../events/events/" class="md-tabs__link">
+      Events
+    </a>
+  </li>
+
+      
+        
+  
+  
+    
+  
+
+
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="./" class="md-tabs__link md-tabs__link--active">
+        Universal Agent
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+
+
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../universal_builder/universal_builder/" class="md-tabs__link">
+        Universal Builder
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+
+
+  <li class="md-tabs__item">
+    <a href="../../universal_scheduler/universal_scheduler/" class="md-tabs__link">
+      Universal Scheduler
+    </a>
+  </li>
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation">
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+  
+
+
+  
+
+<nav class="md-nav md-nav--primary md-nav--lifted md-nav--integrated" aria-label="Навигация" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="gcl_sdk" class="md-nav__button md-logo" aria-label="gcl_sdk" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54Z"></path></svg>
+
+    </a>
+    gcl_sdk
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/infraguys/gcl_sdk" title="Перейти к репозиторию" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.3.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2023 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81z"></path></svg>
+  </div>
+  <div class="md-source__repository">
+    gcl_sdk
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../audit/audit/" class="md-nav__link">
+        Audit
+      </a>
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../events/events/" class="md-nav__link">
+        Events
+      </a>
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+    
+  
+  
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+      
+      
+      
+      <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+      
+      
+      
+        <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+          Universal Agent
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+        <label class="md-nav__title" for="__nav_3">
+          <span class="md-nav__icon md-icon"></span>
+          Universal Agent
+        </label>
+        <ul class="md-nav__list" data-md-scrollfix>
+          
+            
+              
+  
+  
+    
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          Universal Agent
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        Universal Agent
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Содержание раздела">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Содержание раздела
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#quick-start" class="md-nav__link">
+    Quick start
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#main-terms" class="md-nav__link">
+    Main terms
+  </a>
+  
+    <nav class="md-nav" aria-label="Main terms">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#resource" class="md-nav__link">
+    Resource
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#targetresource" class="md-nav__link">
+    TargetResource
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#payload" class="md-nav__link">
+    Payload
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#capability-and-fact-drivers" class="md-nav__link">
+    Capability and fact drivers
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#drivers" class="md-nav__link">
+    Drivers
+  </a>
+  
+    <nav class="md-nav" aria-label="Drivers">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#metadata-driver" class="md-nav__link">
+    Metadata driver
+  </a>
+  
+    <nav class="md-nav" aria-label="Metadata driver">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#sshkeycapabilitydriver" class="md-nav__link">
+    SSHKeyCapabilityDriver
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#direct-driver" class="md-nav__link">
+    Direct driver
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#clients" class="md-nav__link">
+    Clients
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../universal_agent_quick_start/" class="md-nav__link">
+        Universal Agent Quick start
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../capability_driver_quick_start/" class="md-nav__link">
+        Capability driver Quick start
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../metadata_driver_quick_start/" class="md-nav__link">
+        Metadata driver Quick start
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../direct_driver_quick_start/" class="md-nav__link">
+        Direct driver Quick start
+      </a>
+    </li>
+  
+
+            
+          
+        </ul>
+      </nav>
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+  
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+      
+      
+      
+      <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4">
+      
+      
+      
+        <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+          Universal Builder
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+        <label class="md-nav__title" for="__nav_4">
+          <span class="md-nav__icon md-icon"></span>
+          Universal Builder
+        </label>
+        <ul class="md-nav__list" data-md-scrollfix>
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../universal_builder/universal_builder/" class="md-nav__link">
+        Universal Builder
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../universal_builder/universal_builder_quick_start/" class="md-nav__link">
+        Universal Builder Quick start
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../universal_builder/core_infra_builder/" class="md-nav__link">
+        CoreInfraBuilder
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../universal_builder/paas_builder/" class="md-nav__link">
+        PaaSBuilder
+      </a>
+    </li>
+  
+
+            
+          
+        </ul>
+      </nav>
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../universal_scheduler/universal_scheduler/" class="md-nav__link">
+        Universal Scheduler
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+  
+  
+
+
+<h1 id="universal-agent">Universal Agent<a class="headerlink" href="#universal-agent" title="Permanent link">#</a></h1>
+<p>The Universal Agent is a compound term that refers to a collection of services, tools, models. The main components of the Universal Agent are:</p>
+<ul>
+<li>Universal Agent service.</li>
+<li>Universal scheduler service.</li>
+<li>Common high level models such as <code>Resource</code>, <code>TargetResource</code>, <code>Payload</code> and others.</li>
+<li>Logic of hashes calculation using fast hash algorithms <code>xxh3_64</code>.</li>
+<li>Interfaces for Capability and Fact drivers.</li>
+<li>A couple of clients.</li>
+<li>Other helpful tools.</li>
+</ul>
+<h2 id="quick-start">Quick start<a class="headerlink" href="#quick-start" title="Permanent link">#</a></h2>
+<p>Follow the <a href="../universal_agent_quick_start/">quick start guide</a> to run the Universal Agent.</p>
+<h2 id="main-terms">Main terms<a class="headerlink" href="#main-terms" title="Permanent link">#</a></h2>
+<p><strong>Universal agent service</strong> is a unified agent that implements common logic of abstract <code>resource</code> and <code>fact</code> management. The agent operates on high level abstractions such as <code>Resource</code> and <code>TargetResource</code> but actual interaction with data plane is performed via drivers. These drivers are loaded at launch time and registered as agent capabilities or facts. After registration the agent can handle resources with specified capabilities.</p>
+<p><strong>Universal scheduler service</strong> is a service that provides some common logic to schedule resources to particular agents based on the agent capabilities. The simplest logic is implemented for now. First agent that can handle a resource by its capability(kind) is selected and the resource is scheduled to this agent.</p>
+<p><strong>Resource</strong> this model represents an abstract resource for the Universal Agent. The model is mostly used as an <strong>actual</strong> resource. It will be explained later in detail.</p>
+<p><strong>TargetResource</strong> almost the same as <code>Resource</code> but it's used as a target resource. It will be explained later in detail.</p>
+<p><strong>Payload</strong> this model is used to represent the payload of the agent. The payload is a collection of resources, facts and some additional information. It will be explained later in detail.</p>
+<h3 id="resource">Resource<a class="headerlink" href="#resource" title="Permanent link">#</a></h3>
+<p>As described it's a model that represents an abstract resource and the model is mostly used as an actual resource, for instance, gathered from the data plane. In this case the <code>value</code> dict contains a real object gathered from the data plane in dict format. The essential fields are:</p>
+<ul>
+<li><em>kind</em> - resource kind, for instance, "config", "secret" and so on.</li>
+<li><em>value</em> - resource value in dict format.</li>
+<li><em>hash</em> - hash value only for the target fields.</li>
+<li><em>full_hash</em> - hash value for the whole value (all fields).</li>
+<li><em>status</em> - resource status, for instance, "ACTIVE", "NEW" and others.</li>
+</ul>
+<p>Some explanation for the <code>hash</code> and <code>full_hash</code>. Let's assume we have the following target node resource:</p>
+<div class="highlight"><pre><span></span><code><span class="w">    </span><span class="p">{</span>
+<span class="w">        </span><span class="nt">"uuid"</span><span class="p">:</span><span class="w"> </span><span class="s2">"a1b2c3d4-e5f6-7890-a1b2-c3d4e5f67890"</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"vm"</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"project_id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"12345678-c625-4fee-81d5-f691897b8142"</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"cores"</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"ram"</span><span class="p">:</span><span class="w"> </span><span class="mi">1024</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"disk_spec"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="nt">"kind"</span><span class="p">:</span><span class="w"> </span><span class="s2">"root_disk"</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">"root_disk_size"</span><span class="p">:</span><span class="w"> </span><span class="mi">15</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">"image"</span><span class="p">:</span><span class="w"> </span><span class="s2">"http://10.20.0.1:8080/genesis-base.raw"</span><span class="p">,</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+</code></pre></div>
+<p>All these fields are considered as target fields and they are used to calculate <code>hash</code>. After node creation we have the the following:</p>
+<div class="highlight"><pre><span></span><code><span class="w">    </span><span class="p">{</span>
+<span class="w">        </span><span class="nt">"uuid"</span><span class="p">:</span><span class="w"> </span><span class="s2">"a1b2c3d4-e5f6-7890-a1b2-c3d4e5f67890"</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"vm"</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"project_id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"12345678-c625-4fee-81d5-f691897b8142"</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"cores"</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"ram"</span><span class="p">:</span><span class="w"> </span><span class="mi">1024</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"disk_spec"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="nt">"kind"</span><span class="p">:</span><span class="w"> </span><span class="s2">"root_disk"</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">"root_disk_size"</span><span class="p">:</span><span class="w"> </span><span class="mi">15</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">"image"</span><span class="p">:</span><span class="w"> </span><span class="s2">"http://10.20.0.1:8080/genesis-base.raw"</span><span class="p">,</span>
+<span class="w">        </span><span class="p">},</span>
+
+<span class="w">        </span><span class="c1">// Not target fields below</span>
+<span class="w">        </span><span class="nt">"created_at"</span><span class="p">:</span><span class="w"> </span><span class="s2">"2022-01-01T00:00:00+00:00"</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"updated_at"</span><span class="p">:</span><span class="w"> </span><span class="s2">"2022-01-01T00:00:00+00:00"</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"default_network"</span><span class="p">:</span><span class="w"> </span><span class="p">{}</span>
+<span class="w">    </span><span class="p">}</span>
+</code></pre></div>
+<p>For hash calculation only the target fields are used as discussed above. <code>full_hash</code> is calculated for all fields.</p>
+<h3 id="targetresource">TargetResource<a class="headerlink" href="#targetresource" title="Permanent link">#</a></h3>
+<p>Almost the same as <code>Resource</code> but it's used as a target resource. Additional fields are:</p>
+<ul>
+<li><em>agent</em> - agent uuid that will handle this resource.</li>
+<li><em>master</em> - reference to the master resource if it exists.</li>
+<li><em>master_hash</em> - hash of the master resource.</li>
+<li><em>master_full_hash</em> - full hash of the master resource.</li>
+<li><em>tracked_at</em> - timestamp when the resource was tracked. It's useful to track actuality of the resource.</li>
+</ul>
+<h3 id="payload">Payload<a class="headerlink" href="#payload" title="Permanent link">#</a></h3>
+<p>This model is used to represent the payload of the agent. The model is used as for control plane and data plane as well. The control plane payload is received from Orch API and it has to be applied to the data plane, except for <code>facts</code>. A data plane payload is a collected payload from the data. If CP and DP payloads are different from target values of resources that means we need to update something on the data plane. If CP and DP payloads are different from facts point of view, it means we need to update something in the Status API to save new facts.</p>
+<p><strong>capabilities</strong> - a set of managed resources, for example, configuration,
+    secrets and so on. An orchestrator sets which resources should be
+    presented on the data plane. CP resources from the capabilities
+    contains only managed fields. When these resources are gathered
+    from the data plane they may have some additional fields,
+    for instance, created time, updated time and so on. Only the
+    managed fields are orchestrated.</p>
+<p><strong>facts</strong> - opposite to the capabilities. These resources are gathered from
+    the data plane independently from the orchestrator. In other words,
+    they are not managed by the orchestrator. A simple example of facts
+    are network interfaces.</p>
+<p><strong>hash</strong> - a hash of the payload. The formula is described below:</p>
+<div class="highlight"><pre><span></span><code>    <span class="nb">hash</span><span class="p">(</span>
+        <span class="n">cap_resource0</span><span class="o">.</span><span class="n">hash</span><span class="p">,</span>
+        <span class="n">cap_resource1</span><span class="o">.</span><span class="n">hash</span><span class="p">,</span>
+        <span class="o">...</span>
+        <span class="n">fact_resource0</span><span class="o">.</span><span class="n">full_hash</span><span class="p">,</span>
+        <span class="n">fact_resource1</span><span class="o">.</span><span class="n">full_hash</span><span class="p">,</span>
+        <span class="o">...</span>
+    <span class="p">)</span>
+</code></pre></div>
+<h2 id="capability-and-fact-drivers">Capability and fact drivers<a class="headerlink" href="#capability-and-fact-drivers" title="Permanent link">#</a></h2>
+<p>One of ideas of the Universal Agent is to use drivers to interact with the data plane but the agent itself is operated only on high level abstractions. So developers should write only drivers using specified interface. The drivers are loaded at agent launch time and registered their capabilities and facts. After registration the agent can handle resources with specified capabilities.</p>
+<p><a href="https://github.com/infraguys/gcl_sdk/blob/master/gcl_sdk/agents/universal/drivers/base.py#L23">Capability driver interface</a></p>
+<p><a href="https://github.com/infraguys/gcl_sdk/blob/master/gcl_sdk/agents/universal/drivers/base.py#L62">Fact driver interface</a></p>
+<p>Look at <a href="../capability_driver_quick_start/">quick start guide</a> for capability driver and <a href="../fact_driver_quick_start/">quick start guide</a> for fact driver.</p>
+<h2 id="drivers">Drivers<a class="headerlink" href="#drivers" title="Permanent link">#</a></h2>
+<h3 id="metadata-driver">Metadata driver<a class="headerlink" href="#metadata-driver" title="Permanent link">#</a></h3>
+<p>Metadata driver handles models that are partly stored in a <code>meta file</code>. This approach is useful when the data plane cannot provide all fields required to manage resources.</p>
+<p>See <a href="../metadata_driver_quick_start/">Metadata driver quick start</a> for details, examples, and implementation guidance.</p>
+<h4 id="sshkeycapabilitydriver">SSHKeyCapabilityDriver<a class="headerlink" href="#sshkeycapabilitydriver" title="Permanent link">#</a></h4>
+<p>The driver handles SSH keys on the host. The <code>SSHKeyCapabilityDriver</code> is derived from <code>MetaFileStorageAgentDriver</code>. The main data plane model is <code>SSHKey</code>, it's derived from <code>MetaDataPlaneModel</code>. The meta file is located at <code>/var/lib/genesis/universal_agent/ssh_key_meta.json</code>.</p>
+<h3 id="direct-driver">Direct driver<a class="headerlink" href="#direct-driver" title="Permanent link">#</a></h3>
+<p>Direct driver gets resources directly from backend systems without a meta file. It keeps target fields in dedicated storage to preserve stable hash calculation.</p>
+<p>See <a href="../direct_driver_quick_start/">Direct driver quick start</a> for details, examples, and implementation guidance.</p>
+<h2 id="clients">Clients<a class="headerlink" href="#clients" title="Permanent link">#</a></h2>
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    <script id="__config" type="application/json">{"base": "../..", "features": ["search.suggest", "search.highlight", "navigation.tabs", "toc.integrate"], "search": "../../assets/javascripts/workers/search.208ed371.min.js", "translations": {"clipboard.copied": "\u0421\u043a\u043e\u043f\u0438\u0440\u043e\u0432\u0430\u043d\u043e \u0432 \u0431\u0443\u0444\u0435\u0440", "clipboard.copy": "\u041a\u043e\u043f\u0438\u0440\u043e\u0432\u0430\u0442\u044c \u0432 \u0431\u0443\u0444\u0435\u0440", "search.result.more.one": "\u0415\u0449\u0451 1 \u043d\u0430 \u044d\u0442\u043e\u0439 \u0441\u0442\u0440\u0430\u043d\u0438\u0446\u0435", "search.result.more.other": "\u0415\u0449\u0451 # \u043d\u0430 \u044d\u0442\u043e\u0439 \u0441\u0442\u0440\u0430\u043d\u0438\u0446\u0435", "search.result.none": "\u0421\u043e\u0432\u043f\u0430\u0434\u0435\u043d\u0438\u0439 \u043d\u0435 \u043d\u0430\u0439\u0434\u0435\u043d\u043e", "search.result.one": "\u041d\u0430\u0439\u0434\u0435\u043d\u043e 1 \u0441\u043e\u0432\u043f\u0430\u0434\u0435\u043d\u0438\u0435", "search.result.other": "\u041d\u0430\u0439\u0434\u0435\u043d\u043e \u0441\u043e\u0432\u043f\u0430\u0434\u0435\u043d\u0438\u0439: #", "search.result.placeholder": "\u041d\u0430\u0447\u043d\u0438\u0442\u0435 \u043f\u0435\u0447\u0430\u0442\u0430\u0442\u044c \u0434\u043b\u044f \u043f\u043e\u0438\u0441\u043a\u0430", "search.result.term.missing": "\u041e\u0442\u0441\u0443\u0442\u0441\u0442\u0432\u0443\u0435\u0442", "select.version": "\u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u0432\u0435\u0440\u0441\u0438\u044e"}}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.ce72ebac.min.js"></script>
+      
+    
+  
+<script id="init-glightbox">const lightbox = GLightbox({"touchNavigation": true, "loop": false, "zoomable": true, "draggable": true, "openEffect": "zoom", "closeEffect": "zoom", "slideEffect": "slide"});
+document$.subscribe(()=>{ lightbox.reload(); });
+</script></body></html>
