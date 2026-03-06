@@ -12,7 +12,7 @@ The Universal Agent is a compound term that refers to a collection of services, 
 
 ## Quick start
 
-Follow the [quick start guide](universal_agent_quick_start) to run the Universal Agent.
+Follow the [quick start guide](universal_agent_quick_start.md) to run the Universal Agent.
 
 ## Main terms
 
@@ -125,7 +125,7 @@ One of ideas of the Universal Agent is to use drivers to interact with the data 
 
 [Fact driver interface](https://github.com/infraguys/gcl_sdk/blob/master/gcl_sdk/agents/universal/drivers/base.py#L62)
 
-Look at [quick start guide](capability_driver_quick_start) for capability driver and [quick start guide](fact_driver_quick_start) for fact driver.
+Look at [quick start guide](capability_driver_quick_start.md) for capability driver and [quick start guide](fact_driver_quick_start.md) for fact driver.
 
 ## Drivers
 
@@ -133,7 +133,7 @@ Look at [quick start guide](capability_driver_quick_start) for capability driver
 
 Metadata driver handles models that are partly stored in a `meta file`. This approach is useful when the data plane cannot provide all fields required to manage resources.
 
-See [Metadata driver quick start](metadata_driver_quick_start) for details, examples, and implementation guidance.
+See [Metadata driver quick start](metadata_driver_quick_start.md) for details, examples, and implementation guidance.
 
 #### SSHKeyCapabilityDriver
 
@@ -143,6 +143,6 @@ The driver handles SSH keys on the host. The `SSHKeyCapabilityDriver` is derived
 
 Direct driver gets resources directly from backend systems without a meta file. It keeps target fields in dedicated storage to preserve stable hash calculation.
 
-See [Direct driver quick start](direct_driver_quick_start) for details, examples, and implementation guidance.
+See [Direct driver quick start](direct_driver_quick_start.md) for details, examples, and implementation guidance.
 
 ## Clients
