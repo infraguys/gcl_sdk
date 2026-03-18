@@ -166,9 +166,7 @@ def _swap_dirs_mac_compatible(dir1, dir2):
             "directory for reliable swapping"
         )
 
-    with tempfile.TemporaryDirectory(
-        dir=parent, prefix=".swap_tmp_"
-    ) as tmp_dir:
+    with tempfile.TemporaryDirectory(dir=parent, prefix=".swap_tmp_") as tmp_dir:
         # Step 1: Move 'dir1' → tmp
         shutil.move(dir1, tmp_dir + "_a")
         # Step 2: Move 'dir2' → 'dir1'
