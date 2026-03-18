@@ -986,7 +986,7 @@ dependencies = [
     { name = "orjson", version = "3.11.5", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.9.*'" },
     { name = "orjson", version = "3.11.7", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
     { name = "oslo-config" },
-    { name = "renameat2" },
+    { name = "renameat2", marker = "sys_platform == 'linux'" },
     { name = "restalchemy" },
     { name = "xxhash" },
 ]
@@ -1044,7 +1044,7 @@ requires-dist = [
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.0.0" },
     { name = "pytest", marker = "extra == 'test'", specifier = ">=8.0.0,<9.0.0" },
     { name = "pytest-timer", marker = "extra == 'test'", specifier = ">=1.0.0,<2.0.0" },
-    { name = "renameat2", specifier = ">=0.4.4,<1.0.0" },
+    { name = "renameat2", marker = "sys_platform == 'linux'", specifier = ">=0.4.4,<1.0.0" },
     { name = "restalchemy", specifier = ">=15.0.1,<16.0.0" },
     { name = "ruff", marker = "extra == 'ruff'" },
     { name = "shellcheck-py", marker = "extra == 'shellcheck'" },

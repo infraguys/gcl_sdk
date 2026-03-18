@@ -28,6 +28,7 @@ LOG = logging.getLogger(__name__)
 
 class UAServiceSpec(tp.NamedTuple):
     """The service specification for the UA and UB services."""
+
     uuid: sys_uuid.UUID
     orch_client: orch_base.AbstractOrchClient
     capabilities: tp.Collection[str] = tuple()
