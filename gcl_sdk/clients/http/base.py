@@ -48,8 +48,10 @@ class CoreIamAuthenticator(AbstractAuthenticator):
     def __init__(
         self,
         base_url: str,
-        username: str,
-        password: str,
+        username: str | None = None,
+        password: str | None = None,
+        access_token: str | None = None,
+        refresh_token: str | None = None,
         client_id: str = "GenesisCoreClientId",
         client_secret: str = "GenesisCoreSecret",
         client_uuid: sys_uuid.UUID = DEFAULT_CLIENT_UUID,
@@ -74,10 +76,12 @@ class CoreIamAuthenticator(AbstractAuthenticator):
             "ttl": str(ttl),
         }
 
-        self._access_token = None
-        self._refresh_token = None
+        self._access_token = access_token
+        self._refresh_token = refresh_token
 
     def authenticate(self) -> None:
+        if self._data.get("username") is None or self._data.get("password") is None:
+            raise ValueError("Username and password are required for reauthentication")
         response = self._http_client.post(
             self._url, headers=self._headers, data=self._data
         )
