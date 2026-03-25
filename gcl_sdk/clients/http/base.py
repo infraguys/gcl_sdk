@@ -31,6 +31,9 @@ from restalchemy.dm import models
 from gcl_sdk.agents.universal.api import crypto
 from gcl_sdk.agents.universal.api import packers
 
+GRANT_TYPE_PASSWORD = "password"
+GRANT_TYPE_REFRESH_TOKEN = "refresh_token"
+
 
 class AbstractAuthenticator(abc.ABC):
     @abc.abstractmethod
@@ -67,7 +70,7 @@ class CoreIamAuthenticator(AbstractAuthenticator):
         self._headers = {"Content-Type": "application/x-www-form-urlencoded"}
 
         self._data = {
-            "grant_type": "password",
+            "grant_type": GRANT_TYPE_PASSWORD,
             "username": username,
             "password": password,
             "client_id": client_id,
@@ -80,10 +83,11 @@ class CoreIamAuthenticator(AbstractAuthenticator):
         self._refresh_token = refresh_token
 
     def authenticate(self) -> None:
-        if self._data.get("username") is None or self._data.get("password") is None:
-            raise ValueError("Username and password are required for reauthentication")
         response = self._http_client.post(
-            self._url, headers=self._headers, data=self._data
+            self._url,
+            headers=self._headers,
+            data={"grant_type": GRANT_TYPE_REFRESH_TOKEN, "refresh_token": self._refresh_token} if
+            self._refresh_token else self._data
         )
         data = response.json()
         self._access_token = data["access_token"]
