@@ -62,8 +62,10 @@ class CoreIamAuthenticator(AbstractAuthenticator):
         ttl: int = 86400,  # 1 day
         http_client: bazooka.Client | None = None,
     ):
-        if username is None and password is None and access_token is None:
-            raise ValueError("No authentication credentials provided")
+        if not (access_token or refresh_token or (username and password)):
+            raise ValueError(
+                "Insufficient authentication credentials. Provide 'access_token', 'refresh_token', or both 'username' and 'password'."
+            )
 
         self._http_client = http_client or bazooka.Client()
 
