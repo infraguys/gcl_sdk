@@ -62,6 +62,11 @@ class CoreIamAuthenticator(AbstractAuthenticator):
         ttl: int = 86400,  # 1 day
         http_client: bazooka.Client | None = None,
     ):
+        if not (access_token or refresh_token or (username and password)):
+            raise ValueError(
+                "Insufficient authentication credentials. Provide 'access_token', 'refresh_token', or both 'username' and 'password'."
+            )
+
         self._http_client = http_client or bazooka.Client()
 
         client_uuid = str(client_uuid)
@@ -86,8 +91,12 @@ class CoreIamAuthenticator(AbstractAuthenticator):
         response = self._http_client.post(
             self._url,
             headers=self._headers,
-            data={"grant_type": GRANT_TYPE_REFRESH_TOKEN, "refresh_token": self._refresh_token} if
-            self._refresh_token else self._data
+            data={
+                "grant_type": GRANT_TYPE_REFRESH_TOKEN,
+                "refresh_token": self._refresh_token,
+            }
+            if self._refresh_token
+            else self._data,
         )
         data = response.json()
         self._access_token = data["access_token"]
