@@ -144,6 +144,7 @@ ServiceCapabilityDriver = "gcl_sdk.agents.universal.drivers.service:ServiceCapab
 GuestMachineCapabilityDriver = "gcl_sdk.agents.universal.drivers.guest:GuestMachineCapabilityDriver"
 CoreCapabilityDriver = "gcl_sdk.agents.universal.drivers.core:CoreCapabilityDriver"
 RestCoreCapabilityDriver = "gcl_sdk.agents.universal.drivers.core:RestCoreCapabilityDriver"
+UserCapabilityDriver = "gcl_sdk.agents.universal.drivers.core:UserCapabilityDriver"
 
 [tool.uv]
 package = true

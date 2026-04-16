@@ -141,3 +141,43 @@ class DatabaseCapabilityDriver(direct.DirectAgentDriver):
     def get_capabilities(self) -> list[str]:
         """Returns a list of capabilities supported by the driver."""
         return list(self._kinds)
+
+
+class UserCapabilityDriver(direct.DirectAgentDriver):
+    """User capability driver."""
+
+    USERS_TARGET_FIELDS_FILENAME = "core_users_target_fields.json"
+
+    def __init__(
+        self,
+        username: str,
+        password: str,
+        user_api_base_url: str,
+        user_kind: str = "em_core_iam_users",
+        agent_work_dir: str = c.WORK_DIR,
+    ):
+        http = bazooka.Client()
+        auth = base.CoreIamAuthenticator(
+            user_api_base_url, username, password, http_client=http
+        )
+
+        rest_client = base.CollectionBaseClient(
+            http_client=http, base_url=user_api_base_url, auth=auth
+        )
+
+        storage_path = os.path.join(agent_work_dir, self.USERS_TARGET_FIELDS_FILENAME)
+
+        storage = fs.TargetFieldsFileStorage(storage_path)
+        users_client = core_rest_back.GCUsersRestApiBackendClient(
+            rest_client,
+            user_kind=user_kind,
+            tf_storage=storage,
+        )
+
+        self._user_kind = user_kind
+
+        super().__init__(storage=storage, client=users_client)
+
+    def get_capabilities(self) -> list[str]:
+        """Returns a list of capabilities supported by the driver."""
+        return [self._user_kind]
