@@ -43,11 +43,13 @@ class UniversalAgentService(looper_basic.BasicService):
         payload_path: str | None = c.PAYLOAD_PATH,
         iter_min_period: float = 3,
         iter_pause: float = 0.1,
+        system_uuid: sys_uuid.UUID | None = None,
     ):
         super().__init__(iter_min_period, iter_pause)
         self._orch_client = orch_client
         self._payload_path = payload_path
         self._agent_uuid = agent_uuid
+        self._system_uuid = system_uuid
         self._caps_drivers = caps_drivers
         self._facts_drivers = facts_drivers
 
@@ -59,7 +61,10 @@ class UniversalAgentService(looper_basic.BasicService):
             d.get_facts() for d in self._facts_drivers
         )
         agent = models.UniversalAgent.from_system_uuid(
-            capabilities, facts, self._agent_uuid
+            capabilities=capabilities,
+            facts=facts,
+            agent_uuid=self._agent_uuid,
+            system_uuid=self._system_uuid,
         )
         try:
             self._orch_client.agents_create(agent)
@@ -221,7 +226,9 @@ class UniversalAgentService(looper_basic.BasicService):
 
         for uuid in target_resources.keys() - actual_resources.keys():
             resource = target_resources[uuid]
-            resource["node"] = str(utils.node_uuid())
+            resource["node"] = (
+                str(self._system_uuid) if self._system_uuid else str(utils.node_uuid())
+            )
             try:
                 resource = models.Resource.restore_from_simple_view(**resource)
                 self._orch_client.resources_create(resource)

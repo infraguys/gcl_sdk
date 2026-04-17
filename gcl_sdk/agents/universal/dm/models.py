@@ -294,8 +294,10 @@ class UniversalAgent(
         facts: tp.Iterable[str],
         agent_uuid: sys_uuid.UUID | None = None,
         agent_name: str | None = None,
+        system_uuid: sys_uuid.UUID | None = None,
     ):
-        system_uuid = utils.system_uuid()
+        if system_uuid is None:
+            system_uuid = utils.system_uuid()
         uuid = agent_uuid or system_uuid
         capabilities = {"capabilities": list(capabilities)}
         facts = {"facts": list(facts)}
