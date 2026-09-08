@@ -102,6 +102,16 @@ class AbstractCapabilityDriver(abc.ABC):
                 finalize_capability]* -> finalize
         """
 
+    def dependent_capabilities(self) -> bool:
+        """Whether the capabilities of this driver depend on each other.
+
+        When ``True`` the capabilities are applied in order and the resources
+        collected for one capability may affect the others. By default the
+        capabilities are independent.
+        """
+
+        return False
+
 
 class AbstractFactDriver(abc.ABC):
     """Abstract driver for facts.

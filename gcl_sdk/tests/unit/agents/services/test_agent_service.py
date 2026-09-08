@@ -23,6 +23,31 @@ def _make_resource(
     )
 
 
+def _make_service(
+    *,
+    caps_drivers=None,
+    facts_drivers=None,
+    orch_client=None,
+    payload_path=None,
+) -> UniversalAgentService:
+    """Build a real service instance with mocked I/O dependencies.
+
+    The service methods under test (``_cap_driver_iteration``,
+    ``_capability_iteration``, ``_actualize_facts``, ``_iteration``) are
+    real so that exceptions propagate through the reconciliation logic
+    exactly as in production; only the orchestrator client and the
+    drivers are mocks.
+    """
+    return UniversalAgentService(
+        agent_uuid=sys_uuid.uuid4(),
+        orch_client=orch_client or MagicMock(),
+        caps_drivers=caps_drivers or [],
+        facts_drivers=facts_drivers or [],
+        payload_path=payload_path,
+        system_uuid=sys_uuid.uuid4(),
+    )
+
+
 class TestActualizeCapability:
     def test_creates_new_resources(self):
         target_resource = _make_resource()
@@ -225,3 +250,292 @@ class TestActualizeCapability:
         assert changed_updated in result
         assert removed_resource not in result
         assert len(result) == 3
+
+
+class TestReadFailureProtection:
+    """A failed read (``driver.list()`` raising) must never be confused
+    with a successful empty read.
+
+    The failed category must be excluded from reconciliation so its last
+    known snapshot is preserved and no resources are deleted in the
+    Status API. These tests guard the three-state semantics
+    (success-with-resources / success-empty / failed-unknown) introduced
+    to fix the Orion incident where a transient ``driver.list()`` failure
+    caused a mass ``resources_delete`` of the previously exported facts.
+    """
+
+    def test_cap_driver_iteration_excludes_capability_on_list_failure(self):
+        resource = _make_resource()
+        payload = models.Payload.empty()
+        payload.add_caps_resources([resource])
+        payload.calculate_hash()
+
+        collected_payload = models.Payload.empty()
+
+        driver = MagicMock()
+        driver.get_capabilities.return_value = [KIND]
+        driver.list.side_effect = RuntimeError("simulated DB outage")
+
+        agent = _make_service()
+
+        result = agent._cap_driver_iteration(driver, payload, collected_payload)
+
+        # The failing capability must not be reported as processed...
+        assert result == set()
+        # ...and nothing must have been collected for it.
+        assert collected_payload.caps_resources() == []
+        assert collected_payload.facts_resources() == []
+
+    def test_cap_driver_iteration_reports_capability_on_success(self):
+        resource = _make_resource()
+        payload = models.Payload.empty()
+        payload.add_caps_resources([resource])
+        payload.calculate_hash()
+
+        collected_payload = models.Payload.empty()
+
+        driver = MagicMock()
+        driver.get_capabilities.return_value = [KIND]
+        driver.list.return_value = [resource]
+
+        agent = _make_service()
+
+        result = agent._cap_driver_iteration(driver, payload, collected_payload)
+
+        assert result == {KIND}
+        assert collected_payload.caps_resources(KIND) == [resource]
+
+    def test_iteration_no_delete_when_capability_list_raises(self):
+        """The Orion repro: a read failure must not delete exported facts."""
+        resources = [_make_resource(uuid=sys_uuid.uuid4()) for _ in range(3)]
+
+        payload = models.Payload.empty()
+        payload.add_caps_resources(resources)
+        payload.add_facts_resources(resources)
+        payload.calculate_hash()
+
+        driver = MagicMock()
+        driver.get_capabilities.return_value = [KIND]
+        driver.list.side_effect = RuntimeError("simulated DB outage")
+
+        orch = MagicMock()
+        orch.agents_get_payload.return_value = payload
+
+        agent = _make_service(caps_drivers=[driver], orch_client=orch)
+        agent._iteration()
+
+        # Zero create/update/delete for the failing category.
+        orch.resources_delete.assert_not_called()
+        orch.resources_create.assert_not_called()
+        orch.resources_update.assert_not_called()
+        # The read was attempted exactly once.
+        driver.list.assert_called_once_with(KIND)
+
+    def test_iteration_no_delete_when_fact_driver_list_raises(self):
+        """The same protection applies to plain fact drivers."""
+        resources = [_make_resource(uuid=sys_uuid.uuid4()) for _ in range(3)]
+
+        payload = models.Payload.empty()
+        payload.add_facts_resources(resources)
+        payload.calculate_hash()
+
+        fact_driver = MagicMock()
+        fact_driver.get_facts.return_value = [KIND]
+        fact_driver.list.side_effect = RuntimeError("simulated DB outage")
+
+        orch = MagicMock()
+        orch.agents_get_payload.return_value = payload
+
+        agent = _make_service(facts_drivers=[fact_driver], orch_client=orch)
+        agent._iteration()
+
+        orch.resources_delete.assert_not_called()
+        orch.resources_create.assert_not_called()
+        orch.resources_update.assert_not_called()
+
+    def test_iteration_does_not_save_payload_on_list_failure(self, tmp_path):
+        """A failed read must not overwrite the last successful snapshot."""
+        payload_path = tmp_path / "payload.json"
+
+        # Seed a non-empty last-known-good snapshot on disk. It must differ
+        # from the empty collected payload so an overwrite is detectable.
+        last_resources = [_make_resource(uuid=sys_uuid.uuid4()) for _ in range(3)]
+        last_payload = models.Payload.empty()
+        last_payload.add_caps_resources(last_resources)
+        last_payload.add_facts_resources(last_resources)
+        last_payload.calculate_hash()
+        last_payload.save(str(payload_path))
+        original_content = payload_path.read_text()
+
+        resources = [_make_resource(uuid=sys_uuid.uuid4()) for _ in range(3)]
+        payload = models.Payload.empty()
+        payload.add_caps_resources(resources)
+        payload.add_facts_resources(resources)
+        payload.calculate_hash()
+
+        driver = MagicMock()
+        driver.get_capabilities.return_value = [KIND]
+        driver.list.side_effect = RuntimeError("simulated DB outage")
+
+        orch = MagicMock()
+        orch.agents_get_payload.return_value = payload
+
+        agent = _make_service(
+            caps_drivers=[driver], orch_client=orch, payload_path=str(payload_path)
+        )
+        agent._iteration()
+
+        # The on-disk snapshot is preserved verbatim.
+        assert payload_path.read_text() == original_content
+
+    def test_iteration_saves_payload_when_all_caps_succeed(self, tmp_path):
+        """A fully successful iteration still persists the snapshot."""
+        payload_path = tmp_path / "payload.json"
+        assert not payload_path.exists()
+
+        resources = [_make_resource(uuid=sys_uuid.uuid4()) for _ in range(3)]
+        payload = models.Payload.empty()
+        payload.add_caps_resources(resources)
+        payload.add_facts_resources(resources)
+        payload.calculate_hash()
+
+        driver = MagicMock()
+        driver.get_capabilities.return_value = [KIND]
+        # Successful read returning the very same resources: no reconciliation
+        # work, but the category is processed and the snapshot is saved.
+        driver.list.return_value = resources
+
+        orch = MagicMock()
+        orch.agents_get_payload.return_value = payload
+
+        agent = _make_service(
+            caps_drivers=[driver], orch_client=orch, payload_path=str(payload_path)
+        )
+        agent._iteration()
+
+        assert payload_path.exists()
+
+    def test_actualize_facts_skips_unprocessed_deleted_category(self):
+        """A category absent from ``processed_capabilities`` is left alone."""
+        resource = _make_resource()
+        resource_dict = resource.dump_to_simple_view()
+
+        target_facts = {}
+        actual_facts = {KIND: {"resources": [resource_dict]}}
+
+        orch = MagicMock()
+        agent = _make_service(orch_client=orch)
+
+        agent._actualize_facts(target_facts, actual_facts, processed_capabilities=set())
+
+        orch.resources_delete.assert_not_called()
+        orch.resources_create.assert_not_called()
+        orch.resources_update.assert_not_called()
+
+    def test_actualize_facts_deletes_processed_deleted_category(self):
+        """A processed category with a legitimately empty data plane is deleted."""
+        resource = _make_resource()
+        resource_dict = resource.dump_to_simple_view()
+
+        target_facts = {}
+        actual_facts = {KIND: {"resources": [resource_dict]}}
+
+        orch = MagicMock()
+        agent = _make_service(orch_client=orch)
+
+        agent._actualize_facts(
+            target_facts, actual_facts, processed_capabilities={KIND}
+        )
+
+        orch.resources_delete.assert_called_once()
+
+    def test_actualize_facts_skips_unprocessed_new_category(self):
+        """A new category that failed to read must not be created either."""
+        resource = _make_resource()
+        resource_dict = resource.dump_to_simple_view()
+
+        target_facts = {KIND: {"resources": [resource_dict]}}
+        actual_facts = {}
+
+        orch = MagicMock()
+        agent = _make_service(orch_client=orch)
+
+        agent._actualize_facts(target_facts, actual_facts, processed_capabilities=set())
+
+        orch.resources_create.assert_not_called()
+
+    def test_actualize_facts_skips_unprocessed_existing_category(self):
+        """An existing category that failed to read is not reconciled."""
+        target_resource = _make_resource()
+        actual_resource = _make_resource()
+
+        target_facts = {KIND: {"resources": [target_resource.dump_to_simple_view()]}}
+        actual_facts = {KIND: {"resources": [actual_resource.dump_to_simple_view()]}}
+
+        orch = MagicMock()
+        agent = _make_service(orch_client=orch)
+
+        agent._actualize_facts(target_facts, actual_facts, processed_capabilities=set())
+
+        orch.resources_create.assert_not_called()
+        orch.resources_delete.assert_not_called()
+        orch.resources_update.assert_not_called()
+
+    def test_partial_failure_preserves_only_failed_category(self):
+        """A successful category is reconciled while a failed one is skipped."""
+        ok_kind = "ok_kind"
+        fail_kind = "fail_kind"
+
+        ok_resources = [_make_resource(uuid=sys_uuid.uuid4(), kind=ok_kind)]
+        fail_resources = [_make_resource(uuid=sys_uuid.uuid4(), kind=fail_kind)]
+
+        payload = models.Payload.empty()
+        payload.add_caps_resources(ok_resources)
+        payload.add_caps_resources(fail_resources)
+        payload.add_facts_resources(fail_resources)
+        payload.calculate_hash()
+
+        driver = MagicMock()
+        driver.get_capabilities.return_value = [ok_kind, fail_kind]
+        driver.dependent_capabilities.return_value = False
+
+        def list_side_effect(capability):
+            if capability == fail_kind:
+                raise RuntimeError("simulated DB outage")
+            return ok_resources
+
+        driver.list.side_effect = list_side_effect
+
+        orch = MagicMock()
+        orch.agents_get_payload.return_value = payload
+
+        agent = _make_service(caps_drivers=[driver], orch_client=orch)
+        agent._iteration()
+
+        created_resource = orch.resources_create.call_args.args[0]
+        assert created_resource.uuid == ok_resources[0].uuid
+        orch.resources_delete.assert_not_called()
+
+    def test_dependent_driver_failure_invalidates_successful_capabilities(self):
+        ok_kind = "ok_kind"
+        fail_kind = "fail_kind"
+        ok_resources = [_make_resource(kind=ok_kind)]
+
+        payload = models.Payload.empty()
+        payload.add_caps_resources(ok_resources)
+        payload.capabilities[fail_kind] = {"resources": []}
+
+        driver = MagicMock()
+        driver.get_capabilities.return_value = [ok_kind, fail_kind]
+        driver.dependent_capabilities.return_value = True
+        driver.list.side_effect = [
+            ok_resources,
+            RuntimeError("simulated DB outage"),
+        ]
+
+        agent = _make_service()
+        collected_payload = models.Payload.empty()
+
+        result = agent._cap_driver_iteration(driver, payload, collected_payload)
+
+        assert result == set()

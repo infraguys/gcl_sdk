@@ -119,7 +119,21 @@ class UniversalAgentService(looper_basic.BasicService):
         driver: driver_base.AbstractCapabilityDriver,
         payload: models.Payload,
         collected_payload: models.Payload,
-    ) -> list[models.Resource]:
+    ) -> set[str]:
+        """Apply all capabilities of a single driver.
+
+        Iterates over the driver capabilities, actualizes the target
+        resources in the data plane and collects the results into
+        ``collected_payload``. Returns the list of successfully processed
+        capabilities in order.
+
+        If the driver declares its capabilities as dependent (see
+        :meth:`AbstractCapabilityDriver.dependent_capabilities`), a failure
+        in one capability aborts the iteration and an empty list is
+        returned.
+        """
+        collected_capabilities = set()
+
         try:
             # Perform some preparations for the driver
             driver.start()
@@ -130,24 +144,38 @@ class UniversalAgentService(looper_basic.BasicService):
                     LOG.debug("Skipping capability %s", capability)
                     continue
 
-                self._capability_iteration(
-                    driver, capability, payload, collected_payload
-                )
+                target_resources = payload.caps_resources(capability)
+
+                try:
+                    collected_resources = self._capability_iteration(
+                        driver, capability, target_resources
+                    )
+                    collected_payload.add_caps_resources(collected_resources)
+
+                    # All gathered resources for capabilities are considered
+                    # as facts too
+                    collected_payload.add_facts_resources(collected_resources)
+                    collected_capabilities.add(capability)
+                except Exception:
+                    LOG.exception("Error actualizing resources for %s", capability)
+                    # If the capabilities depend on each other, a failure in
+                    # one capability invalidates the whole driver iteration.
+                    if driver.dependent_capabilities():
+                        return set()
         except Exception:
             LOG.exception("Error actualizing driver %s", driver.__class__.__name__)
         finally:
             # Finalize the driver
             driver.finalize()
 
+        return collected_capabilities
+
     def _capability_iteration(
         self,
         driver: driver_base.AbstractCapabilityDriver,
         capability: str,
-        payload: models.Payload,
-        collected_payload: models.Payload,
-    ) -> None:
-        target_resources = payload.caps_resources(capability)
-
+        target_resources: list[models.Resource],
+    ) -> list[models.Resource]:
         try:
             # Perform some preparations for the capability
             driver.start_capability(capability)
@@ -155,13 +183,7 @@ class UniversalAgentService(looper_basic.BasicService):
             collected_resources = self._actualize_capability(
                 driver, capability, target_resources
             )
-            collected_payload.add_caps_resources(collected_resources)
-
-            # All gathered resources for capabilities are considered
-            # as facts too
-            collected_payload.add_facts_resources(collected_resources)
-        except Exception:
-            LOG.exception("Error actualizing resources for %s", capability)
+            return collected_resources
         finally:
             # Finalize the capability
             driver.finalize_capability(capability)
@@ -284,24 +306,38 @@ class UniversalAgentService(looper_basic.BasicService):
             except Exception:
                 LOG.exception("Error updating resource %s", uuid)
 
-    def _actualize_facts(self, target_facts: dict, actual_facts: dict) -> None:
+    def _actualize_facts(
+        self,
+        target_facts: dict,
+        actual_facts: dict,
+        processed_capabilities: set[str],
+    ) -> None:
         """Actualize facts in Status API.
 
         target_facts - The facts collected from the data plane.
         actual_facts - The facts collected from the Status API.
+        processed_capabilities - The set of capabilities that were
+            successfully processed during this iteration. Only facts
+            present in this set are actualized; the rest are skipped.
         """
         # New fact category
         for fact in target_facts.keys() - actual_facts.keys():
+            if fact not in processed_capabilities:
+                continue
             resources = target_facts[fact]["resources"]
             self._actualize_resource_facts(resources, [])
 
         # Deleted fact category
         for fact in actual_facts.keys() - target_facts.keys():
+            if fact not in processed_capabilities:
+                continue
             resources = actual_facts[fact]["resources"]
             self._actualize_resource_facts([], resources)
 
         # Actualize resource facts in the existing fact category
         for fact in target_facts.keys() & actual_facts.keys():
+            if fact not in processed_capabilities:
+                continue
             target_resources = target_facts[fact]["resources"]
             actual_resources = actual_facts[fact]["resources"]
             self._actualize_resource_facts(target_resources, actual_resources)
@@ -315,6 +351,7 @@ class UniversalAgentService(looper_basic.BasicService):
         # At the end of the iteration the payload hash is calculated
         # and it is saved
         collected_payload = models.Payload.empty()
+        collected_payload_all_caps = True
 
         # Last successfully saved payload. Use it to compare with CP payload.
         if self._payload_path:
@@ -335,10 +372,18 @@ class UniversalAgentService(looper_basic.BasicService):
         # TODO(akremenetsky): Implement actions
 
         # Capabilities
+        processed_capabilities = set()
         for driver in self._caps_drivers:
-            self._cap_driver_iteration(driver, payload, collected_payload)
+            try:
+                caps = self._cap_driver_iteration(driver, payload, collected_payload)
+                processed_capabilities.update(caps)
 
-        # TODO(akremenetsky): Implement facts iterations like capabilities iteration
+                if caps != set(driver.get_capabilities()):
+                    collected_payload_all_caps = False
+            except Exception:
+                LOG.exception("Error actualizing driver %s", driver.__class__.__name__)
+                collected_payload_all_caps = False
+
         # Facts
         for driver in self._facts_drivers:
             for fact in driver.get_facts():
@@ -352,6 +397,9 @@ class UniversalAgentService(looper_basic.BasicService):
                     collected_payload.add_facts_resources(collected_facts)
                 except Exception:
                     LOG.exception("Error collecting resources for fact: %s", fact)
+                    collected_payload_all_caps = False
+                else:
+                    processed_capabilities.add(fact)
 
         # All work done. The target resources are applied and facts collected.
         # Calculate the hash of the collected payload
@@ -359,11 +407,13 @@ class UniversalAgentService(looper_basic.BasicService):
 
         # The payloads aren't the same. It means the facts were updated.
         if collected_payload != payload:
-            self._actualize_facts(collected_payload.facts, payload.facts)
+            self._actualize_facts(
+                collected_payload.facts, payload.facts, processed_capabilities
+            )
 
         # Save the collected payload after actualization. The hash is already
         # up to date (calculated above) and the payload isn't mutated
         # afterwards, so skip the re-hashing that ``Payload.save`` performs by
         # default to avoid doubling the per-iteration hashing cost.
-        if self._payload_path:
+        if collected_payload_all_caps and self._payload_path:
             collected_payload.save(self._payload_path, recalculate_hash=False)
