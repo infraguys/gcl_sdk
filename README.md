@@ -1,54 +1,36 @@
-![Tests workflow](https://github.com/exordos/gcl_sdk/actions/workflows/tests.yaml/badge.svg)
-![PyPI - Python Version](https://img.shields.io/pypi/pyversions/gcl-sdk)
-![PyPI - Downloads](https://img.shields.io/pypi/dm/gcl-sdk)
+[![Tests](https://img.shields.io/github/actions/workflow/status/exordos/gcl_sdk/tests.yaml?branch=master&label=tests&logo=github&style=flat-square)](https://github.com/exordos/gcl_sdk/actions/workflows/tests.yaml)
+[![Publish](https://img.shields.io/github/actions/workflow/status/exordos/gcl_sdk/publish-to-pypi.yml?branch=master&label=publish&logo=github&style=flat-square)](https://github.com/exordos/gcl_sdk/actions/workflows/publish-to-pypi.yml)
+[![PyPI](https://img.shields.io/pypi/v/gcl-sdk?style=flat-square)](https://pypi.org/project/gcl-sdk/)
+[![Python](https://img.shields.io/pypi/pyversions/gcl-sdk?style=flat-square)](https://www.python.org/)
+[![Downloads](https://img.shields.io/pypi/dm/gcl-sdk?style=flat-square)](https://pypi.org/project/gcl-sdk/)
+[![uv](https://img.shields.io/badge/uv-managed-DE5FE9?logo=uv&logoColor=white&style=flat-square)](https://github.com/astral-sh/uv)
+[![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-D7FF64?logo=ruff&logoColor=black&style=flat-square)](https://github.com/astral-sh/ruff)
+[![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue?style=flat-square)](https://www.apache.org/licenses/LICENSE-2.0)
 
-Welcome to the Exordos SDK!
+# Exordos SDK
 
-The Exordos SDK is a set of tools for developing Exordos elements. Main information you can find in the [wiki](https://github.com/exordos/gcl_sdk/wiki).
+**📚 Documentation:** [exordos.github.io/gcl_sdk](https://exordos.github.io/gcl_sdk/)
 
-# 🚀 Development
+Exordos SDK is a set of tools and libraries for developing Exordos elements. It provides the building blocks needed to integrate your own services and capabilities with the [Exordos Core platform](https://github.com/exordos/exordos_core) — from event handling and auditing to universal agents, builders, and schedulers.
 
-Install required packages:
+## What Exordos SDK does
 
-Ubuntu:
+Exordos SDK hides the complexity of interacting with the platform and lets element developers focus on their domain logic.
 
-```bash
-sudo apt-get install tox libev-dev
-```
+Key components:
 
-Fedora:
+- **Universal Agent** — a ready-to-use agent runtime with a pluggable capability driver model for managing services, load balancers, SSH keys, secrets, machine pools, and more on any node.
+- **Universal Builder** — a framework for describing and building infrastructure and application topologies in a declarative way.
+- **Universal Scheduler** — a scheduling component for orchestrating element lifecycle operations.
+- **Events** — a unified API for publishing and consuming Exordos events with pluggable payload models.
+- **Audit** — built-in support for recording and exporting audit trails.
 
-```bash
-sudo dnf install python3-tox libev-devel
-```
-
-Initialize virtual environment:
-
-```bash
-tox -e develop
-source .tox/develop/bin/activate
-```
-
-# ⚙️ Tests
-
-**NOTE:** Python version 3.12 is supposed to be used, but you can use other versions
-
-Unit tests:
-
-```bash
-tox -e py312
-```
-
-Functional tests:
-
-```bash
-tox -e py312-functional
-```
+> **For a full overview of components, quick start guides, and advanced usage, visit the [documentation](https://exordos.github.io/gcl_sdk/).**
 
 # 🔗 Related projects
 
-- Exordos Core is main project of the Exordos ecosystem. You can find it [here](https://github.com/exordos/exordos_core).
-- Exordos DevTools it's a set oftools to manager life cycle of exordos projects. You can find it [here](https://github.com/exordos/exordos).
+- Exordos Core is the main project of the Exordos ecosystem. You can find it [here](https://github.com/exordos/exordos_core).
+- Exordos CLI is the official command-line interface for the Exordos Core platform. You can find it [here](https://github.com/exordos/exordos).
 
 # 💡 Contributing
 
