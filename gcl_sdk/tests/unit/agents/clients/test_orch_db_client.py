@@ -22,6 +22,33 @@ from gcl_sdk.agents.universal.clients.orch import db as orch_db
 from gcl_sdk.agents.universal.dm import models
 
 
+class TestDatabaseOrchClientAgentsCreate:
+    def test_agents_create_ignores_check_node_exists(self):
+        # The node check guards the remote registration path only. This
+        # client runs in-process with the service owning the database, and
+        # that database is not necessarily the node registry - a downstream
+        # service has no `ua_node_encryption_keys` row for its own host and
+        # never will, so honouring the flag would make registration
+        # impossible there.
+        client = orch_db.DatabaseOrchClient()
+
+        agent = models.UniversalAgent(
+            uuid=sys_uuid.uuid4(),
+            name="agent",
+            node=sys_uuid.uuid4(),
+            capabilities={"capabilities": ["pool"]},
+            facts={"facts": []},
+        )
+
+        with mock.patch.object(agent, "insert", return_value=agent) as insert:
+            result = client.agents_create(
+                agent, check_node_exists=True, session=mock.MagicMock()
+            )
+
+        insert.assert_called_once()
+        assert result is agent
+
+
 class TestDatabaseOrchClientAgentsUpdate:
     def test_agents_update_activates_the_agent(self):
         # A re-registering agent (uuid already exists) goes through this

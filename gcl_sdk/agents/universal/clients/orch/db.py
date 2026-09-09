@@ -28,7 +28,6 @@ from gcl_sdk.agents.universal import constants as c
 from gcl_sdk.agents.universal.clients.orch import base
 from gcl_sdk.agents.universal.clients.orch import exceptions
 from gcl_sdk.agents.universal.dm import models
-from gcl_sdk.agents.universal.status_api.dm import models as status_models
 
 LOG = logging.getLogger(__name__)
 
@@ -47,40 +46,32 @@ class DatabaseOrchClient(base.AbstractOrchClient):
             with contexts.Context().session_manager() as session:
                 yield session
 
-    def _verify_node_exists(
-        self, agent: models.UniversalAgent, session: tp.Any
-    ) -> None:
-        """Verify that the agent's node encryption key exists.
-
-        Args:
-            agent: The UniversalAgent to verify.
-            session: The database session.
-
-        Raises:
-            exceptions.NodeNotFound: If the node encryption key doesn't exist.
-        """
-        if agent.node is None:
-            raise exceptions.NodeNotFound(uuid=None)
-
-        try:
-            status_models.NodeVerifier.objects.get_one(
-                filters={"uuid": dm_filters.EQ(str(agent.node))},
-                session=session,
-            )
-        except ra_exc.RecordNotFound:
-            raise exceptions.NodeNotFound(uuid=agent.node)
-
     def agents_create(
         self,
         agent: models.UniversalAgent,
         check_node_exists: bool = False,
         session: tp.Any = None,
     ) -> models.UniversalAgent:
-        """Create an instance of Universal agent."""
+        """Create an instance of Universal agent.
+
+        `check_node_exists` is accepted for interface compatibility with
+        the HTTP client but is never acted on here. That check guards the
+        remote registration path: an agent on some node asks the
+        orchestrator's API to register it, and the orchestrator refuses
+        unless it already knows the node (it holds the node's encryption
+        key). This client has no such gap to guard - it is constructed
+        in-process by the service that owns the database, so registering
+        an agent is that service registering itself.
+
+        Worse, honouring the flag here checks the wrong database.
+        `ua_node_encryption_keys` lives in whichever service embeds this
+        client, and only the node registry (Exordos Core) provisions rows
+        in its own copy. A downstream service running an agent against
+        its own database has no row for the host it runs on and never
+        will, so the check could only ever fail.
+        """
         try:
             with self._session_context(session=session) as s:
-                if check_node_exists:
-                    self._verify_node_exists(agent, session=s)
                 return agent.insert(session=s)
         except ra_exc.ConflictRecords:
             raise exceptions.AgentAlreadyExists(uuid=agent.uuid)
