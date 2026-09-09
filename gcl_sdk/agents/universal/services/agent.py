@@ -80,7 +80,9 @@ class UniversalAgentService(looper_basic.BasicService):
             self._orch_client.agents_update(agent)
         except orch_exc.NodeNotFound:
             LOG.warning(
-                "Node verification failed, cannot register agent %s", agent.uuid
+                "Node %s verification failed, cannot register agent %s",
+                agent.node,
+                agent.uuid,
             )
 
     def _create_resource(
